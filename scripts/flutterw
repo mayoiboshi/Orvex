@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+set -euo pipefail
+ORVEX_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+export PUB_CACHE="${PUB_CACHE:-$ORVEX_ROOT/.tooling/pub-cache}"
+export FLUTTER_SUPPRESS_ANALYTICS=true
+export CI=true
+if [[ -n "${ORVEX_PROXY:-}" ]]; then
+  export HTTPS_PROXY="$ORVEX_PROXY" HTTP_PROXY="$ORVEX_PROXY" ALL_PROXY="$ORVEX_PROXY"
+fi
+if [[ ! -x "$ORVEX_ROOT/.tooling/flutter/bin/flutter" ]]; then
+  echo "Run ./scripts/bootstrap-flutter.sh to install the project-local Flutter SDK." >&2
+  exit 1
+fi
+exec "$ORVEX_ROOT/.tooling/flutter/bin/flutter" "$@"

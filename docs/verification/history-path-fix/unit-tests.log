@@ -1,0 +1,49 @@
+00:00 +0: loading /Users/wanzhenyu/CodexProjects/Orvex/test/bangumi_client_test.dart
+00:00 +0: /Users/wanzhenyu/CodexProjects/Orvex/test/playback_history_store_test.dart: old UUID duplicates rebase to the existing import, retaining the most recent position
+00:00 +1: /Users/wanzhenyu/CodexProjects/Orvex/test/anime_metadata_test.dart: reported four-digit Conan episode is removed without treating release years as episodes
+00:00 +2: /Users/wanzhenyu/CodexProjects/Orvex/test/anime_metadata_test.dart: reported four-digit Conan episode is removed without treating release years as episodes
+00:00 +3: /Users/wanzhenyu/CodexProjects/Orvex/test/playback_history_store_test.dart: concurrent checkpoints retain newest position and unique recency order
+00:00 +4: /Users/wanzhenyu/CodexProjects/Orvex/test/anime_metadata_test.dart: main-story evidence requires two sources, a TV series and an episodic file
+00:00 +5: /Users/wanzhenyu/CodexProjects/Orvex/test/anime_metadata_test.dart: main-story evidence requires two sources, a TV series and an episodic file
+00:00 +6: /Users/wanzhenyu/CodexProjects/Orvex/test/anime_metadata_test.dart: old automatic review cache is retried after update while manual selections survive
+00:00 +7: /Users/wanzhenyu/CodexProjects/Orvex/test/anime_metadata_test.dart: release names keep title and episode while stripping group and quality
+00:00 +8: /Users/wanzhenyu/CodexProjects/Orvex/test/anime_metadata_test.dart: exact aliases match; alternate seasons, years, ambiguity and partial names do not
+00:00 +9: /Users/wanzhenyu/CodexProjects/Orvex/test/anime_metadata_test.dart: episodes share a query and cached matches survive app container relocation
+00:00 +10: /Users/wanzhenyu/CodexProjects/Orvex/test/anime_metadata_test.dart: manual correction and ignore win over an in-flight automatic result
+00:00 +11: /Users/wanzhenyu/CodexProjects/Orvex/test/anime_metadata_test.dart: network failure stays retryable and is not retried on every tab switch
+00:00 +12: /Users/wanzhenyu/CodexProjects/Orvex/test/anime_metadata_test.dart: automatic toggle persists and does not replace a manual association
+00:00 +13: /Users/wanzhenyu/CodexProjects/Orvex/test/imported_file_store_test.dart: import survives source deletion and remains discoverable after restart
+00:00 +14: /Users/wanzhenyu/CodexProjects/Orvex/test/imported_file_store_test.dart: import survives source deletion and remains discoverable after restart
+00:00 +15: /Users/wanzhenyu/CodexProjects/Orvex/test/bangumi_client_test.dart: franchise fallback requires two independent main-story links (ambiguous=false)
+00:00 +16: /Users/wanzhenyu/CodexProjects/Orvex/test/bangumi_client_test.dart: franchise fallback requires two independent main-story links (ambiguous=false)
+00:00 +17: /Users/wanzhenyu/CodexProjects/Orvex/test/bangumi_client_test.dart: franchise fallback requires two independent main-story links (ambiguous=false)
+00:00 +18: /Users/wanzhenyu/CodexProjects/Orvex/test/imported_file_store_test.dart: failed import cleans only its own partial directory
+00:00 +19: /Users/wanzhenyu/CodexProjects/Orvex/test/imported_file_store_test.dart: failed import cleans only its own partial directory
+00:00 +20: /Users/wanzhenyu/CodexProjects/Orvex/test/bangumi_client_test.dart: public search sends anime filter, versioned agent and only the cleaned query
+00:00 +21: /Users/wanzhenyu/CodexProjects/Orvex/test/imported_file_store_test.dart: repeated subtitle import keeps one stable identity
+00:00 +22: /Users/wanzhenyu/CodexProjects/Orvex/test/imported_file_store_test.dart: repeated subtitle import keeps one stable identity
+00:00 +23: /Users/wanzhenyu/CodexProjects/Orvex/test/imported_file_store_test.dart: moving the Documents directory preserves identity and resolves an old record to the live file
+00:02 +24: /Users/wanzhenyu/CodexProjects/Orvex/test/preferences_resume_store_test.dart: migrates the most recent viewing position, then stable progress survives another container move
+00:02 +25: /Users/wanzhenyu/CodexProjects/Orvex/test/playback_session_test.dart: audio interruptions only pause and preserve the current checkpoint
+00:02 +26: /Users/wanzhenyu/CodexProjects/Orvex/test/playback_session_test.dart: audio interruptions only pause and preserve the current checkpoint
+00:02 +27: /Users/wanzhenyu/CodexProjects/Orvex/test/playback_session_test.dart: audio interruptions only pause and preserve the current checkpoint
+00:02 +28: /Users/wanzhenyu/CodexProjects/Orvex/test/widget_test.dart: four tabs fit phone and iPad layout 360.0
+00:02 +29: /Users/wanzhenyu/CodexProjects/Orvex/test/widget_test.dart: four tabs fit phone and iPad layout 360.0
+00:02 +30: /Users/wanzhenyu/CodexProjects/Orvex/test/widget_test.dart: four tabs fit phone and iPad layout 360.0
+00:02 +31: /Users/wanzhenyu/CodexProjects/Orvex/test/widget_test.dart: four tabs fit phone and iPad layout 360.0
+00:02 +32: /Users/wanzhenyu/CodexProjects/Orvex/test/widget_test.dart: four tabs fit phone and iPad layout 360.0
+00:02 +33: /Users/wanzhenyu/CodexProjects/Orvex/test/widget_test.dart: four tabs fit phone and iPad layout 360.0
+00:02 +34: /Users/wanzhenyu/CodexProjects/Orvex/test/widget_test.dart: four tabs fit phone and iPad layout 360.0
+00:02 +35: /Users/wanzhenyu/CodexProjects/Orvex/test/widget_test.dart: four tabs fit phone and iPad layout 360.0
+00:02 +36: /Users/wanzhenyu/CodexProjects/Orvex/test/widget_test.dart: four tabs fit phone and iPad layout 360.0
+00:02 +37: /Users/wanzhenyu/CodexProjects/Orvex/test/widget_test.dart: four tabs fit phone and iPad layout 360.0
+00:02 +38: /Users/wanzhenyu/CodexProjects/Orvex/test/widget_test.dart: four tabs fit phone and iPad layout 360.0
+00:02 +39: /Users/wanzhenyu/CodexProjects/Orvex/test/widget_test.dart: four tabs fit phone and iPad layout 360.0
+00:03 +40: /Users/wanzhenyu/CodexProjects/Orvex/test/widget_test.dart: four tabs fit phone and iPad layout 360.0
+00:03 +41: /Users/wanzhenyu/CodexProjects/Orvex/test/widget_test.dart: four tabs fit phone and iPad layout 430.0
+00:03 +42: /Users/wanzhenyu/CodexProjects/Orvex/test/widget_test.dart: four tabs fit phone and iPad layout 744.0
+00:03 +43: /Users/wanzhenyu/CodexProjects/Orvex/test/widget_test.dart: four tabs fit phone and iPad layout 1194.0
+00:03 +44: /Users/wanzhenyu/CodexProjects/Orvex/test/widget_test.dart: library search opens media and returning shows real persisted history
+00:04 +45: /Users/wanzhenyu/CodexProjects/Orvex/test/widget_test.dart: matched titles are searchable and the details sheet permits correction and ignore
+00:04 +46: /Users/wanzhenyu/CodexProjects/Orvex/test/widget_test.dart: time label distinguishes long videos
+00:04 +47: All tests passed!

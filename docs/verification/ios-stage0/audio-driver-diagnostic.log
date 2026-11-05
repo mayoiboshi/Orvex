@@ -1,0 +1,69 @@
+Resolving dependencies...
+Downloading packages...
+  code_assets 1.2.1 (2.1.0 available)
+  cross_file 0.3.5+5 (0.4.0 available)
+  hooks 2.0.2 (2.2.0 available)
+  material_color_utilities 0.13.0 (0.13.1 available)
+  meta 1.18.3 (1.19.0 available)
+  objective_c 9.5.0 (9.6.3 available)
+  petitparser 7.0.2 (7.1.0 available)
+  record_use 0.6.0 (1.1.1 available)
+  shared_preferences_foundation 2.5.7 (2.6.1 available)
+  test_api 0.7.12 (0.7.15 available)
+  vector_math 2.4.0 (2.4.4 available)
+  xml 7.0.1 (7.1.0 available)
+Got dependencies!
+12 packages have newer versions incompatible with dependency constraints.
+Try `flutter pub outdated` for more information.
+00:00 +0: loading /Users/wanzhenyu/CodexProjects/Orvex/integration_test/native_playback_test.dart
+The following plugins do not support Swift Package Manager for ios:
+  - media_kit_libs_ios_video
+  - media_kit_video
+This will become an error in a future version of Flutter. Please contact the plugin maintainers to request Swift Package Manager adoption.
+Running Xcode build...                                          
+Xcode build done.                                           16.7s
+00:00 +0: native local playback, tracks, subtitles, resume and cleanup
+media_kit: NativeReferenceHolder: Allocated 4387840000
+VideoOutput.Resize
+{handle: 4825976656, id: 0, rect: {width: 0.0, left: 0.0, top: 0.0, height: 0.0}}
+NativeVideoController: Texture ID: 0
+MPV demux: Trying demuxer: rawaudio (force-level: normal)
+MPV cplayer: (+) Audio --aid=1 (*) (aac 1ch 48000Hz)
+MPV cplayer: Audio --aid=2 (aac 1ch 48000Hz)
+MPV cplayer: Could not open/initialize audio device -> no sound.
+MPV cplayer: Audio: no audio
+MPV cplayer: playback restart complete @ 0.000000, audio=eof, video=playing
+VideoOutput.Resize
+{id: 0, rect: {width: 640.0, top: 0.0, left: 0.0, height: 360.0}, handle: 4825976656}
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: null
+  Actual: '播放失败：Could not open/initialize audio device -> no sound.'
+local MP4 playback advances
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure>.until (file:///Users/wanzhenyu/CodexProjects/Orvex/integration_test/native_playback_test.dart:52:7)
+<asynchronous suspension>
+#5      main.<anonymous closure> (file:///Users/wanzhenyu/CodexProjects/Orvex/integration_test/native_playback_test.dart:99:7)
+<asynchronous suspension>
+#6      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#7      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1953:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///Users/wanzhenyu/CodexProjects/Orvex/integration_test/native_playback_test.dart line 52
+The test description was:
+  native local playback, tracks, subtitles, resume and cleanup
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:02 +0 -1: native local playback, tracks, subtitles, resume and cleanup [E]
+  Test failed. See exception logs above.
+  The test description was: native local playback, tracks, subtitles, resume and cleanup
+  
+00:02 +0 -1: (tearDownAll)
+00:02 +0 -1: Some tests failed.
+
+Failing tests:
+  /Users/wanzhenyu/CodexProjects/Orvex/integration_test/native_playback_test.dart: native local playback, tracks, subtitles, resume and cleanup

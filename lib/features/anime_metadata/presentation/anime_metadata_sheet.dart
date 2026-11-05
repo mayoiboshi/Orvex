@@ -1,0 +1,375 @@
+import 'dart:io';
+
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+
+import '../../player/domain/playback_engine.dart';
+import '../application/anime_metadata_controller.dart';
+import '../domain/anime_filename.dart';
+import '../domain/anime_subject.dart';
+
+class AnimeMetadataSheet extends StatefulWidget {
+  const AnimeMetadataSheet({
+    super.key,
+    required this.media,
+    required this.metadata,
+  });
+  final LocalMedia media;
+  final AnimeMetadataController metadata;
+
+  @override
+  State<AnimeMetadataSheet> createState() => _AnimeMetadataSheetState();
+}
+
+class _AnimeMetadataSheetState extends State<AnimeMetadataSheet> {
+  late final TextEditingController _query;
+  List<AnimeSubject> _results = [];
+  bool _busy = false;
+  bool _expandedSummary = false;
+  String? _error;
+  int _generation = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _query = TextEditingController(
+      text: AnimeFilename.parse(widget.media.name).query,
+    );
+    _results = widget.metadata.matchFor(widget.media)?.candidates ?? [];
+  }
+
+  @override
+  void dispose() {
+    _generation++;
+    _query.dispose();
+    super.dispose();
+  }
+
+  Future<void> _search() async {
+    final query = _query.text.trim();
+    if (query.length < 2 || _busy) return;
+    final generation = ++_generation;
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      final results = await widget.metadata.search(query);
+      if (!mounted || generation != _generation) return;
+      setState(() {
+        _results = results;
+        if (results.isEmpty) _error = '未找到条目，试试中文名、原名或其他别名。';
+      });
+    } catch (error) {
+      if (mounted && generation == _generation) {
+        setState(() => _error = '$error');
+      }
+    } finally {
+      if (mounted && generation == _generation) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _select(AnimeSubject? subject) async {
+    if (_busy) return;
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      await widget.metadata.select(widget.media, subject);
+      if (mounted) setState(() => _results = []);
+    } catch (_) {
+      if (mounted) setState(() => _error = '关联未能保存，请重试。');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => AnimatedPadding(
+    duration: const Duration(milliseconds: 180),
+    padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
+    child: FractionallySizedBox(
+      heightFactor: 0.91,
+      child: ListenableBuilder(
+        listenable: widget.metadata,
+        builder: (context, _) {
+          final match = widget.metadata.matchFor(widget.media);
+          final subject = match?.subject;
+          return SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(24, 0, 24, 30),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Expanded(
+                      child: Text(
+                        '番剧资料',
+                        style: TextStyle(
+                          fontSize: 23,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      tooltip: '关闭番剧资料',
+                      onPressed: () => Navigator.pop(context),
+                      icon: const Icon(Icons.close_rounded),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  widget.media.name,
+                  style: const TextStyle(
+                    color: Colors.white54,
+                    fontSize: 12,
+                    height: 1.6,
+                  ),
+                ),
+                const SizedBox(height: 22),
+                if (subject != null) ...[
+                  _subject(subject),
+                  const SizedBox(height: 12),
+                  Text(
+                    match!.manual
+                        ? '已手动关联'
+                        : subject.relatedSearchNames.isNotEmpty
+                        ? '已自动匹配 · Bangumi 主线关联'
+                        : '已自动匹配',
+                    style: const TextStyle(
+                      color: Color(0xFFF4B763),
+                      fontSize: 12,
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  if (subject.summary.isNotEmpty) ...[
+                    const Text(
+                      '剧情简介',
+                      style: TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      subject.summary,
+                      maxLines: _expandedSummary ? null : 6,
+                      overflow: _expandedSummary
+                          ? TextOverflow.visible
+                          : TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        height: 1.8,
+                        fontSize: 14,
+                      ),
+                    ),
+                    if (subject.summary.length > 180)
+                      TextButton(
+                        onPressed: () => setState(
+                          () => _expandedSummary = !_expandedSummary,
+                        ),
+                        child: Text(_expandedSummary ? '收起简介' : '展开简介'),
+                      ),
+                    const SizedBox(height: 18),
+                  ],
+                  OutlinedButton.icon(
+                    onPressed: () async {
+                      await Clipboard.setData(
+                        ClipboardData(text: subject.sourceUrl),
+                      );
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('已复制 Bangumi 条目链接')),
+                        );
+                      }
+                    },
+                    icon: const Icon(Icons.link_rounded, size: 18),
+                    label: Text('Bangumi · #${subject.id} · 复制链接'),
+                  ),
+                  const SizedBox(height: 22),
+                ] else ...[
+                  Text(
+                    switch (match?.status) {
+                      AnimeMatchStatus.queued => '正在从 Bangumi 匹配资料…',
+                      AnimeMatchStatus.needsReview => '发现多个或不够确定的结果，请选择正确条目。',
+                      AnimeMatchStatus.failed =>
+                        match?.error ?? '自动匹配暂未完成，请搜索重试。',
+                      AnimeMatchStatus.ignored => '此视频已设为不关联，可在下方重新搜索。',
+                      _ => '尚未匹配到番剧，可修改片名后搜索。',
+                    },
+                    style: const TextStyle(color: Colors.white70, height: 1.7),
+                  ),
+                  const SizedBox(height: 22),
+                ],
+                const Divider(color: Colors.white12),
+                const SizedBox(height: 16),
+                Text(
+                  subject == null ? '搜索番剧' : '匹配有误？搜索更换',
+                  style: const TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _query,
+                  textInputAction: TextInputAction.search,
+                  onSubmitted: (_) => _search(),
+                  decoration: InputDecoration(
+                    hintText: '输入中文名、原名或别名',
+                    filled: true,
+                    fillColor: const Color(0xFF25272F),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none,
+                    ),
+                    suffixIcon: IconButton(
+                      tooltip: '搜索 Bangumi',
+                      onPressed: _busy ? null : _search,
+                      icon: const Icon(Icons.search_rounded),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  '仅查询片名，不上传视频、字幕或文件路径。',
+                  style: TextStyle(
+                    color: Colors.white38,
+                    fontSize: 11,
+                    height: 1.6,
+                  ),
+                ),
+                if (_busy)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 14),
+                    child: LinearProgressIndicator(minHeight: 2),
+                  ),
+                if (_error != null)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    child: Text(
+                      _error!,
+                      style: const TextStyle(color: Color(0xFFFFB8C5)),
+                    ),
+                  ),
+                for (final result in _results) ...[
+                  const SizedBox(height: 12),
+                  Material(
+                    color: const Color(0xFF22242C),
+                    borderRadius: BorderRadius.circular(12),
+                    child: ListTile(
+                      contentPadding: const EdgeInsets.all(12),
+                      leading: SizedBox(
+                        width: 42,
+                        height: 62,
+                        child: _poster(result),
+                      ),
+                      title: Text(
+                        result.title,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      subtitle: Text(
+                        '${result.date.isEmpty ? '日期未知' : result.date} · ${result.episodes > 0 ? '${result.episodes} 集' : '集数未知'}\n${result.name}',
+                        maxLines: 3,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 11,
+                          height: 1.5,
+                          color: Colors.white54,
+                        ),
+                      ),
+                      trailing: const Icon(Icons.add_link_rounded, size: 22),
+                      onTap: _busy ? null : () => _select(result),
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 22),
+                TextButton.icon(
+                  onPressed: _busy ? null : () => _select(null),
+                  icon: const Icon(Icons.link_off_rounded, size: 18),
+                  label: const Text('不关联此视频'),
+                ),
+                const SizedBox(height: 12),
+                const Text(
+                  '元数据与封面来源：Bangumi（bgm.tv）',
+                  style: TextStyle(color: Colors.white38, fontSize: 11),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    ),
+  );
+
+  Widget _subject(AnimeSubject subject) => Row(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      SizedBox(
+        width: 92,
+        height: 138,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(10),
+          child: _poster(subject),
+        ),
+      ),
+      const SizedBox(width: 18),
+      Expanded(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              subject.title,
+              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 8),
+            if (subject.name != subject.title)
+              Text(
+                subject.name,
+                style: const TextStyle(
+                  color: Colors.white54,
+                  fontSize: 12,
+                  height: 1.5,
+                ),
+              ),
+            const SizedBox(height: 10),
+            Text(
+              [
+                subject.date,
+                if (subject.episodes > 0) '${subject.episodes} 集',
+                if (subject.score > 0) '★ ${subject.score.toStringAsFixed(1)}',
+              ].where((s) => s.isNotEmpty).join(' · '),
+              style: const TextStyle(
+                color: Color(0xFFF4B763),
+                fontSize: 12,
+                height: 1.6,
+              ),
+            ),
+          ],
+        ),
+      ),
+    ],
+  );
+
+  Widget _poster(AnimeSubject subject) {
+    const fallback = ColoredBox(
+      color: Color(0xFF34323A),
+      child: Icon(Icons.movie_outlined, color: Colors.white38),
+    );
+    final path = widget.metadata.posterPath(subject.id);
+    return path == null
+        ? fallback
+        : Image.file(
+            File(path),
+            fit: BoxFit.cover,
+            errorBuilder: (_, _, _) => fallback,
+          );
+  }
+}

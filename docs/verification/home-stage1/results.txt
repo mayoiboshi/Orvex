@@ -1,0 +1,27 @@
+NOT_TESTED: simulator audio; this build has no audio driver
+video and subtitles imported to durable app documents
+local MP4 playback advances
+two distinct decoded video frames
+pause is acknowledged
+position stays still while paused
+seek to 8 seconds
+seek to 3 seconds
+seek to 6 seconds
+two audio tracks discovered
+second audio track selected
+SRT track loaded
+SRT pixels appear in decoded frame
+ASS track loaded
+ASS pixels appear in decoded frame
+reselecting the same subtitle does not duplicate tracks
+speed menu sets 1.5x
+full-screen controls rendered
+long press enters 2x
+release restores normal speed
+full-screen exit returns to the player
+reopen restores persisted position and resumes
+interruption explicitly pauses native playback
+repeated interruptions remain paused
+library shell shows persisted native playback history
+all four tabs render and remain navigable after playback
+session closed and native player released

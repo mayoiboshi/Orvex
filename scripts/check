@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ORVEX_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ORVEX_DART="$ORVEX_ROOT/.tooling/flutter/bin/dart"
+
+if [[ ! -x "$ORVEX_DART" ]]; then
+  echo "Flutter SDK is missing. Run ./scripts/bootstrap-flutter.sh first." >&2
+  exit 1
+fi
+if [[ ! -f "$ORVEX_ROOT/.dart_tool/package_config.json" ]]; then
+  echo "Dependencies are missing. Run ./scripts/flutterw pub get first." >&2
+  exit 1
+fi
+
+export PUB_CACHE="${PUB_CACHE:-$ORVEX_ROOT/.tooling/pub-cache}"
+export FLUTTER_SUPPRESS_ANALYTICS=true
+export CI=true
+
+cd "$ORVEX_ROOT"
+"$ORVEX_DART" format --output=none --set-exit-if-changed lib test integration_test test_driver
+"$ORVEX_ROOT/scripts/flutterw" analyze --no-pub
+"$ORVEX_ROOT/scripts/flutterw" test --no-pub

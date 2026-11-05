@@ -1,0 +1,124 @@
+Resolving dependencies...
+Downloading packages...
+  code_assets 1.2.1 (2.1.0 available)
+  cross_file 0.3.5+5 (0.4.0 available)
+  hooks 2.0.2 (2.2.0 available)
+  material_color_utilities 0.13.0 (0.13.1 available)
+  meta 1.18.3 (1.19.0 available)
+  objective_c 9.5.0 (9.6.3 available)
+  petitparser 7.0.2 (7.1.0 available)
+  record_use 0.6.0 (1.1.1 available)
+  shared_preferences_foundation 2.5.7 (2.6.1 available)
+  test_api 0.7.12 (0.7.15 available)
+  vector_math 2.4.0 (2.4.4 available)
+  xml 7.0.1 (7.1.0 available)
+Got dependencies!
+12 packages have newer versions incompatible with dependency constraints.
+Try `flutter pub outdated` for more information.
+00:00 +0: loading /Users/wanzhenyu/CodexProjects/Orvex/integration_test/native_playback_test.dart
+The following plugins do not support Swift Package Manager for ios:
+  - media_kit_libs_ios_video
+  - media_kit_video
+This will become an error in a future version of Flutter. Please contact the plugin maintainers to request Swift Package Manager adoption.
+Running Xcode build...                                          
+Xcode build done.                                           17.1s
+00:00 +0: simulator visuals, imports and controls (audio NOT TESTED)
+media_kit: NativeReferenceHolder: Allocated 4427059200
+VideoOutput.Resize
+{handle: 4427844176, id: 0, rect: {top: 0.0, left: 0.0, width: 0.0, height: 0.0}}
+NativeVideoController: Texture ID: 0
+MPV cplayer: Set property: sub-fonts-dir="/Users/wanzhenyu/Library/Developer/CoreSimulator/Devices/0D043D06-A86D-44E7-A32A-B72FDCC30299/data/Containers/Data/Application/202AD17E-38E8-4C7A-9CA3-275722AB9045/Library/Application Support/subtitle-fonts-v2" -> 1
+MPV cplayer: Set property: sub-font="Noto Sans CJK SC" -> 1
+MPV demux: Trying demuxer: rawaudio (force-level: normal)
+MPV cplayer: (+) Audio --aid=1 (*) (aac 1ch 48000Hz)
+MPV cplayer: Audio --aid=2 (aac 1ch 48000Hz)
+MPV ao: Trying audio driver 'null'
+MPV ao/null: requested format: 48000 Hz, mono channels, floatp
+MPV ao/null: Channel layouts:
+MPV ao/null: - anything
+MPV ao/null: result: mono
+MPV ao/null: device buffer: 9472 samples.
+MPV ao/null: using soft-buffer of 9600 samples.
+MPV cplayer: AO: Description: Null audio output
+MPV cplayer: audio ready
+MPV cplayer: delaying audio start 0.000000 vs. 0.000000, diff=0.000000
+MPV cplayer: playback restart complete @ 0.000000, audio=ready, video=playing
+MPV cplayer: starting audio playback
+MPV ao/null: starting AO
+VideoOutput.Resize
+{rect: {width: 640.0, top: 0.0, left: 0.0, height: 360.0}, handle: 4427844176, id: 0}
+MPV lavf: seeking stream 1 (audio) to packet 8.000000/8.000000
+MPV lavf: seeking stream 2 (audio) to nothing
+MPV cplayer: audio ready
+MPV cplayer: starting audio playback
+MPV cplayer: playback restart complete @ 8.000000, audio=playing, video=playing (paused)
+MPV lavf: seeking stream 1 (audio) to packet 2.986667/2.986667
+MPV lavf: seeking stream 2 (audio) to nothing
+MPV cplayer: audio ready
+MPV cplayer: starting audio playback
+MPV cplayer: playback restart complete @ 3.000000, audio=playing, video=playing (paused)
+MPV lavf: seeking stream 1 (audio) to packet 5.994667/5.994667
+MPV lavf: seeking stream 2 (audio) to nothing
+MPV cplayer: audio ready
+MPV cplayer: delaying audio start 6.000000 vs. 6.000000, diff=0.000000
+MPV cplayer: playback restart complete @ 6.000000, audio=ready, video=playing (paused)
+MPV cplayer: Audio --aid=1 (*) (aac 1ch 48000Hz)
+MPV cplayer: (+) Audio --aid=2 (aac 1ch 48000Hz)
+MPV cplayer: audio ready
+MPV cplayer: starting audio playback
+MPV cplayer: Audio --aid=1 (*) (aac 1ch 48000Hz)
+MPV cplayer: (+) Audio --aid=2 (aac 1ch 48000Hz)
+MPV demux: Trying demuxer: rawaudio (force-level: normal)
+MPV global: user path: '/Users/wanzhenyu/Library/Developer/CoreSimulator/Devices/0D043D06-A86D-44E7-A32A-B72FDCC30299/data/Containers/Data/Application/202AD17E-38E8-4C7A-9CA3-275722AB9045/Library/Application Support/subtitle-fonts-v2' -> '/Users/wanzhenyu/Library/Developer/CoreSimulator/Devices/0D043D06-A86D-44E7-A32A-B72FDCC30299/data/Containers/Data/Application/202AD17E-38E8-4C7A-9CA3-275722AB9045/Library/Application Support/subtitle-fonts-v2'
+MPV sub/ass: ASS library version: 0x1701000 (runtime 0x1701000)
+MPV sub/ass: libass API version: 0x1701000
+MPV sub/ass: libass source: tarball: 0.17.1
+MPV sub/ass: Shaper: FriBidi 1.0.13 (SIMPLE) HarfBuzz-ng 8.1.1 (COMPLEX)
+MPV sub/ass: Setting up fonts...
+MPV sub/ass: Loading font file '/Users/wanzhenyu/Library/Developer/CoreSimulator/Devices/0D043D06-A86D-44E7-A32A-B72FDCC30299/data/Containers/Data/Application/202AD17E-38E8-4C7A-9CA3-275722AB9045/Library/Application Support/subtitle-fonts-v2/NotoSansCJKsc-Regular.otf'
+MPV sub/ass: Using font provider coretext
+MPV sub/ass: Done.
+MPV cplayer: Audio --aid=1 (*) (aac 1ch 48000Hz)
+MPV cplayer: (+) Audio --aid=2 (aac 1ch 48000Hz)
+MPV sub/ass: fontselect: (Noto Sans CJK SC, 400, 0) -> NotoSansCJKsc-Regular, 0, NotoSansCJKsc-Regular
+MPV demux: Trying demuxer: rawaudio (force-level: normal)
+MPV global: user path: '/Users/wanzhenyu/Library/Developer/CoreSimulator/Devices/0D043D06-A86D-44E7-A32A-B72FDCC30299/data/Containers/Data/Application/202AD17E-38E8-4C7A-9CA3-275722AB9045/Library/Application Support/subtitle-fonts-v2' -> '/Users/wanzhenyu/Library/Developer/CoreSimulator/Devices/0D043D06-A86D-44E7-A32A-B72FDCC30299/data/Containers/Data/Application/202AD17E-38E8-4C7A-9CA3-275722AB9045/Library/Application Support/subtitle-fonts-v2'
+MPV sub/ass: ASS library version: 0x1701000 (runtime 0x1701000)
+MPV sub/ass: libass API version: 0x1701000
+MPV sub/ass: libass source: tarball: 0.17.1
+MPV sub/ass: Shaper: FriBidi 1.0.13 (SIMPLE) HarfBuzz-ng 8.1.1 (COMPLEX)
+MPV sub/ass: Setting up fonts...
+MPV sub/ass: Loading font file '/Users/wanzhenyu/Library/Developer/CoreSimulator/Devices/0D043D06-A86D-44E7-A32A-B72FDCC30299/data/Containers/Data/Application/202AD17E-38E8-4C7A-9CA3-275722AB9045/Library/Application Support/subtitle-fonts-v2/NotoSansCJKsc-Regular.otf'
+MPV sub/ass: Using font provider coretext
+MPV sub/ass: Done.
+MPV cplayer: Audio --aid=1 (*) (aac 1ch 48000Hz)
+MPV cplayer: (+) Audio --aid=2 (aac 1ch 48000Hz)
+MPV sub/ass: fontselect: (Arial, 400, 0) -> /private/var/run/com.apple.security.cryptexd/mnt/com.apple.iPhoneOS.SimulatorRuntime-v24.2.8117.0.KKN3WU/Library/Developer/CoreSimulator/Profiles/Runtimes/iOS 27.2.simruntime/Contents/Resources/RuntimeRoot/System/Library/Fonts/WebFonts/Arial.ttf, -1, ArialMT
+MPV sub/ass: Glyph 0x6837 not found, selecting one more font for (Arial, 400, 0)
+MPV sub/ass: fontselect: Using default font family: (Arial, 400, 0) -> NotoSansCJKsc-Regular, 0, NotoSansCJKsc-Regular
+MPV sub/ass: fontselect: (Arial, 400, 0) -> NotoSansCJKsc-Regular, 0, NotoSansCJKsc-Regular
+VideoOutput.Resize
+{rect: {top: 0.0, width: 0.0, left: 0.0, height: 0.0}, handle: 5024400720, id: 1}
+NativeVideoController: Texture ID: 1
+MPV cplayer: Set property: sub-fonts-dir="/Users/wanzhenyu/Library/Developer/CoreSimulator/Devices/0D043D06-A86D-44E7-A32A-B72FDCC30299/data/Containers/Data/Application/202AD17E-38E8-4C7A-9CA3-275722AB9045/Library/Application Support/subtitle-fonts-v2" -> 1
+MPV cplayer: Set property: sub-font="Noto Sans CJK SC" -> 1
+MPV demux: Trying demuxer: rawaudio (force-level: normal)
+MPV cplayer: (+) Audio --aid=1 (*) (aac 1ch 48000Hz)
+MPV cplayer: Audio --aid=2 (aac 1ch 48000Hz)
+MPV ao: Trying audio driver 'null'
+MPV ao/null: requested format: 48000 Hz, mono channels, floatp
+MPV ao/null: Channel layouts:
+MPV ao/null: - anything
+MPV ao/null: result: mono
+MPV ao/null: device buffer: 9472 samples.
+MPV ao/null: using soft-buffer of 9600 samples.
+MPV cplayer: AO: Description: Null audio output
+VideoOutput.Resize
+{rect: {top: 0.0, width: 640.0, left: 0.0, height: 360.0}, handle: 5024400720, id: 1}
+MPV cplayer: audio ready
+MPV cplayer: starting audio playback
+MPV cplayer: playback restart complete @ 6.000000, audio=playing, video=playing
+MPV ao/null: starting AO
+ORVEX_EVIDENCE=/Users/wanzhenyu/Library/Developer/CoreSimulator/Devices/0D043D06-A86D-44E7-A32A-B72FDCC30299/data/Containers/Data/Application/202AD17E-38E8-4C7A-9CA3-275722AB9045/tmp/orvex-playback-jsSaOc
+00:12 +1: (tearDownAll)
+00:12 +1: All tests passed!

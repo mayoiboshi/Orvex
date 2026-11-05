@@ -1,0 +1,11 @@
+{
+  "protectedExistingFilesChecked": 158,
+  "protectedExistingFilesChanged": [],
+  "businessCodeChanged": false,
+  "newCheckEntry": "scripts/check",
+  "format": "Passed; 32 files, 0 changes",
+  "analysis": "Passed; No issues found",
+  "tests": "Passed; 47 tests",
+  "deviceOrNativeBuildRunThisRound": false,
+  "relativeMarkdownLinksBroken": []
+}

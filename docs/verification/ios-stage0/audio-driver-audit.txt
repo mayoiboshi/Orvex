@@ -1,0 +1,13 @@
+iOS audio driver audit — 2026-11-05
+Package: media_kit_libs_ios_video 1.1.4 / upstream libmpv-darwin-build v0.6.0
+
+ios-arm64
+SHA-256: 3dad619c02fc89da9958131887d698fb6fe38280e2bb9e1d3750a04cf47c9728
+  -Daudiounit=enabled -Dcoreaudio=disabled -Dopenal=disabled -Dopensles=disabled -Dpulse=disabled -Dsdl2-audio=disabled -Dwasapi=disabled
+
+ios-arm64_x86_64-simulator
+SHA-256: e235ea602be29c7285746643ad1ba28c1a19a5cc4288261ee65c1025a050da88
+  -Daudiounit=disabled -Dcoreaudio=disabled -Dopenal=disabled -Dopensles=disabled -Dpulse=disabled -Dsdl2-audio=disabled -Dwasapi=disabled
+
+Conclusion: device slice enables AudioUnit; simulator slices disable all actual audio outputs.
+The simulator-only test explicitly uses ao=null and does not establish audible playback.

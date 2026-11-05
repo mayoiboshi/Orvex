@@ -1,0 +1,38 @@
+00:00 +0: loading /Users/wanzhenyu/CodexProjects/Orvex/test/bangumi_client_test.dart
+00:00 +0: /Users/wanzhenyu/CodexProjects/Orvex/test/anime_metadata_test.dart: release names keep title and episode while stripping group and quality
+00:00 +1: /Users/wanzhenyu/CodexProjects/Orvex/test/imported_file_store_test.dart: import survives source deletion and remains discoverable after restart
+00:00 +2: /Users/wanzhenyu/CodexProjects/Orvex/test/imported_file_store_test.dart: import survives source deletion and remains discoverable after restart
+00:00 +3: /Users/wanzhenyu/CodexProjects/Orvex/test/imported_file_store_test.dart: import survives source deletion and remains discoverable after restart
+00:00 +4: /Users/wanzhenyu/CodexProjects/Orvex/test/imported_file_store_test.dart: import survives source deletion and remains discoverable after restart
+00:00 +5: /Users/wanzhenyu/CodexProjects/Orvex/test/imported_file_store_test.dart: import survives source deletion and remains discoverable after restart
+00:00 +6: /Users/wanzhenyu/CodexProjects/Orvex/test/bangumi_client_test.dart: public search sends anime filter, versioned agent and only the cleaned query
+00:00 +7: /Users/wanzhenyu/CodexProjects/Orvex/test/bangumi_client_test.dart: public search sends anime filter, versioned agent and only the cleaned query
+00:00 +8: /Users/wanzhenyu/CodexProjects/Orvex/test/bangumi_client_test.dart: public search sends anime filter, versioned agent and only the cleaned query
+00:00 +9: /Users/wanzhenyu/CodexProjects/Orvex/test/bangumi_client_test.dart: public search sends anime filter, versioned agent and only the cleaned query
+00:00 +10: /Users/wanzhenyu/CodexProjects/Orvex/test/bangumi_client_test.dart: public search sends anime filter, versioned agent and only the cleaned query
+00:00 +11: /Users/wanzhenyu/CodexProjects/Orvex/test/bangumi_client_test.dart: public search sends anime filter, versioned agent and only the cleaned query
+00:00 +12: /Users/wanzhenyu/CodexProjects/Orvex/test/bangumi_client_test.dart: public search sends anime filter, versioned agent and only the cleaned query
+00:00 +13: /Users/wanzhenyu/CodexProjects/Orvex/test/imported_file_store_test.dart: repeated subtitle import keeps one stable identity
+00:00 +14: /Users/wanzhenyu/CodexProjects/Orvex/test/imported_file_store_test.dart: repeated subtitle import keeps one stable identity
+00:00 +15: /Users/wanzhenyu/CodexProjects/Orvex/test/anime_metadata_test.dart: cover bytes persist per subject and a restarted library needs no network
+00:00 +16: /Users/wanzhenyu/CodexProjects/Orvex/test/widget_test.dart: four tabs fit phone and iPad layout 360.0
+00:00 +17: /Users/wanzhenyu/CodexProjects/Orvex/test/widget_test.dart: four tabs fit phone and iPad layout 360.0
+00:00 +18: /Users/wanzhenyu/CodexProjects/Orvex/test/widget_test.dart: four tabs fit phone and iPad layout 360.0
+00:00 +19: /Users/wanzhenyu/CodexProjects/Orvex/test/widget_test.dart: four tabs fit phone and iPad layout 360.0
+00:00 +20: /Users/wanzhenyu/CodexProjects/Orvex/test/widget_test.dart: four tabs fit phone and iPad layout 360.0
+00:00 +21: /Users/wanzhenyu/CodexProjects/Orvex/test/widget_test.dart: four tabs fit phone and iPad layout 360.0
+00:00 +22: /Users/wanzhenyu/CodexProjects/Orvex/test/widget_test.dart: four tabs fit phone and iPad layout 360.0
+00:00 +23: /Users/wanzhenyu/CodexProjects/Orvex/test/widget_test.dart: four tabs fit phone and iPad layout 360.0
+00:00 +24: /Users/wanzhenyu/CodexProjects/Orvex/test/widget_test.dart: four tabs fit phone and iPad layout 360.0
+00:00 +25: /Users/wanzhenyu/CodexProjects/Orvex/test/widget_test.dart: four tabs fit phone and iPad layout 360.0
+00:00 +26: /Users/wanzhenyu/CodexProjects/Orvex/test/widget_test.dart: four tabs fit phone and iPad layout 360.0
+00:00 +27: /Users/wanzhenyu/CodexProjects/Orvex/test/widget_test.dart: four tabs fit phone and iPad layout 360.0
+00:00 +28: /Users/wanzhenyu/CodexProjects/Orvex/test/widget_test.dart: four tabs fit phone and iPad layout 360.0
+00:00 +29: /Users/wanzhenyu/CodexProjects/Orvex/test/playback_surface_test.dart: phone controls fit and gestures reach playback commands
+00:00 +30: /Users/wanzhenyu/CodexProjects/Orvex/test/playback_surface_test.dart: phone controls fit and gestures reach playback commands
+00:01 +31: /Users/wanzhenyu/CodexProjects/Orvex/test/playback_surface_test.dart: phone controls fit and gestures reach playback commands
+00:01 +32: /Users/wanzhenyu/CodexProjects/Orvex/test/widget_test.dart: four tabs fit phone and iPad layout 1194.0
+00:01 +33: /Users/wanzhenyu/CodexProjects/Orvex/test/widget_test.dart: library search opens media and returning shows real persisted history
+00:01 +34: /Users/wanzhenyu/CodexProjects/Orvex/test/widget_test.dart: matched titles are searchable and the details sheet permits correction and ignore
+00:01 +35: /Users/wanzhenyu/CodexProjects/Orvex/test/widget_test.dart: time label distinguishes long videos
+00:01 +36: All tests passed!

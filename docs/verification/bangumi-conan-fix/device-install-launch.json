@@ -1,0 +1,14 @@
+{
+  "configuration": "Release",
+  "bundleIdentifier": "dev.orvex.orvex",
+  "signatureVerification": "Passed",
+  "installationOutcome": "success",
+  "launchOutcome": "success",
+  "processIdentifier": 32181,
+  "matcherVersion": 2,
+  "inPlaceInstall": true,
+  "orvexTestDefines": [],
+  "physicalReportedFileRetest": "Passed (user reported, 2026-11-05): own file correctly displays Detective Conan TV series, episode 615, and cover",
+  "physicalRetestEvidence": "User replied: 已正确显示番剧名和封面",
+  "userMediaImportedOrDeletedByAgent": false
+}

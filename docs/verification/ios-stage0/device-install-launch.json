@@ -1,0 +1,19 @@
+{
+  "entrypoint": "lib/main.dart",
+  "configuration": "Release",
+  "bundleIdentifier": "dev.orvex.orvex",
+  "codeSignatureVerification": "Passed (codesign --verify --deep --strict)",
+  "profileExpirationUTC": "2026-11-12T13:57:28Z",
+  "deviceRegistered": true,
+  "installationOutcome": "success",
+  "launchOutcome": "success",
+  "processIdentifier": 31907,
+  "personalMediaPlayback": "Passed (user reported, 2026-11-05): own video import and playback, audible sound, external subtitle display and synchronization",
+  "personalMediaEvidence": "User replied: 可以，没有问题; no user media collected",
+  "physicalDeviceControlsAndResume": "Passed (user reported, 2026-11-05): pause and continue, seek, fullscreen and portrait/landscape, resume after app termination from imported list",
+  "physicalDeviceControlsEvidence": "User replied: 可以，全部正常，没有问题",
+  "iosFirstMilestone": "Passed (user reported on own media and iPhone 17 Pro Max)",
+  "physicalSystemInterruptionsAndPerformance": "Not Tested",
+  "silentSimulatorDefine": false,
+  "generatedFixtureTestRunOnDevice": false
+}

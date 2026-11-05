@@ -1,0 +1,23 @@
+{
+  "status": "matched",
+  "query": "Detective Conan",
+  "matcherVersion": 2,
+  "manual": false,
+  "subject": {
+    "id": 899,
+    "name": "名探偵コナン",
+    "name_cn": "名侦探柯南",
+    "platform": "TV",
+    "aliases": [],
+    "relatedSearchNames": [
+      "Detective Conan"
+    ],
+    "relatedSourceIds": [
+      2969,
+      489499,
+      2783
+    ]
+  },
+  "fixtureOnly": true,
+  "userVideoCopied": false
+}

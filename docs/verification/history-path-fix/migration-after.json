@@ -1,0 +1,16 @@
+{
+  "legacyBackupRows": 2,
+  "currentEpisode615Rows": 1,
+  "sameRelativeIdentity": true,
+  "currentPathDiffersFromLegacy": true,
+  "physicalRetest": "Passed (user reported, 2026-11-05): one record, playback and resume normal",
+  "physicalRetestEvidence": "User replied: 只有一条，播放和续播正常",
+  "rawMediaCopied": false,
+  "mediaFilesDeleted": false,
+  "legacySnapshotPositionMs": 32991,
+  "legacySnapshotUpdatedAt": "2026-11-05T15:24:01.088531Z",
+  "currentCheckpointPositionMs": 42793,
+  "currentCheckpointUpdatedAt": "2026-11-05T15:31:34.927725Z",
+  "newPlaybackRecordedAfterLegacySnapshot": true,
+  "exactCheckpointComparison": "Not applicable: v2 already contains a newer playback checkpoint; this is not an untouched migration snapshot. Resume correctness was confirmed by the user and covered by focused migration tests."
+}

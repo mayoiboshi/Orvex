@@ -1,0 +1,22 @@
+# Project-local SDKs and dependency caches.
+.tooling/
+.DS_Store
+.dart_tool/
+build/
+.flutter-plugins
+.flutter-plugins-dependencies
+*.iml
+.idea/
+.vscode/
+android/local.properties
+android/.gradle/
+ios/Pods/
+ios/.symlinks/
+ios/Flutter/ephemeral/
+ios/Flutter/Generated.xcconfig
+ios/Flutter/flutter_export_environment.sh
+macos/Pods/
+macos/.symlinks/
+macos/Flutter/ephemeral/
+windows/flutter/ephemeral/
+

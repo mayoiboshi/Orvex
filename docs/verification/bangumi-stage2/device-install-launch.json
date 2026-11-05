@@ -1,0 +1,15 @@
+{
+  "entrypoint": "lib/main.dart",
+  "configuration": "Release",
+  "bundleIdentifier": "dev.orvex.orvex",
+  "signatureVerification": "Passed",
+  "installationOutcome": "success",
+  "launchOutcome": "success",
+  "processIdentifier": 32145,
+  "inPlaceInstall": true,
+  "userMediaDeleted": false,
+  "testProxyDefineIncluded": false,
+  "silentSimulatorDefineIncluded": false,
+  "physicalMetadataMatching": "Not Tested; awaiting user feedback",
+  "iPadPhysicalMetadataMatching": "Not Tested"
+}

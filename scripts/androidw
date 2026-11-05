@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+set -euo pipefail
+ORVEX_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+export ANDROID_HOME="${ORVEX_ANDROID_SDK:-$ORVEX_ROOT/.tooling/android-sdk}"
+export ANDROID_SDK_ROOT="$ANDROID_HOME"
+export GRADLE_USER_HOME="$ORVEX_ROOT/.tooling/gradle-cache"
+if [[ -n "${ORVEX_JAVA_HOME:-}" ]]; then
+  export JAVA_HOME="$ORVEX_JAVA_HOME"
+elif [[ -x /opt/homebrew/opt/openjdk@17/bin/java ]]; then
+  export JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home
+fi
+if [[ ! -d "$ANDROID_HOME/platforms" ]]; then
+  echo "Android SDK is not installed at $ANDROID_HOME. See docs/platform-setup.md." >&2
+  exit 1
+fi
+if [[ -z "${JAVA_HOME:-}" || ! -x "${JAVA_HOME:-}/bin/java" ]]; then
+  echo "Set ORVEX_JAVA_HOME to a Java 17+ installation before building Android." >&2
+  exit 1
+fi
+export PATH="$ANDROID_HOME/platform-tools:$JAVA_HOME/bin:$PATH"
+exec "$ORVEX_ROOT/scripts/flutterw" "$@"

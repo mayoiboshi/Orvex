@@ -1,0 +1,28 @@
+Resolving dependencies...
+Downloading packages...
+  code_assets 1.2.1 (2.1.0 available)
+  cross_file 0.3.5+5 (0.4.0 available)
+  hooks 2.0.2 (2.2.0 available)
+  material_color_utilities 0.13.0 (0.13.1 available)
+  meta 1.18.3 (1.19.0 available)
+  objective_c 9.5.0 (9.6.3 available)
+  petitparser 7.0.2 (7.1.0 available)
+  record_use 0.6.0 (1.1.1 available)
+  shared_preferences_foundation 2.5.7 (2.6.1 available)
+  test_api 0.7.12 (0.7.15 available)
+  vector_math 2.4.0 (2.4.4 available)
+  xml 7.0.1 (7.1.0 available)
+Got dependencies!
+12 packages have newer versions incompatible with dependency constraints.
+Try `flutter pub outdated` for more information.
+00:00 +0: loading /Users/wanzhenyu/CodexProjects/Orvex/integration_test/bangumi_metadata_test.dart
+The following plugins do not support Swift Package Manager for ios:
+  - media_kit_libs_ios_video
+  - media_kit_video
+This will become an error in a future version of Flutter. Please contact the plugin maintainers to request Swift Package Manager adoption.
+Running Xcode build...                                          
+Xcode build done.                                           24.5s
+00:00 +0: live Bangumi automatic matching, artwork, details and disk cache (simulator only)
+ORVEX_BANGUMI_EVIDENCE=/Users/wanzhenyu/Library/Developer/CoreSimulator/Devices/0D043D06-A86D-44E7-A32A-B72FDCC30299/data/Containers/Data/Application/1DC6445F-2C67-4B1E-8075-3E90D9E996FF/tmp/orvex-bangumi-lv9f5s
+00:05 +1: (tearDownAll)
+00:05 +1: All tests passed!

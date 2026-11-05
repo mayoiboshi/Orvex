@@ -1,0 +1,14 @@
+{
+  "entrypoint": "lib/main.dart",
+  "configuration": "Release",
+  "bundleIdentifier": "dev.orvex.orvex",
+  "signatureVerification": "Passed",
+  "installationOutcome": "success",
+  "launchOutcome": "success",
+  "processIdentifier": 32066,
+  "installationMethod": "In-place app install; no uninstall or user media deletion",
+  "silentSimulatorDefine": false,
+  "newHomePhysicalInteraction": "Not Tested",
+  "iPadPhysicalDevice": "Not Tested",
+  "priorCorePlaybackAcceptance": "User reported Passed on own video and subtitles; see ios-stage0"
+}

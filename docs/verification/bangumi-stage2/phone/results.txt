@@ -1,0 +1,9 @@
+PASS: generated fixture imported in isolated simulator directory only
+PASS: live unauthenticated Bangumi search matched subject 400602
+PASS: release group, episode and resolution removed from query
+PASS: actual remote poster decoded in library card
+PASS: Chinese title, rating/year and episode rendered
+PASS: details show automatic match, synopsis and Bangumi attribution
+PASS: metadata restored from disk with an unreachable network proxy
+NOT TESTED: physical device metadata matching, general filename recognition accuracy
+NOT TESTED: audio or media playback in this metadata-only test

@@ -1,0 +1,11 @@
+PASS: generated fixture imported in isolated simulator directory only
+PASS: live unauthenticated Bangumi lookup matched subject 899
+PASS: reported four-digit episode matched TV main story through independent explicit Bangumi relationships
+PASS: old review cache was automatically refreshed after the matcher update
+PASS: release group, episode and resolution removed from query
+PASS: actual remote poster decoded in library card
+PASS: Chinese title, rating/year and episode rendered
+PASS: details show automatic match, synopsis and Bangumi attribution
+PASS: metadata restored from disk with an unreachable network proxy
+NOT TESTED: physical device metadata matching, general filename recognition accuracy
+NOT TESTED: audio or media playback in this metadata-only test

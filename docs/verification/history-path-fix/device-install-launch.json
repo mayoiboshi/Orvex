@@ -1,0 +1,11 @@
+{
+  "configuration": "Release",
+  "bundleIdentifier": "dev.orvex.orvex",
+  "signatureVerification": "Passed",
+  "installationOutcome": "success",
+  "launchOutcome": "success",
+  "inPlaceInstall": true,
+  "testDefines": [],
+  "deviceHistoryRowsAfter": 1,
+  "physicalRetest": "Passed (user reported): one history row, playback and resume normal"
+}

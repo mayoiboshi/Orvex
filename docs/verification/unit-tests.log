@@ -1,0 +1,22 @@
+00:00 +0: loading /Users/wanzhenyu/CodexProjects/Orvex/test/imported_file_store_test.dart
+00:00 +0: /Users/wanzhenyu/CodexProjects/Orvex/test/imported_file_store_test.dart: import survives source deletion and remains discoverable after restart
+00:00 +1: /Users/wanzhenyu/CodexProjects/Orvex/test/widget_test.dart: empty player fits 360.0 without layout exceptions
+00:00 +2: /Users/wanzhenyu/CodexProjects/Orvex/test/widget_test.dart: empty player fits 360.0 without layout exceptions
+00:00 +3: /Users/wanzhenyu/CodexProjects/Orvex/test/widget_test.dart: empty player fits 360.0 without layout exceptions
+00:00 +4: /Users/wanzhenyu/CodexProjects/Orvex/test/widget_test.dart: empty player fits 360.0 without layout exceptions
+00:00 +5: /Users/wanzhenyu/CodexProjects/Orvex/test/widget_test.dart: empty player fits 360.0 without layout exceptions
+00:00 +6: /Users/wanzhenyu/CodexProjects/Orvex/test/widget_test.dart: empty player fits 360.0 without layout exceptions
+00:00 +7: /Users/wanzhenyu/CodexProjects/Orvex/test/widget_test.dart: empty player fits 360.0 without layout exceptions
+00:00 +8: /Users/wanzhenyu/CodexProjects/Orvex/test/widget_test.dart: empty player fits 360.0 without layout exceptions
+00:00 +9: /Users/wanzhenyu/CodexProjects/Orvex/test/widget_test.dart: empty player fits 360.0 without layout exceptions
+00:00 +10: /Users/wanzhenyu/CodexProjects/Orvex/test/widget_test.dart: empty player fits 360.0 without layout exceptions
+00:00 +11: /Users/wanzhenyu/CodexProjects/Orvex/test/widget_test.dart: empty player fits 360.0 without layout exceptions
+00:00 +12: /Users/wanzhenyu/CodexProjects/Orvex/test/widget_test.dart: empty player fits 360.0 without layout exceptions
+00:00 +13: /Users/wanzhenyu/CodexProjects/Orvex/test/widget_test.dart: empty player fits 360.0 without layout exceptions
+00:00 +14: /Users/wanzhenyu/CodexProjects/Orvex/test/widget_test.dart: empty player fits 360.0 without layout exceptions
+00:00 +15: /Users/wanzhenyu/CodexProjects/Orvex/test/widget_test.dart: empty player fits 360.0 without layout exceptions
+00:00 +16: /Users/wanzhenyu/CodexProjects/Orvex/test/widget_test.dart: empty player fits 360.0 without layout exceptions
+00:00 +17: /Users/wanzhenyu/CodexProjects/Orvex/test/playback_surface_test.dart: phone controls fit and gestures reach playback commands
+00:00 +18: /Users/wanzhenyu/CodexProjects/Orvex/test/playback_surface_test.dart: phone controls fit and gestures reach playback commands
+00:00 +19: /Users/wanzhenyu/CodexProjects/Orvex/test/playback_surface_test.dart: phone controls fit and gestures reach playback commands
+00:01 +20: All tests passed!
