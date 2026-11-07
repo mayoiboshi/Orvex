@@ -168,6 +168,17 @@ void main() {
                 tester.getSize(target).width,
                 greaterThanOrEqualTo(OrvexMetrics.hitSize),
               );
+              final icon = tester.getRect(
+                find.descendant(of: target, matching: find.byType(Icon)),
+              );
+              final label = tester.getRect(
+                find.descendant(of: target, matching: find.byType(Text)),
+              );
+              expect(
+                icon.expandToInclude(label).center.dy,
+                closeTo(tester.getCenter(target).dy, 0.5),
+                reason: 'tab $i at $width $brightness scale $scale',
+              );
               await tester.tap(target);
               expect(tabs.last, i);
             }
