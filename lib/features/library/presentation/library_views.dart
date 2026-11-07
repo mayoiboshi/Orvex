@@ -583,7 +583,7 @@ class LibraryViews extends StatelessWidget {
           borderRadius: BorderRadius.circular(OrvexMetrics.coverRadius),
           child: AspectRatio(
             aspectRatio: 16 / 9,
-            child: _ResumeArtwork(
+            child: _HomeVideoArtwork(
               media: record.media,
               cache: thumbnails,
               entry: thumbnails?.library.entry(record.media),
@@ -683,6 +683,12 @@ class LibraryViews extends StatelessWidget {
                 .clamp(1, 6)
           : (available / 174).floor().clamp(2, 6);
       final width = (available - (columns - 1) * gap) / columns;
+      final durations = <String, Duration>{
+        if (home)
+          for (final record in history)
+            if (record.duration > Duration.zero)
+              record.media.resumeKey: record.duration,
+      };
       return Wrap(
         spacing: gap,
         runSpacing: home ? OrvexMetrics.section : 22,
@@ -703,11 +709,16 @@ class LibraryViews extends StatelessWidget {
                         OrvexMetrics.coverRadius,
                       ),
                       child: AspectRatio(
-                        aspectRatio: 2 / 3,
+                        aspectRatio: home ? 4 / 3 : 2 / 3,
                         child: Stack(
                           fit: StackFit.expand,
                           children: [
-                            _cover(media, poster: true),
+                            home
+                                ? _recentArtwork(
+                                    media,
+                                    durations[media.resumeKey],
+                                  )
+                                : _cover(media, poster: true),
                             Positioned(
                               top: home ? 2 : 6,
                               right: home ? 2 : 6,
@@ -757,7 +768,7 @@ class LibraryViews extends StatelessWidget {
                             1.3 *
                             2,
                         child: Text(
-                          _mediaTitle(media),
+                          _recentTitle(media),
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                           style: Theme.of(context).textTheme.titleSmall
@@ -874,6 +885,46 @@ class LibraryViews extends StatelessWidget {
     fit: fit,
     posterPath: metadata.posterPath(metadata.subjectFor(media)?.id ?? 0),
   );
+
+  AnimeSubject? _movieSubject(LocalMedia media) {
+    final match = metadata.matchFor(media);
+    if (match?.status != AnimeMatchStatus.matched) return null;
+    final subject = match?.subject;
+    return subject?.platform.trim() == '剧场版' ? subject : null;
+  }
+
+  Widget _recentArtwork(LocalMedia media, Duration? duration) {
+    final entry = thumbnails?.library.entry(media);
+    final preview = _HomeVideoArtwork(
+      media: media,
+      cache: thumbnails,
+      entry: entry,
+      fallback: MediaCover(media: media),
+      showDuration: true,
+      knownDuration: duration ?? Duration(milliseconds: entry?.duration ?? 0),
+    );
+    final movie = _movieSubject(media);
+    final poster = movie == null ? null : metadata.posterPath(movie.id);
+    if (poster == null) return preview;
+    return MediaCover(
+      media: media,
+      poster: true,
+      posterPath: poster,
+      fit: BoxFit.contain,
+      artworkRatio: 2 / 3,
+      missingArtwork: preview,
+    );
+  }
+
+  String _recentTitle(LocalMedia media) {
+    final subject = metadata.subjectFor(media);
+    if (subject == null) return mediaTitle(media.name);
+    if (_movieSubject(media) != null) return subject.title;
+    final episode =
+        thumbnails?.library.identityFor(media).episode ??
+        AnimeFilename.parse(media.name).episode;
+    return episode == null ? subject.title : '${subject.title} · 第 $episode 集';
+  }
 
   String _mediaTitle(LocalMedia media) {
     final subject = metadata.subjectFor(media);
@@ -1166,24 +1217,28 @@ String mediaTitle(String name) {
   return dot > 0 ? name.substring(0, dot) : name;
 }
 
-class _ResumeArtwork extends StatefulWidget {
-  const _ResumeArtwork({
+class _HomeVideoArtwork extends StatefulWidget {
+  const _HomeVideoArtwork({
     required this.media,
     required this.cache,
     required this.entry,
     required this.fallback,
+    this.showDuration = false,
+    this.knownDuration = Duration.zero,
   });
 
   final LocalMedia media;
   final ThumbnailCache? cache;
   final FolderEntry? entry;
   final Widget fallback;
+  final bool showDuration;
+  final Duration knownDuration;
 
   @override
-  State<_ResumeArtwork> createState() => _ResumeArtworkState();
+  State<_HomeVideoArtwork> createState() => _HomeVideoArtworkState();
 }
 
-class _ResumeArtworkState extends State<_ResumeArtwork> {
+class _HomeVideoArtworkState extends State<_HomeVideoArtwork> {
   ThumbnailRequest? _request;
   File? _preview;
 
@@ -1194,7 +1249,7 @@ class _ResumeArtworkState extends State<_ResumeArtwork> {
   }
 
   @override
-  void didUpdateWidget(_ResumeArtwork oldWidget) {
+  void didUpdateWidget(_HomeVideoArtwork oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.cache != widget.cache ||
         oldWidget.media.uri != widget.media.uri ||
@@ -1236,15 +1291,48 @@ class _ResumeArtworkState extends State<_ResumeArtwork> {
   @override
   Widget build(BuildContext context) {
     final preview = _preview;
-    if (preview == null) return widget.fallback;
-    return ColoredBox(
-      color: OrvexColors.of(context).elevated,
-      child: Image.file(
-        preview,
-        fit: BoxFit.contain,
-        cacheWidth: 480,
-        errorBuilder: (_, _, _) => widget.fallback,
-      ),
+    final artwork = preview == null
+        ? widget.fallback
+        : ColoredBox(
+            color: OrvexColors.of(context).elevated,
+            child: Image.file(
+              preview,
+              fit: BoxFit.contain,
+              cacheWidth: 480,
+              frameBuilder: (context, child, frame, _) =>
+                  frame == null ? widget.fallback : child,
+              errorBuilder: (_, _, _) => widget.fallback,
+            ),
+          );
+    final duration = widget.knownDuration > Duration.zero
+        ? widget.knownDuration
+        : Duration(milliseconds: _request?.duration ?? 0);
+    if (!widget.showDuration || duration < const Duration(seconds: 1)) {
+      return artwork;
+    }
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        artwork,
+        PositionedDirectional(
+          end: OrvexMetrics.small,
+          bottom: OrvexMetrics.small,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: OrvexColors.player.overlay,
+              borderRadius: BorderRadius.circular(OrvexMetrics.small),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+              child: Text(
+                formatTime(duration),
+                style: Theme.of(context).textTheme.labelSmall
+                    ?.copyWith(color: OrvexColors.player.text),
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -1256,11 +1344,15 @@ class MediaCover extends StatelessWidget {
     this.poster = false,
     this.fit = BoxFit.cover,
     this.posterPath,
+    this.artworkRatio,
+    this.missingArtwork,
   });
   final LocalMedia media;
   final bool poster;
   final BoxFit fit;
   final String? posterPath;
+  final double? artworkRatio;
+  final Widget? missingArtwork;
   @override
   Widget build(BuildContext context) {
     final colors = OrvexColors.of(context);
@@ -1287,15 +1379,22 @@ class MediaCover extends StatelessWidget {
       ),
     );
     final path = posterPath;
-    if (path == null) return fallback;
+    if (path == null) return missingArtwork ?? fallback;
+    final ratio = artworkRatio;
     final image = Image.file(
       File(path),
       fit: fit,
       cacheWidth: 600,
       gaplessPlayback: true,
-      errorBuilder: (_, _, _) => fallback,
-      frameBuilder: (context, child, frame, _) =>
-          frame == null ? fallback : child,
+      errorBuilder: (_, _, _) => missingArtwork ?? fallback,
+      frameBuilder: (context, child, frame, _) {
+        if (frame == null) return fallback;
+        return ratio == null
+            ? child
+            : Center(
+                child: AspectRatio(aspectRatio: ratio, child: child),
+              );
+      },
     );
     return fit == BoxFit.contain
         ? ColoredBox(color: colors.elevated, child: image)

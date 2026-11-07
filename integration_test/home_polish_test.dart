@@ -115,7 +115,24 @@ void main() {
     );
     final entries = <String, AnimeMatch>{};
     for (var i = 0; i < videos.length; i++) {
-      final subject = subjects[i < 4 ? 400602 : 899]!;
+      if (i == 7) continue; // Unmatched local file.
+      final subject = switch (i) {
+        6 => const AnimeSubject(
+          id: 101,
+          name: '电影测试样片',
+          nameCn: '电影测试样片',
+          platform: '剧场版',
+          episodes: 1,
+        ),
+        3 => const AnimeSubject(
+          id: 102,
+          name: '封面损坏测试样片',
+          nameCn: '封面损坏测试样片',
+          platform: '剧场版',
+          episodes: 1,
+        ),
+        _ => subjects[i < 4 ? 400602 : 899]!,
+      };
       entries[animeMediaKey(videos[i])] = AnimeMatch(
         query: subject.title,
         status: AnimeMatchStatus.matched,
@@ -131,6 +148,13 @@ void main() {
         await File('${cached!.path}/bangumi-cover-$id.img').readAsBytes(),
       );
     }
+    // Reuse a cached image to exercise the movie-poster slot without fetching
+    // new art. The damaged cover must fall back to the same video-frame path.
+    await metadataStore.savePoster(
+      101,
+      await File('${cached!.path}/bangumi-cover-899.img').readAsBytes(),
+    );
+    await metadataStore.savePoster(102, [1, 2, 3]);
     final metadata = AnimeMetadataController(store: metadataStore);
     await metadata.initialize();
     final history = PlaybackHistoryStore();
@@ -243,14 +267,30 @@ void main() {
       final hero = find.byKey(const ValueKey('home-resume-card'));
       final rail = find.byKey(const ValueKey('home-continue-rail'));
       final covers = find.descendant(of: rail, matching: find.byType(Image));
-      bool hasLocalThumbnail() => tester.widgetList<Image>(covers).any((image) {
+      String? imageFilePath(Image image) {
         final source = image.image;
-        return source is ResizeImage &&
-            source.imageProvider is FileImage &&
-            (source.imageProvider as FileImage).file.path.contains(
-              '/thumbnails-v1/',
-            );
-      });
+        return source is ResizeImage && source.imageProvider is FileImage
+            ? (source.imageProvider as FileImage).file.path
+            : null;
+      }
+
+      bool hasLocalThumbnail() => tester
+          .widgetList<Image>(covers)
+          .any(
+            (image) =>
+                imageFilePath(image)?.contains('/thumbnails-v1/') ?? false,
+          );
+      String? recentImage(LocalMedia media, String part) => tester
+          .widgetList<Image>(
+            find.descendant(
+              of: recentCard(media),
+              matching: find.byType(Image),
+            ),
+          )
+          .map(imageFilePath)
+          .whereType<String>()
+          .where((path) => path.contains(part))
+          .firstOrNull;
       for (final narrow in [false, true]) {
         final size = narrow ? Size(438, landscape.height) : landscape;
         tester.view.physicalSize = size * tester.view.devicePixelRatio;
@@ -294,6 +334,41 @@ void main() {
       );
       observations['navigationSize'] = [nav.width, nav.height];
       if (stage != 'before') {
+        await until(
+          () => [
+            1,
+            3,
+            4,
+            5,
+            7,
+          ].every((i) => recentImage(videos[i], '/thumbnails-v1/') != null),
+          'recent episode, local file and broken movie cover use video frames',
+        );
+        expect(recentImage(videos[6], 'bangumi-cover-101.img'), isNotNull);
+        expect(recentImage(videos[6], '/thumbnails-v1/'), isNull);
+        expect(recentImage(videos[4], 'bangumi-cover-899.img'), isNull);
+        expect(
+          recentImage(videos[4], '/thumbnails-v1/'),
+          isNot(recentImage(videos[5], '/thumbnails-v1/')),
+        );
+        final artwork = find.descendant(
+          of: recentCard(videos[6]),
+          matching: find.byType(AspectRatio),
+        );
+        expect(
+          tester
+              .widgetList<AspectRatio>(artwork)
+              .map((view) => view.aspectRatio),
+          containsAll([4 / 3, 2 / 3]),
+        );
+        expect(
+          find.descendant(
+            of: recentCard(videos[4]),
+            matching: find.text('00:18'),
+          ),
+          findsOneWidget,
+        );
+        observations['recentMixedArtwork'] = true;
         final card = tester.getSize(hero);
         expect(covers, findsWidgets);
         expect(
