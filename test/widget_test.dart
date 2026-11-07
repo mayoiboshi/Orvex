@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -23,8 +25,13 @@ import 'support/fake_metadata.dart';
 
 class TestImports extends ImportedFileStore {
   List<LocalMedia> videos = [];
+  final pendingResolutions = <String, Future<LocalMedia>>{};
   @override
   Future<List<LocalMedia>> listVideos() async => videos;
+
+  @override
+  Future<LocalMedia> resolve(LocalMedia media) =>
+      pendingResolutions[media.resumeKey] ?? super.resolve(media);
 }
 
 void main() {
@@ -326,6 +333,37 @@ void main() {
       await tester.pumpWidget(const SizedBox.shrink());
     },
   );
+
+  testWidgets('leaving playback discards a pending episode selection', (
+    tester,
+  ) async {
+    final episodes = [
+      for (var i = 1; i <= 2; i++)
+        LocalMedia(uri: Uri.file('/test/$i.mp4'), name: '返回验证 - $i.mp4'),
+    ];
+    imports.videos = episodes;
+    await mount(tester, const Size(390, 844));
+    await session.open(episodes.first, queue: episodes);
+    await tester.pumpAndSettle();
+    final resolved = Completer<LocalMedia>();
+    imports.pendingResolutions[episodes.last.resumeKey] = resolved.future;
+    final row = find.byKey(ValueKey(episodes.last.resumeKey));
+    await tester.ensureVisible(row);
+    await tester.pumpAndSettle();
+    await tester.tap(row);
+    await tester.pumpAndSettle();
+    final back = find.byTooltip('返回首页');
+    await tester.ensureVisible(back);
+    await tester.pumpAndSettle();
+    await tester.tap(back);
+    await tester.pumpAndSettle();
+    resolved.complete(episodes.last);
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(find.byType(PlaybackSurface), findsNothing);
+    expect(session.media?.resumeKey, episodes.first.resumeKey);
+    expect(createdEngines, 1);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
 
   testWidgets(
     'iOS interactive back cancels safely then returns one level at a time',

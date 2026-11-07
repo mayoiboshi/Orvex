@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -270,10 +271,13 @@ void main() {
   });
 
   test('cancel and failed child directory preserve unseen records and release access', () async {
-    await file('a/one.mp4');
-    await file('b/two.mp4');
+    final removed = await file('badminton/one.mp4');
+    await file('bad/nested/two.mp4');
     await library.scan(root);
     final originalIds = library.entries.map((e) => e.id).toSet();
+    final retained = library.entries.singleWhere(
+      (e) => e.path == 'bad/nested/two.mp4',
+    );
     var cancelled = false;
     void cancel() {
       if (!cancelled && library.scanning && library.foldersScanned == 1) {
@@ -288,19 +292,51 @@ void main() {
     expect(library.entries.map((e) => e.id).toSet(), containsAll(originalIds));
     expect(library.entries.every((e) => e.available), isTrue);
     expect(root.issue, contains('取消'));
-    access.failPath = 'b';
+    await removed.delete();
+    access.failPath = 'bad';
     await library.scan(root);
     expect(
-      library.entries.singleWhere((e) => e.path == 'b/two.mp4').available,
-      isFalse,
+      library.children(root.id, 'bad/nested', directories: false).single.id,
+      retained.id,
     );
     expect(
-      library.entries.singleWhere((e) => e.path == 'a/one.mp4').available,
-      isTrue,
+      library.entries
+          .singleWhere((e) => e.path == 'badminton/one.mp4')
+          .available,
+      isFalse,
     );
     expect(root.issue, contains('无法访问'));
     expect(access.releases, 3);
+    final prepared = await library.prepare(retained.media);
+    expect(prepared.media.resumeKey, retained.media.resumeKey);
+    await prepared.release();
   });
+
+  test(
+    'a malformed index falls back to its backup without replacing it',
+    () async {
+      await file('one.mp4');
+      await library.scan(root);
+      await library.save();
+      final primary = File('${store.path}/folder-library-v1.json');
+      final backup = File('${primary.path}.backup');
+      final valid = await backup.readAsString();
+      final malformed = jsonDecode(valid) as Map<String, dynamic>;
+      malformed['entries'] = <String, dynamic>{};
+      await primary.writeAsString(jsonEncode(malformed));
+
+      final restored = FolderLibrary(
+        access: access,
+        directory: () async => store,
+      );
+      addTearDown(restored.dispose);
+      await restored.initialize();
+      expect(restored.roots.single.id, root.id);
+      expect(restored.entries.single.id, library.entries.single.id);
+      await restored.save();
+      expect(await backup.readAsString(), valid);
+    },
+  );
 
   test('lost root retains index, bad traversal is refused and missing video has recovery error', () async {
     await file('one.mp4');

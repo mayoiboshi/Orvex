@@ -26,6 +26,7 @@ class FolderLibrary extends ChangeNotifier {
   String? scanningRoot, error;
   int discovered = 0, foldersScanned = 0, _scanGeneration = 0;
   Future<void> _writes = Future.value();
+  bool _canBackupPrimary = false;
   final _childrenCache = <String, List<FolderEntry>>{};
   int revision = 0;
   Map<String, FolderEntry>? _entryIndex;
@@ -46,30 +47,41 @@ class FolderLibrary extends ChangeNotifier {
   Future<void> initialize() async {
     try {
       final file = await _file();
-      Map<String, dynamic>? data;
       for (final candidate in [file, File('${file.path}.backup')]) {
-        if (!await candidate.exists()) continue;
         try {
-          data = await compute(_decodeIndex, await candidate.readAsString());
+          if (!await candidate.exists()) continue;
+          final data = await compute(
+            _decodeIndex,
+            await candidate.readAsString(),
+          );
+          final loadedRoots = (data['roots'] as List)
+              .map(
+                (j) => FolderRoot.fromJson(Map<String, dynamic>.from(j as Map)),
+              )
+              .toList();
+          final loadedEntries = <FolderEntry>[];
+          var skippedEntries = false;
+          for (final j in data['entries'] as List) {
+            try {
+              loadedEntries.add(
+                FolderEntry.fromJson(Map<String, dynamic>.from(j as Map)),
+              );
+            } catch (_) {
+              skippedEntries = true;
+            }
+          }
+          roots.addAll(loadedRoots);
+          entries.addAll(loadedEntries);
+          final fromPrimary = identical(candidate, file);
+          _canBackupPrimary = fromPrimary && !skippedEntries;
+          if (skippedEntries) {
+            error = '部分目录记录无效，重新扫描可修复';
+          } else if (!fromPrimary) {
+            error = '目录索引已从备份恢复';
+          }
           break;
         } catch (_) {
-          error = '目录索引损坏，尝试恢复备份';
-        }
-      }
-      if (data != null) {
-        roots.addAll(
-          (data['roots'] as List).map(
-            (j) => FolderRoot.fromJson(Map<String, dynamic>.from(j as Map)),
-          ),
-        );
-        for (final j in data['entries'] as List) {
-          try {
-            entries.add(
-              FolderEntry.fromJson(Map<String, dynamic>.from(j as Map)),
-            );
-          } catch (_) {
-            error = '部分目录记录无效，重新扫描可修复';
-          }
+          error = '目录索引损坏，未找到可用索引';
         }
       }
     } catch (e) {
@@ -90,8 +102,11 @@ class FolderLibrary extends ChangeNotifier {
       await file.parent.create(recursive: true);
       final temporary = File('${file.path}.part');
       await temporary.writeAsString(snapshot, flush: true);
-      if (await file.exists()) await file.copy('${file.path}.backup');
+      if (_canBackupPrimary && await file.exists()) {
+        await file.copy('${file.path}.backup');
+      }
       await temporary.rename(file.path);
+      _canBackupPrimary = true;
     });
     _writes = result.catchError((Object e) {
       error = '目录索引保存失败：$e';
@@ -254,7 +269,7 @@ class FolderLibrary extends ChangeNotifier {
     final visitedDirectories = <String>{
       if (root.identity != null) root.identity!,
     };
-    final seen = <FolderEntry>[], used = <String>{}, failed = <String>[];
+    final seen = <FolderEntry>[], used = <String>{}, failed = <String>{};
     var complete = false;
     FolderLease? lease;
     try {
@@ -327,7 +342,9 @@ class FolderLibrary extends ChangeNotifier {
         entries.removeWhere((e) => e.rootId == root.id);
         entries.addAll(seen);
         for (final previous in old.where((e) => !used.contains(e.id))) {
-          previous.available = false;
+          if (!_hasUnreadableAncestor(previous.path, failed)) {
+            previous.available = false;
+          }
           entries.add(previous);
         }
         root.scannedAt = DateTime.now().toUtc();
@@ -349,6 +366,15 @@ class FolderLibrary extends ChangeNotifier {
       await save();
       changed();
     }
+  }
+
+  bool _hasUnreadableAncestor(String path, Set<String> failed) {
+    if (failed.isEmpty) return false;
+    while (!failed.contains(path)) {
+      if (path.isEmpty) return false;
+      path = parentPath(path);
+    }
+    return true;
   }
 
   Future<({LocalMedia media, Future<void> Function() release})> prepare(

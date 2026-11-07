@@ -187,17 +187,23 @@ class ImportedFileStore {
     final root = await directoryProvider();
     final imports = Directory('${root.path}/Imports');
     if (!await imports.exists()) return [];
-    final found = <File>[];
+    final found = <({File file, DateTime modified})>[];
     await for (final entity in imports.list(
       recursive: true,
       followLinks: false,
     )) {
-      if (entity is File && isVideoName(entity.path)) found.add(entity);
+      if (entity is! File || !isVideoName(entity.path)) continue;
+      try {
+        final stat = await entity.stat();
+        if (stat.type == FileSystemEntityType.file) {
+          found.add((file: entity, modified: stat.modified));
+        }
+      } on FileSystemException {
+        // A file can disappear or become inaccessible during enumeration.
+      }
     }
-    found.sort(
-      (a, b) => b.statSync().modified.compareTo(a.statSync().modified),
-    );
-    return [for (final file in found) _media(file, root)];
+    found.sort((a, b) => b.modified.compareTo(a.modified));
+    return [for (final entry in found) _media(entry.file, root)];
   }
 
   Future<List<LocalMedia>> listSubtitles() async {

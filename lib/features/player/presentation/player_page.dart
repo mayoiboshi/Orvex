@@ -59,8 +59,23 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
   final _watchBrowserKey = GlobalKey();
   bool _changingFullscreen = false;
   bool _foreground = true;
+  ({int revision, List<LocalMedia> imports, List<LocalMedia> videos})?
+  _catalogSnapshot;
   late PlaybackSession _session;
   late AnimeMetadataController _metadata;
+
+  List<LocalMedia> get _catalog {
+    final revision = _folders.revision;
+    final snapshot = _catalogSnapshot;
+    if (snapshot != null &&
+        snapshot.revision == revision &&
+        identical(snapshot.imports, _videos)) {
+      return snapshot.videos;
+    }
+    final videos = _folders.catalog(_videos);
+    _catalogSnapshot = (revision: revision, imports: _videos, videos: videos);
+    return videos;
+  }
 
   @override
   void initState() {
@@ -90,6 +105,7 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
             state == AppLifecycleState.hidden ||
             state == AppLifecycleState.detached)) {
       _foreground = false;
+      ++_openGeneration;
       _session.allowAutoNext = false;
       unawaited(_session.pauseForInterruption());
     } else if (state != AppLifecycleState.resumed) {
@@ -153,7 +169,7 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
     _catalogTimer?.cancel();
     _catalogTimer = Timer(const Duration(milliseconds: 300), () {
       if (!mounted) return;
-      unawaited(_metadata.scan(_folders.catalog(_videos)));
+      unawaited(_metadata.scan(_catalog));
       setState(() {});
     });
   }
@@ -212,7 +228,7 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
         _loadingLibrary = false;
         _libraryError = null;
       });
-      unawaited(_metadata.scan(_folders.catalog(_videos)));
+      unawaited(_metadata.scan(_catalog));
     } catch (_) {
       if (!mounted || generation != _loadGeneration) return;
       setState(() {
@@ -235,7 +251,7 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
       }
       return;
     }
-    if (!mounted || generation != _openGeneration) return;
+    if (!mounted || generation != _openGeneration || !_foreground) return;
     _session.allowAutoNext = _foreground;
     setState(() {
       _keepLibraryVisible = false;
@@ -251,7 +267,7 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
                 ? _videos
                 : [resolved])
           : _folders.playlist(resolved);
-      final catalog = _folders.catalog(_videos);
+      final catalog = _catalog;
       unawaited(
         _metadata.scan([
           ...catalog,
@@ -267,6 +283,7 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
 
   Future<void> _returnToLibrary() async {
     if (!_showPlayer) return;
+    ++_openGeneration;
     _session.allowAutoNext = false;
     setState(() {
       _keepLibraryVisible = true;
@@ -388,7 +405,7 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
                             ? _seriesLibrary()
                             : LibraryViews(
                                 tab: _tab,
-                                videos: _folders.catalog(_videos),
+                                videos: _catalog,
                                 history: _history,
                                 loading: _loadingLibrary,
                                 picking:
