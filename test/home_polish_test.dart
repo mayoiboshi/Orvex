@@ -51,6 +51,7 @@ void main() {
         tester.view.devicePixelRatio = 1;
         for (final brightness in Brightness.values) {
           for (final scale in [1.0, 2.0]) {
+            var selectedTab = 0;
             await tester.pumpWidget(
               MaterialApp(
                 key: ValueKey('$width-$brightness-$scale'),
@@ -64,9 +65,14 @@ void main() {
                   ),
                   child: Scaffold(
                     extendBody: true,
-                    bottomNavigationBar: LibraryTabBar(
-                      selected: 0,
-                      onSelected: tabs.add,
+                    bottomNavigationBar: StatefulBuilder(
+                      builder: (context, setState) => LibraryTabBar(
+                        selected: selectedTab,
+                        onSelected: (index) {
+                          tabs.add(index);
+                          setState(() => selectedTab = index);
+                        },
+                      ),
                     ),
                     body: LibraryViews(
                       tab: 0,
@@ -158,8 +164,18 @@ void main() {
               matching: find.byTooltip('番剧资料'),
             );
             await tester.tap(info);
+            final bar = find.byType(LibraryTabBar);
+            final homeBar = tester.getRect(bar);
             for (var i = 0; i < 4; i++) {
               final target = find.byKey(ValueKey('tab-$i'));
+              await tester.tap(target);
+              await tester.pumpAndSettle();
+              expect(tabs.last, i);
+              expect(
+                tester.getRect(bar),
+                homeBar,
+                reason: 'tab $i at $width $brightness scale $scale',
+              );
               expect(
                 tester.getSize(target).height,
                 greaterThanOrEqualTo(OrvexMetrics.hitSize),
@@ -179,8 +195,6 @@ void main() {
                 closeTo(tester.getCenter(target).dy, 0.5),
                 reason: 'tab $i at $width $brightness scale $scale',
               );
-              await tester.tap(target);
-              expect(tabs.last, i);
             }
             expect(
               tester.takeException(),

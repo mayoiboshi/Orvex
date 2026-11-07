@@ -1475,14 +1475,13 @@ class LibraryTabBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = OrvexColors.of(context);
-    final home = selected == 0;
     return SafeArea(
       top: false,
-      minimum: EdgeInsets.fromLTRB(
+      minimum: const EdgeInsets.fromLTRB(
         OrvexMetrics.gap,
-        home ? 4 : OrvexMetrics.small,
+        4,
         OrvexMetrics.gap,
-        home ? OrvexMetrics.small : OrvexMetrics.gap,
+        OrvexMetrics.small,
       ),
       child: Center(
         heightFactor: 1,
@@ -1490,161 +1489,95 @@ class LibraryTabBar extends StatelessWidget {
           constraints: const BoxConstraints(maxWidth: 500),
           child: GlassSurface(
             translucent: true,
-            subtle: home,
+            subtle: true,
             radius: OrvexMetrics.navigationRadius,
-            padding: EdgeInsets.symmetric(
-              horizontal: 4,
-              vertical: home ? 2 : 4,
-            ),
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
             child: LayoutBuilder(
               builder: (context, constraints) {
                 final horizontal =
-                    constraints.maxWidth >= (home ? 396 : 460) &&
+                    constraints.maxWidth >= 396 &&
                     MediaQuery.textScalerOf(context).scale(11) <= 16;
-                final items = Row(
-                  crossAxisAlignment: home
-                      ? CrossAxisAlignment.stretch
-                      : CrossAxisAlignment.center,
-                  children: [
-                    for (var index = 0; index < 4; index++)
-                      Expanded(
-                        child: Semantics(
-                          selected: selected == index,
-                          button: true,
-                          child: Material(
-                            color: home && selected == index
-                                ? colors.accent.withValues(alpha: 0.09)
-                                : Colors.transparent,
-                            borderRadius: home
-                                ? BorderRadius.circular(OrvexMetrics.pillRadius)
-                                : null,
-                            child: InkWell(
-                              key: ValueKey('tab-$index'),
-                              onTap: () => onSelected(index),
-                              borderRadius: BorderRadius.circular(
-                                home
-                                    ? OrvexMetrics.pillRadius
-                                    : OrvexMetrics.controlRadius,
-                              ),
-                              child: ConstrainedBox(
-                                constraints: const BoxConstraints(
-                                  minHeight: OrvexMetrics.hitSize,
-                                ),
-                                child: Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 4,
-                                    horizontal: 2,
-                                  ),
-                                  child: Align(
-                                    heightFactor: 1,
-                                    alignment: home
-                                        ? Alignment.center
-                                        : Alignment.topCenter,
-                                    child: Column(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        if (horizontal)
-                                          Row(
-                                            mainAxisAlignment:
-                                                MainAxisAlignment.center,
-                                            children: [
-                                              Icon(
-                                                selected == index
-                                                    ? _tabSelectedIcons[index]
-                                                    : _tabIcons[index],
-                                                size: OrvexMetrics.iconSize,
-                                                color: selected == index
-                                                    ? colors.accent
-                                                    : colors.secondary,
-                                              ),
-                                              const SizedBox(width: 6),
-                                              Flexible(
-                                                child: Text(
-                                                  _tabLabels[index],
-                                                  maxLines: 1,
-                                                  overflow:
-                                                      TextOverflow.ellipsis,
-                                                  style: TextStyle(
-                                                    fontSize: 12,
-                                                    height: home ? 1.2 : null,
-                                                    leadingDistribution: home
-                                                        ? TextLeadingDistribution
-                                                              .even
-                                                        : null,
-                                                    fontWeight:
-                                                        selected == index
-                                                        ? FontWeight.w600
-                                                        : FontWeight.w400,
-                                                    color: selected == index
-                                                        ? colors.accent
-                                                        : colors.secondary,
-                                                  ),
-                                                ),
-                                              ),
-                                            ],
-                                          )
-                                        else ...[
-                                          Icon(
-                                            selected == index
-                                                ? _tabSelectedIcons[index]
-                                                : _tabIcons[index],
-                                            size: OrvexMetrics.iconSize,
-                                            color: selected == index
-                                                ? colors.accent
-                                                : colors.secondary,
-                                          ),
-                                          const SizedBox(height: 3),
-                                          Text(
-                                            _tabLabels[index],
-                                            maxLines: 2,
-                                            textAlign: TextAlign.center,
-                                            overflow: TextOverflow.ellipsis,
-                                            style: TextStyle(
-                                              fontSize: 11,
-                                              height: home ? 1.2 : null,
-                                              leadingDistribution: home
-                                                  ? TextLeadingDistribution.even
-                                                  : null,
-                                              fontWeight: selected == index
-                                                  ? FontWeight.w600
-                                                  : FontWeight.w400,
-                                              color: selected == index
-                                                  ? colors.accent
-                                                  : colors.secondary,
-                                            ),
-                                          ),
-                                        ],
-                                        if (!home) ...[
-                                          const SizedBox(height: 3),
-                                          AnimatedContainer(
-                                            duration: OrvexMetrics.duration(
-                                              context,
-                                            ),
-                                            curve: OrvexMetrics.curve,
-                                            width: selected == index ? 12 : 0,
-                                            height: 2,
-                                            decoration: BoxDecoration(
-                                              color: colors.accent,
-                                              borderRadius:
-                                                  BorderRadius.circular(
-                                                    OrvexMetrics.pillRadius,
-                                                  ),
-                                            ),
-                                          ),
-                                        ],
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
+                return IntrinsicHeight(
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      for (var index = 0; index < _tabLabels.length; index++)
+                        Expanded(
+                          child: _tabItem(
+                            index,
+                            horizontal: horizontal,
+                            colors: colors,
                           ),
                         ),
-                      ),
-                  ],
+                    ],
+                  ),
                 );
-                return home ? IntrinsicHeight(child: items) : items;
               },
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _tabItem(
+    int index, {
+    required bool horizontal,
+    required OrvexColors colors,
+  }) {
+    final active = selected == index;
+    final foreground = active ? colors.accent : colors.secondary;
+    final radius = BorderRadius.circular(OrvexMetrics.pillRadius);
+    final icon = Icon(
+      active ? _tabSelectedIcons[index] : _tabIcons[index],
+      size: OrvexMetrics.iconSize,
+      color: foreground,
+    );
+    final label = Text(
+      _tabLabels[index],
+      maxLines: horizontal ? 1 : 2,
+      textAlign: TextAlign.center,
+      overflow: TextOverflow.ellipsis,
+      style: TextStyle(
+        fontSize: horizontal ? 12 : 11,
+        height: 1.2,
+        leadingDistribution: TextLeadingDistribution.even,
+        fontWeight: active ? FontWeight.w600 : FontWeight.w400,
+        color: foreground,
+      ),
+    );
+    return Semantics(
+      selected: active,
+      button: true,
+      child: Material(
+        color: active
+            ? colors.accent.withValues(alpha: 0.09)
+            : Colors.transparent,
+        borderRadius: radius,
+        child: InkWell(
+          key: ValueKey('tab-$index'),
+          onTap: () => onSelected(index),
+          borderRadius: radius,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: OrvexMetrics.hitSize),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
+              child: Align(
+                heightFactor: 1,
+                child: horizontal
+                    ? Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          icon,
+                          const SizedBox(width: 6),
+                          Flexible(child: label),
+                        ],
+                      )
+                    : Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [icon, const SizedBox(height: 3), label],
+                      ),
+              ),
             ),
           ),
         ),

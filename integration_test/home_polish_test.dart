@@ -334,14 +334,14 @@ void main() {
       tester.view.physicalSize = landscape * tester.view.devicePixelRatio;
       await appearance.setMode(ThemeMode.light);
       await scrollHome();
-      final nav = tester.getSize(
-        find
-            .descendant(
-              of: find.byType(LibraryTabBar),
-              matching: find.byType(GlassSurface),
-            )
-            .first,
-      );
+      final navSurface = find
+          .descendant(
+            of: find.byType(LibraryTabBar),
+            matching: find.byType(GlassSurface),
+          )
+          .first;
+      final homeNavRect = tester.getRect(navSurface);
+      final nav = homeNavRect.size;
       observations['navigationSize'] = [nav.width, nav.height];
       if (stage != 'before') {
         await until(
@@ -390,12 +390,14 @@ void main() {
         await tester.tap(find.byTooltip('搜索媒体库'));
         await tester.pump(const Duration(milliseconds: 450));
         expect(find.byType(TextFormField), findsWidgets);
+        expect(tester.getRect(navSurface), homeNavRect);
         await tester.tap(find.byKey(const ValueKey('tab-0')));
         await tester.pump(const Duration(milliseconds: 450));
         await scrollHome();
         await tester.tap(find.widgetWithText(TextButton, '播放记录'));
         await tester.pump(const Duration(milliseconds: 450));
         expect(find.text('最近播放'), findsOneWidget);
+        expect(tester.getRect(navSurface), homeNavRect);
         await tester.tap(find.byKey(const ValueKey('tab-0')));
         await tester.pump(const Duration(milliseconds: 450));
         await scrollHome();
@@ -422,6 +424,8 @@ void main() {
         await tester.tap(find.byKey(const ValueKey('tab-3')));
         await tester.pump(const Duration(milliseconds: 450));
         expect(find.text('显示继续观看'), findsOneWidget);
+        expect(tester.getRect(navSurface), homeNavRect);
+        observations['navigationStableAcrossTabs'] = true;
         await tester.tap(find.byKey(const ValueKey('tab-0')));
         await tester.pump(const Duration(milliseconds: 450));
         await scrollHome();
