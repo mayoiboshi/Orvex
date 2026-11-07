@@ -1,0 +1,13 @@
+Generated videos; actual Bangumi API metadata and posters; no user media
+NOT TESTED: simulator audio and physical brightness
+three generated files have actual Bangumi metadata and cached covers
+native generated video opens
+native paused checkpoint available
+native generated video opens
+native paused checkpoint available
+light: home, library, details, history and settings render without overflow; preference saved on host
+dark: home, library, details, history and settings render without overflow; preference saved on host
+continue-watching resumes native playback
+theme switches preserve the same playing native engine
+reduce-transparency removes all active backdrop filters
+system mode persists on host

@@ -1,0 +1,36 @@
+00:00 +0: loading /Users/wanzhenyu/CodexProjects/Orvex/integration_test/series_library_test.dart
+The following plugins do not support Swift Package Manager for ios:
+  - media_kit_libs_ios_video
+  - media_kit_video
+This will become an error in a future version of Flutter. Please contact the plugin maintainers to request Swift Package Manager adoption.
+Running Xcode build...                                          
+Xcode build done.                                           16.9s
+00:00 +0: native scanned episodes group, first live Bangumi candidate, poster and cross-folder queue
+media_kit: NativeReferenceHolder: Allocated 4393840640
+VideoOutput.Resize
+{rect: {left: 0.0, height: 0.0, top: 0.0, width: 0.0}, handle: 5014782032, id: 0}
+NativeVideoController: Texture ID: 0
+VideoOutput.Resize
+{id: 0, handle: 5014782032, rect: {left: 0.0, width: 480.0, height: 270.0, top: 0.0}}
+VideoOutput.Resize
+{handle: 5014782032, rect: {top: 0.0, width: 640.0, height: 360.0, left: 0.0}, id: 0}
+VideoOutput.Resize
+{handle: 5014782672, id: 1, rect: {top: 0.0, left: 0.0, width: 0.0, height: 0.0}}
+NativeVideoController: Texture ID: 1
+VideoOutput.Resize
+{rect: {height: 270.0, top: 0.0, left: 0.0, width: 480.0}, handle: 5014782672, id: 1}
+VideoOutput.Resize
+{rect: {width: 640.0, height: 360.0, top: 0.0, left: 0.0}, handle: 5014782672, id: 1}
+VideoOutput.Resize
+{rect: {left: 0.0, height: 0.0, width: 0.0, top: 0.0}, handle: 5014783952, id: 2}
+NativeVideoController: Texture ID: 2
+VideoOutput.Resize
+{id: 2, handle: 5014783952, rect: {height: 360.0, top: 0.0, left: 0.0, width: 640.0}}
+VideoOutput.Resize
+{rect: {width: 0.0, height: 0.0, left: 0.0, top: 0.0}, id: 3, handle: 5014784592}
+NativeVideoController: Texture ID: 3
+VideoOutput.Resize
+{rect: {width: 640.0, top: 0.0, height: 360.0, left: 0.0}, id: 3, handle: 5014784592}
+ORVEX_SERIES_EVIDENCE=/Users/wanzhenyu/Library/Developer/CoreSimulator/Devices/139B061B-ED02-4594-A56A-1AAC3A7AF574/data/Containers/Data/Application/4EB65295-4A55-4DDD-AF7F-CCBA9E11E4FA/Documents/OrvexSeriesEvidence/run-q4zkix
+00:09 +1: (tearDownAll)
+00:09 +1: All tests passed!

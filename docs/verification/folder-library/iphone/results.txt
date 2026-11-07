@@ -1,0 +1,12 @@
+Actual generated MP4 fixture files in a real nested folder; .mkv names still contain MP4, NOT genuine MKV coverage.
+Native Apple bookmarks restored across adapter and Flutter app launches. App-owned root: external Files/iCloud/provider grant UI NOT TESTED.
+Simulator silent mode: audio and physical brightness NOT TESTED.
+Apple preview rejects .mkv fixture names; themed placeholder used independently of playback
+Real Apple AVAssetImageGenerator preview and duration persisted to bounded disk cache
+directory item starts actual media_kit playback
+seek updates native frame
+native playback running
+Scrolling, directory browsing, theme changes and fullscreen preserve one native engine and progress
+return to portrait after fullscreen without replacing engine
+next episode opens same real folder queue
+History retains stable folder/file IDs and reconstructs the containing two-item playlist

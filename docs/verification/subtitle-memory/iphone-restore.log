@@ -1,0 +1,22 @@
+00:00 +0: loading /Users/wanzhenyu/CodexProjects/Orvex/integration_test/subtitle_memory_test.dart
+The following plugins do not support Swift Package Manager for ios:
+  - media_kit_libs_ios_video
+  - media_kit_video
+This will become an error in a future version of Flutter. Please contact the plugin maintainers to request Swift Package Manager adoption.
+Running Xcode build...                                          
+Xcode build done.                                           17.6s
+00:00 +0: native local subtitle memory and matching: restore
+media_kit: NativeReferenceHolder: Allocated 4741644288
+VideoOutput.Resize
+{rect: {height: 0.0, top: 0.0, left: 0.0, width: 0.0}, handle: 4741318608, id: 0}
+NativeVideoController: Texture ID: 0
+VideoOutput.Resize
+{rect: {width: 640.0, top: 0.0, left: 0.0, height: 360.0}, handle: 4741318608, id: 0}
+VideoOutput.Resize
+{id: 1, handle: 4741335632, rect: {width: 0.0, top: 0.0, left: 0.0, height: 0.0}}
+NativeVideoController: Texture ID: 1
+VideoOutput.Resize
+{handle: 4741335632, rect: {width: 640.0, height: 360.0, top: 0.0, left: 0.0}, id: 1}
+ORVEX_SUBTITLE_EVIDENCE=/Users/wanzhenyu/Library/Developer/CoreSimulator/Devices/0D043D06-A86D-44E7-A32A-B72FDCC30299/data/Containers/Data/Application/834B758F-B5AE-4873-AC3A-ED0523B225E0/Documents/OrvexSubtitleEvidence/run-htnMQ5
+00:03 +1: (tearDownAll)
+00:04 +1: All tests passed!

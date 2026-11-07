@@ -1,0 +1,5 @@
+Actual native bookmark + seven generated fixture files; five numbered episodes group across range folders, two movies stay independent.
+Real Bangumi API candidate first ID: 899; five members use that result with one search.
+Actual cached poster, light/dark overview, episode list, native playback and next-episode across the grouped context.
+Original folder browsing retained; return restores selected series.
+Simulator playback audio is not a physical sound acceptance test.

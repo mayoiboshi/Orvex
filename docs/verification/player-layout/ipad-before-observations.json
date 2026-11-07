@@ -1,0 +1,42 @@
+{
+  "portrait-light": {
+    "window": [
+      834.0,
+      1210.0
+    ],
+    "safeInsets": [
+      0.0,
+      32.0,
+      0.0,
+      20.0
+    ],
+    "videoRect": [
+      12.0,
+      117.0,
+      810.0,
+      455.625
+    ],
+    "engineCount": 1,
+    "positionMs": 4125
+  },
+  "portrait-dark": {
+    "window": [
+      834.0,
+      1210.0
+    ],
+    "safeInsets": [
+      0.0,
+      32.0,
+      0.0,
+      20.0
+    ],
+    "videoRect": [
+      12.0,
+      117.0,
+      810.0,
+      455.625
+    ],
+    "engineCount": 1,
+    "positionMs": 4125
+  }
+}

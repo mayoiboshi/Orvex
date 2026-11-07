@@ -1,0 +1,22 @@
+00:00 +0: loading /Users/wanzhenyu/CodexProjects/Orvex/integration_test/folder_library_test.dart
+The following plugins do not support Swift Package Manager for ios:
+  - media_kit_libs_ios_video
+  - media_kit_video
+This will become an error in a future version of Flutter. Please contact the plugin maintainers to request Swift Package Manager adoption.
+Running Xcode build...                                          
+Xcode build done.                                           24.7s
+00:00 +0: native folder bookmarks, scan, thumbnails and continuous portrait playlist
+media_kit: NativeReferenceHolder: Allocated 4393644032
+VideoOutput.Resize
+{rect: {top: 0.0, left: 0.0, height: 0.0, width: 0.0}, handle: 4949800784, id: 0}
+NativeVideoController: Texture ID: 0
+VideoOutput.Resize
+{rect: {width: 640.0, left: 0.0, height: 360.0, top: 0.0}, handle: 4949800784, id: 0}
+VideoOutput.Resize
+{id: 1, rect: {left: 0.0, height: 0.0, top: 0.0, width: 0.0}, handle: 4950038864}
+NativeVideoController: Texture ID: 1
+VideoOutput.Resize
+{id: 1, handle: 4950038864, rect: {height: 360.0, width: 640.0, left: 0.0, top: 0.0}}
+ORVEX_FOLDER_EVIDENCE=/Users/wanzhenyu/Library/Developer/CoreSimulator/Devices/139B061B-ED02-4594-A56A-1AAC3A7AF574/data/Containers/Data/Application/03350437-2D9F-4EB1-A8E6-9EE6D6EDB9AF/Documents/OrvexFolderEvidence
+00:09 +1: (tearDownAll)
+00:09 +1: All tests passed!

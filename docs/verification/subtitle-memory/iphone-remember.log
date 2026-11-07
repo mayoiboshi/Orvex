@@ -1,0 +1,28 @@
+Waiting for another flutter command to release the startup lock...
+00:00 +0: loading /Users/wanzhenyu/CodexProjects/Orvex/integration_test/subtitle_memory_test.dart
+The following plugins do not support Swift Package Manager for ios:
+  - media_kit_libs_ios_video
+  - media_kit_video
+This will become an error in a future version of Flutter. Please contact the plugin maintainers to request Swift Package Manager adoption.
+Running Xcode build...                                          
+Xcode build done.                                           26.3s
+00:00 +0: native local subtitle memory and matching: remember
+media_kit: NativeReferenceHolder: Allocated 4750004224
+VideoOutput.Resize
+{handle: 4807636816, id: 0, rect: {left: 0.0, top: 0.0, height: 0.0, width: 0.0}}
+NativeVideoController: Texture ID: 0
+VideoOutput.Resize
+{rect: {width: 640.0, left: 0.0, height: 360.0, top: 0.0}, handle: 4807636816, id: 0}
+VideoOutput.Resize
+{rect: {width: 0.0, top: 0.0, height: 0.0, left: 0.0}, handle: 4406447312, id: 1}
+NativeVideoController: Texture ID: 1
+VideoOutput.Resize
+{rect: {left: 0.0, width: 640.0, height: 360.0, top: 0.0}, handle: 4406447312, id: 1}
+VideoOutput.Resize
+{rect: {left: 0.0, top: 0.0, height: 0.0, width: 0.0}, handle: 5002700240, id: 2}
+NativeVideoController: Texture ID: 2
+VideoOutput.Resize
+{handle: 5002700240, id: 2, rect: {top: 0.0, width: 640.0, height: 360.0, left: 0.0}}
+ORVEX_SUBTITLE_EVIDENCE=/Users/wanzhenyu/Library/Developer/CoreSimulator/Devices/0D043D06-A86D-44E7-A32A-B72FDCC30299/data/Containers/Data/Application/FC391C4B-C6D2-4F11-AC5D-E1FC8BBEB512/Documents/OrvexSubtitleEvidence/run-htnMQ5
+00:07 +1: (tearDownAll)
+00:07 +1: All tests passed!

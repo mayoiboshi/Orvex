@@ -1,0 +1,57 @@
+{
+  "tabletDisplay": false,
+  "phone-light": {
+    "videoRect": [
+      0.0,
+      147.0,
+      402.0,
+      226.125
+    ],
+    "engineCount": 1,
+    "positionMs": 4083,
+    "subtitleId": "1",
+    "playing": false,
+    "sideList": false
+  },
+  "phone-dark": {
+    "videoRect": [
+      0.0,
+      147.0,
+      402.0,
+      226.125
+    ],
+    "engineCount": 1,
+    "positionMs": 4083,
+    "subtitleId": "1",
+    "playing": false,
+    "sideList": false
+  },
+  "phone-landscape": {
+    "videoRect": [
+      262.44444444444446,
+      147.0,
+      407.1111111111111,
+      229.0
+    ],
+    "engineCount": 1,
+    "positionMs": 4083,
+    "subtitleId": "1",
+    "playing": false,
+    "sideList": false
+  },
+  "fullscreen": {
+    "videoRect": [
+      0.0,
+      0.0,
+      932.0,
+      430.0
+    ],
+    "engineCount": 1,
+    "positionMs": 4083,
+    "subtitleId": "1",
+    "playing": false,
+    "sideList": false
+  },
+  "sameEngineAndSubtitleWhilePlaying": true,
+  "passed": true
+}

@@ -1,0 +1,45 @@
+00:00 +0: loading /Users/wanzhenyu/CodexProjects/Orvex/integration_test/wide_player_test.dart
+The following plugins do not support Swift Package Manager for ios:
+  - media_kit_libs_ios_video
+  - media_kit_video
+This will become an error in a future version of Flutter. Please contact the plugin maintainers to request Swift Package Manager adoption.
+Running Xcode build...                                          
+Xcode build done.                                           18.5s
+00:00 +0: wide and side playlist layouts preserve native playback
+media_kit: NativeReferenceHolder: Allocated 4775694336
+VideoOutput.Resize
+{handle: 4947563600, id: 0, rect: {width: 0.0, height: 0.0, left: 0.0, top: 0.0}}
+NativeVideoController: Texture ID: 0
+VideoOutput.Resize
+{rect: {left: 0.0, height: 0.0, width: 0.0, top: 0.0}, handle: 5013180880, id: 1}
+NativeVideoController: Texture ID: 1
+VideoOutput.Resize
+{id: 1, rect: {top: 0.0, left: 0.0, width: 480.0, height: 270.0}, handle: 5013180880}
+VideoOutput.Resize
+{handle: 5013180880, rect: {height: 360.0, top: 0.0, left: 0.0, width: 640.0}, id: 1}
+VideoOutput.Resize
+{handle: 4947563600, rect: {left: 0.0, top: 0.0, height: 360.0, width: 640.0}, id: 0}
+VideoOutput.Resize
+{handle: 5138762960, id: 2, rect: {height: 0.0, left: 0.0, width: 0.0, top: 0.0}}
+NativeVideoController: Texture ID: 2
+VideoOutput.Resize
+{handle: 5138762960, id: 2, rect: {height: 270.0, top: 0.0, left: 0.0, width: 480.0}}
+VideoOutput.Resize
+{handle: 5138762960, rect: {width: 640.0, height: 360.0, top: 0.0, left: 0.0}, id: 2}
+VideoOutput.Resize
+{rect: {top: 0.0, left: 0.0, width: 0.0, height: 0.0}, handle: 5138767440, id: 3}
+NativeVideoController: Texture ID: 3
+VideoOutput.Resize
+{id: 3, rect: {left: 0.0, width: 480.0, top: 0.0, height: 270.0}, handle: 5138767440}
+VideoOutput.Resize
+{rect: {top: 0.0, left: 0.0, width: 640.0, height: 360.0}, handle: 5138767440, id: 3}
+VideoOutput.Resize
+{handle: 5138768080, rect: {left: 0.0, top: 0.0, width: 0.0, height: 0.0}, id: 4}
+NativeVideoController: Texture ID: 4
+VideoOutput.Resize
+{rect: {width: 480.0, height: 270.0, top: 0.0, left: 0.0}, handle: 5138768080, id: 4}
+VideoOutput.Resize
+{id: 4, rect: {width: 640.0, left: 0.0, top: 0.0, height: 360.0}, handle: 5138768080}
+ORVEX_WIDE_EVIDENCE=/Users/wanzhenyu/Library/Developer/CoreSimulator/Devices/0D043D06-A86D-44E7-A32A-B72FDCC30299/data/Containers/Data/Application/4A6DC98B-B870-439C-9B29-8069772E386F/tmp/orvex-wide-nHa2Ik
+00:05 +1: (tearDownAll)
+00:05 +1: All tests passed!

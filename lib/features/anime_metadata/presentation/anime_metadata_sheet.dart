@@ -4,8 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../player/domain/playback_engine.dart';
+import '../../../design/orvex_theme.dart';
 import '../application/anime_metadata_controller.dart';
-import '../domain/anime_filename.dart';
 import '../domain/anime_subject.dart';
 
 class AnimeMetadataSheet extends StatefulWidget {
@@ -13,15 +13,18 @@ class AnimeMetadataSheet extends StatefulWidget {
     super.key,
     required this.media,
     required this.metadata,
+    this.group = const [],
   });
   final LocalMedia media;
   final AnimeMetadataController metadata;
+  final List<LocalMedia> group;
 
   @override
   State<AnimeMetadataSheet> createState() => _AnimeMetadataSheetState();
 }
 
 class _AnimeMetadataSheetState extends State<AnimeMetadataSheet> {
+  OrvexColors get _colors => OrvexColors.of(context);
   late final TextEditingController _query;
   List<AnimeSubject> _results = [];
   bool _busy = false;
@@ -33,7 +36,7 @@ class _AnimeMetadataSheetState extends State<AnimeMetadataSheet> {
   void initState() {
     super.initState();
     _query = TextEditingController(
-      text: AnimeFilename.parse(widget.media.name).query,
+      text: widget.metadata.queryFor(widget.media),
     );
     _results = widget.metadata.matchFor(widget.media)?.candidates ?? [];
   }
@@ -76,7 +79,10 @@ class _AnimeMetadataSheetState extends State<AnimeMetadataSheet> {
       _error = null;
     });
     try {
-      await widget.metadata.select(widget.media, subject);
+      await widget.metadata.selectMany(
+        widget.group.isEmpty ? [widget.media] : widget.group,
+        subject,
+      );
       if (mounted) setState(() => _results = []);
     } catch (_) {
       if (mounted) setState(() => _error = '关联未能保存，请重试。');
@@ -87,7 +93,7 @@ class _AnimeMetadataSheetState extends State<AnimeMetadataSheet> {
 
   @override
   Widget build(BuildContext context) => AnimatedPadding(
-    duration: const Duration(milliseconds: 180),
+    duration: OrvexMetrics.duration(context),
     padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
     child: FractionallySizedBox(
       heightFactor: 0.91,
@@ -122,12 +128,20 @@ class _AnimeMetadataSheetState extends State<AnimeMetadataSheet> {
                 const SizedBox(height: 6),
                 Text(
                   widget.media.name,
-                  style: const TextStyle(
-                    color: Colors.white54,
+                  style: TextStyle(
+                    color: _colors.secondary,
                     fontSize: 12,
                     height: 1.6,
                   ),
                 ),
+                if (widget.group.length > 1)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Text(
+                      '更正或取消关联将应用于同组 ${widget.group.length} 个视频',
+                      style: TextStyle(color: _colors.secondary, fontSize: 12),
+                    ),
+                  ),
                 const SizedBox(height: 22),
                 if (subject != null) ...[
                   _subject(subject),
@@ -138,10 +152,7 @@ class _AnimeMetadataSheetState extends State<AnimeMetadataSheet> {
                         : subject.relatedSearchNames.isNotEmpty
                         ? '已自动匹配 · Bangumi 主线关联'
                         : '已自动匹配',
-                    style: const TextStyle(
-                      color: Color(0xFFF4B763),
-                      fontSize: 12,
-                    ),
+                    style: TextStyle(color: _colors.accent, fontSize: 12),
                   ),
                   const SizedBox(height: 20),
                   if (subject.summary.isNotEmpty) ...[
@@ -159,8 +170,8 @@ class _AnimeMetadataSheetState extends State<AnimeMetadataSheet> {
                       overflow: _expandedSummary
                           ? TextOverflow.visible
                           : TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: Colors.white70,
+                      style: TextStyle(
+                        color: _colors.text,
                         height: 1.8,
                         fontSize: 14,
                       ),
@@ -190,20 +201,17 @@ class _AnimeMetadataSheetState extends State<AnimeMetadataSheet> {
                   ),
                   const SizedBox(height: 22),
                 ] else ...[
-                  Text(
-                    switch (match?.status) {
-                      AnimeMatchStatus.queued => '正在从 Bangumi 匹配资料…',
-                      AnimeMatchStatus.needsReview => '发现多个或不够确定的结果，请选择正确条目。',
-                      AnimeMatchStatus.failed =>
-                        match?.error ?? '自动匹配暂未完成，请搜索重试。',
-                      AnimeMatchStatus.ignored => '此视频已设为不关联，可在下方重新搜索。',
-                      _ => '尚未匹配到番剧，可修改片名后搜索。',
-                    },
-                    style: const TextStyle(color: Colors.white70, height: 1.7),
-                  ),
+                  Text(switch (match?.status) {
+                    AnimeMatchStatus.queued => '正在从 Bangumi 匹配资料…',
+                    AnimeMatchStatus.needsReview => '发现多个或不够确定的结果，请选择正确条目。',
+                    AnimeMatchStatus.failed =>
+                      match?.error ?? '自动匹配暂未完成，请搜索重试。',
+                    AnimeMatchStatus.ignored => '此视频已设为不关联，可在下方重新搜索。',
+                    _ => '尚未匹配到番剧，可修改片名后搜索。',
+                  }, style: TextStyle(color: _colors.text, height: 1.7)),
                   const SizedBox(height: 22),
                 ],
-                const Divider(color: Colors.white12),
+                Divider(color: _colors.divider),
                 const SizedBox(height: 16),
                 Text(
                   subject == null ? '搜索番剧' : '匹配有误？搜索更换',
@@ -220,9 +228,11 @@ class _AnimeMetadataSheetState extends State<AnimeMetadataSheet> {
                   decoration: InputDecoration(
                     hintText: '输入中文名、原名或别名',
                     filled: true,
-                    fillColor: const Color(0xFF25272F),
+                    fillColor: _colors.elevated,
                     border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(
+                        OrvexMetrics.controlRadius,
+                      ),
                       borderSide: BorderSide.none,
                     ),
                     suffixIcon: IconButton(
@@ -233,10 +243,10 @@ class _AnimeMetadataSheetState extends State<AnimeMetadataSheet> {
                   ),
                 ),
                 const SizedBox(height: 8),
-                const Text(
+                Text(
                   '仅查询片名，不上传视频、字幕或文件路径。',
                   style: TextStyle(
-                    color: Colors.white38,
+                    color: _colors.secondary,
                     fontSize: 11,
                     height: 1.6,
                   ),
@@ -251,14 +261,16 @@ class _AnimeMetadataSheetState extends State<AnimeMetadataSheet> {
                     padding: const EdgeInsets.symmetric(vertical: 12),
                     child: Text(
                       _error!,
-                      style: const TextStyle(color: Color(0xFFFFB8C5)),
+                      style: TextStyle(color: _colors.error),
                     ),
                   ),
                 for (final result in _results) ...[
                   const SizedBox(height: 12),
                   Material(
-                    color: const Color(0xFF22242C),
-                    borderRadius: BorderRadius.circular(12),
+                    color: _colors.surface,
+                    borderRadius: BorderRadius.circular(
+                      OrvexMetrics.controlRadius,
+                    ),
                     child: ListTile(
                       contentPadding: const EdgeInsets.all(12),
                       leading: SizedBox(
@@ -279,10 +291,10 @@ class _AnimeMetadataSheetState extends State<AnimeMetadataSheet> {
                         '${result.date.isEmpty ? '日期未知' : result.date} · ${result.episodes > 0 ? '${result.episodes} 集' : '集数未知'}\n${result.name}',
                         maxLines: 3,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 11,
                           height: 1.5,
-                          color: Colors.white54,
+                          color: _colors.secondary,
                         ),
                       ),
                       trailing: const Icon(Icons.add_link_rounded, size: 22),
@@ -294,12 +306,12 @@ class _AnimeMetadataSheetState extends State<AnimeMetadataSheet> {
                 TextButton.icon(
                   onPressed: _busy ? null : () => _select(null),
                   icon: const Icon(Icons.link_off_rounded, size: 18),
-                  label: const Text('不关联此视频'),
+                  label: Text(widget.group.length > 1 ? '不关联此剧集' : '不关联此视频'),
                 ),
                 const SizedBox(height: 12),
-                const Text(
+                Text(
                   '元数据与封面来源：Bangumi（bgm.tv）',
-                  style: TextStyle(color: Colors.white38, fontSize: 11),
+                  style: TextStyle(color: _colors.secondary, fontSize: 11),
                 ),
               ],
             ),
@@ -316,7 +328,7 @@ class _AnimeMetadataSheetState extends State<AnimeMetadataSheet> {
         width: 92,
         height: 138,
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(OrvexMetrics.smallRadius),
           child: _poster(subject),
         ),
       ),
@@ -333,8 +345,8 @@ class _AnimeMetadataSheetState extends State<AnimeMetadataSheet> {
             if (subject.name != subject.title)
               Text(
                 subject.name,
-                style: const TextStyle(
-                  color: Colors.white54,
+                style: TextStyle(
+                  color: _colors.secondary,
                   fontSize: 12,
                   height: 1.5,
                 ),
@@ -346,8 +358,8 @@ class _AnimeMetadataSheetState extends State<AnimeMetadataSheet> {
                 if (subject.episodes > 0) '${subject.episodes} 集',
                 if (subject.score > 0) '★ ${subject.score.toStringAsFixed(1)}',
               ].where((s) => s.isNotEmpty).join(' · '),
-              style: const TextStyle(
-                color: Color(0xFFF4B763),
+              style: TextStyle(
+                color: _colors.accent,
                 fontSize: 12,
                 height: 1.6,
               ),
@@ -359,9 +371,9 @@ class _AnimeMetadataSheetState extends State<AnimeMetadataSheet> {
   );
 
   Widget _poster(AnimeSubject subject) {
-    const fallback = ColoredBox(
-      color: Color(0xFF34323A),
-      child: Icon(Icons.movie_outlined, color: Colors.white38),
+    final fallback = ColoredBox(
+      color: _colors.elevated,
+      child: Icon(Icons.movie_outlined, color: _colors.secondary),
     );
     final path = widget.metadata.posterPath(subject.id);
     return path == null

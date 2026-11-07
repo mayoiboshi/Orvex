@@ -1,0 +1,110 @@
+{
+  "tabletDisplay": true,
+  "side-light": {
+    "videoRect": [
+      0.0,
+      117.0,
+      838.0,
+      471.375
+    ],
+    "engineCount": 1,
+    "positionMs": 4000,
+    "subtitleId": "1",
+    "playing": false,
+    "sideList": true
+  },
+  "wide-light": {
+    "videoRect": [
+      0.0,
+      117.0,
+      1203.5555555555557,
+      677.0000000000001
+    ],
+    "engineCount": 1,
+    "positionMs": 4000,
+    "subtitleId": "1",
+    "playing": false,
+    "sideList": false
+  },
+  "side-dark": {
+    "videoRect": [
+      0.0,
+      117.0,
+      838.0,
+      471.375
+    ],
+    "engineCount": 1,
+    "positionMs": 4000,
+    "subtitleId": "1",
+    "playing": false,
+    "sideList": true
+  },
+  "wide-dark": {
+    "videoRect": [
+      0.0,
+      117.0,
+      1203.5555555555557,
+      677.0000000000001
+    ],
+    "engineCount": 1,
+    "positionMs": 4000,
+    "subtitleId": "1",
+    "playing": false,
+    "sideList": false
+  },
+  "small-window-fallback": {
+    "videoRect": [
+      0.0,
+      117.0,
+      574.2222222222222,
+      323.0
+    ],
+    "engineCount": 1,
+    "positionMs": 4000,
+    "subtitleId": "1",
+    "playing": false,
+    "sideList": false
+  },
+  "side-restored": {
+    "videoRect": [
+      0.0,
+      117.0,
+      838.0,
+      471.375
+    ],
+    "engineCount": 1,
+    "positionMs": 4000,
+    "subtitleId": "1",
+    "playing": false,
+    "sideList": true
+  },
+  "fullscreen": {
+    "videoRect": [
+      0.0,
+      0.0,
+      1210.0,
+      834.0
+    ],
+    "engineCount": 1,
+    "positionMs": 4000,
+    "subtitleId": "1",
+    "playing": false,
+    "sideList": false
+  },
+  "sameEngineAndSubtitleWhilePlaying": true,
+  "side-selected-next": {
+    "videoRect": [
+      0.0,
+      117.0,
+      838.0,
+      471.375
+    ],
+    "engineCount": 2,
+    "positionMs": 0,
+    "subtitleId": "auto",
+    "playing": false,
+    "sideList": true
+  },
+  "sideEpisodeOpened": true,
+  "passed": true
+}

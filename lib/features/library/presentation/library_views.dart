@@ -2,16 +2,15 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 
+import '../../../design/appearance_controller.dart';
+import '../../../design/glass.dart';
+import '../../../design/orvex_theme.dart';
 import '../../player/domain/playback_engine.dart';
 import '../../anime_metadata/application/anime_metadata_controller.dart';
 import '../../anime_metadata/domain/anime_filename.dart';
 import '../../anime_metadata/domain/anime_subject.dart';
 import '../../player/presentation/playback_surface.dart';
 import '../domain/playback_record.dart';
-
-const libraryAccent = Color(0xFFF4B763);
-const _muted = Color(0xFF93959F);
-const _panel = Color(0xFF181A21);
 
 class LibraryViews extends StatelessWidget {
   const LibraryViews({
@@ -31,14 +30,13 @@ class LibraryViews extends StatelessWidget {
     required this.onShowContinue,
     required this.metadata,
     required this.onMetadata,
+    required this.appearance,
   });
 
   final int tab;
   final List<LocalMedia> videos;
   final List<PlaybackRecord> history;
-  final bool loading;
-  final bool picking;
-  final bool showContinue;
+  final bool loading, picking, showContinue;
   final String query;
   final ValueChanged<String> onQuery;
   final VoidCallback onImport;
@@ -48,6 +46,7 @@ class LibraryViews extends StatelessWidget {
   final ValueChanged<bool> onShowContinue;
   final AnimeMetadataController metadata;
   final ValueChanged<LocalMedia> onMetadata;
+  final AppearanceController appearance;
 
   List<PlaybackRecord> get continuing =>
       history.where((record) => record.canContinue).toList();
@@ -55,22 +54,23 @@ class LibraryViews extends StatelessWidget {
   @override
   Widget build(BuildContext context) => LayoutBuilder(
     builder: (context, constraints) {
-      final padding = constraints.maxWidth < 600 ? 24.0 : 44.0;
+      final inset = constraints.maxWidth < 600 ? OrvexMetrics.page : 36.0;
       return RefreshIndicator(
         onRefresh: onRefresh,
-        color: libraryAccent,
         child: SingleChildScrollView(
           key: PageStorageKey('library-tab-$tab'),
           physics: const AlwaysScrollableScrollPhysics(),
-          padding: EdgeInsets.fromLTRB(padding, 20, padding, 32),
+          padding: EdgeInsets.fromLTRB(inset, 20, inset, 120),
           child: Center(
             child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 1200),
+              constraints: BoxConstraints(maxWidth: tab == 3 ? 760 : 1160),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   _header(context),
-                  const SizedBox(height: 28),
+                  SizedBox(
+                    height: tab == 0 ? OrvexMetrics.page : OrvexMetrics.section,
+                  ),
                   if (loading) ...[
                     const LinearProgressIndicator(minHeight: 2),
                     const SizedBox(height: 20),
@@ -90,292 +90,443 @@ class LibraryViews extends StatelessWidget {
     },
   );
 
-  Widget _header(BuildContext context) => Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      const Row(
-        children: [
-          Icon(
-            Icons.play_circle_filled_rounded,
-            size: 17,
-            color: libraryAccent,
-          ),
-          SizedBox(width: 7),
-          Text(
-            'ORVEX',
-            style: TextStyle(
-              color: _muted,
-              fontSize: 11,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 3,
+  Widget _header(BuildContext context) => tab == 0
+      ? _homeHeader(context)
+      : Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const OrvexBrand(),
+            const SizedBox(height: 20),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    const ['首页', '媒体库', '播放记录', '设置'][tab],
+                    style: Theme.of(context).textTheme.headlineLarge,
+                  ),
+                ),
+                if (tab == 0) ...[
+                  GlassIconButton(
+                    icon: Icons.search_rounded,
+                    tooltip: '搜索媒体库',
+                    onPressed: () => onTab(1),
+                  ),
+                  const SizedBox(width: 8),
+                ],
+                if (tab != 3)
+                  GlassIconButton(
+                    icon: Icons.add_rounded,
+                    tooltip: '打开本地视频',
+                    prominent: true,
+                    onPressed: picking ? null : onImport,
+                  ),
+              ],
             ),
-          ),
-        ],
-      ),
-      const SizedBox(height: 16),
-      Row(
-        children: [
-          Expanded(
-            child: Text(
-              const ['首页', '媒体库', '播放记录', '设置'][tab],
-              style: const TextStyle(
-                fontSize: 34,
-                fontWeight: FontWeight.w700,
-                letterSpacing: -1,
-              ),
-            ),
-          ),
-          if (tab == 0)
-            IconButton(
-              tooltip: '搜索媒体库',
-              onPressed: () => onTab(1),
-              icon: const Icon(Icons.search_rounded),
-            ),
-          if (tab != 3)
-            IconButton.filledTonal(
-              tooltip: '打开本地视频',
-              onPressed: picking ? null : onImport,
-              style: IconButton.styleFrom(
-                backgroundColor: const Color(0xFF30281F),
-                foregroundColor: libraryAccent,
-              ),
-              icon: const Icon(Icons.add_rounded),
-            ),
-        ],
-      ),
-      const SizedBox(height: 7),
-      Text(switch (tab) {
-        1 => '${videos.length} 部本地视频，随时开场',
-        2 => '每一段故事，都有迹可循',
-        3 => '让放映，更合你心意',
-        _ => '你的故事，接着看。',
-      }, style: const TextStyle(color: _muted, fontSize: 14)),
-    ],
-  );
+            const SizedBox(height: 6),
+            Text(switch (tab) {
+              1 => '${videos.length} 部本地视频',
+              2 => '从上次停下的地方，继续。',
+              3 => '按你的方式，享受每一次播放。',
+              _ => '喜欢的内容，触手可及。',
+            }, style: Theme.of(context).textTheme.bodySmall),
+          ],
+        );
 
-  Widget _home(BuildContext context) => Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      _hero(context),
-      if (showContinue) ...[
-        const SizedBox(height: 30),
-        _section('继续观看', action: '全部', onTap: () => onTab(2)),
-        const SizedBox(height: 14),
-        if (continuing.isEmpty)
-          _quietCard(Icons.history_rounded, '好故事，不必一次看完', '播放进度会自动保留，下次从这里继续。')
-        else
-          SizedBox(
-            height: 204,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              itemCount: continuing.length,
-              separatorBuilder: (_, _) => const SizedBox(width: 14),
-              itemBuilder: (_, index) {
-                final record = continuing[index];
-                return SizedBox(width: 254, child: _continueCard(record));
-              },
-            ),
+  Widget _homeHeader(BuildContext context) {
+    final colors = OrvexColors.of(context);
+    final text = Theme.of(context).textTheme;
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const OrvexBrand(),
+              const SizedBox(height: OrvexMetrics.gap),
+              Text(
+                '首页',
+                style: text.headlineMedium?.copyWith(
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                loading
+                    ? '正在读取媒体…'
+                    : videos.isEmpty
+                    ? '添加视频，建立你的媒体库。'
+                    : '${videos.length} 部视频${showContinue && continuing.isNotEmpty ? ' · ${continuing.length} 部可继续观看' : ' · 随时开始观看'}',
+                style: text.bodySmall,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
           ),
-      ],
-      const SizedBox(height: 30),
-      _section('我的媒体库', action: '查看全部', onTap: () => onTab(1)),
-      const SizedBox(height: 14),
-      Material(
-        color: _panel,
-        borderRadius: BorderRadius.circular(18),
-        child: ListTile(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(18),
-          ),
-          contentPadding: const EdgeInsets.symmetric(
-            horizontal: 18,
-            vertical: 8,
-          ),
-          leading: Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              color: const Color(0xFF332A20),
-              borderRadius: BorderRadius.circular(13),
-            ),
-            child: const Icon(Icons.folder_rounded, color: libraryAccent),
-          ),
-          title: const Text(
-            '本地视频',
-            style: TextStyle(fontWeight: FontWeight.w600),
-          ),
-          subtitle: Text(
-            '${videos.length} 部视频',
-            style: const TextStyle(color: _muted),
-          ),
-          trailing: const Icon(Icons.chevron_right_rounded, color: _muted),
-          onTap: () => onTab(1),
         ),
-      ),
-      if (videos.isNotEmpty) ...[
-        const SizedBox(height: 30),
-        _section('最近添加', action: '全部', onTap: () => onTab(1)),
-        const SizedBox(height: 14),
-        _posterGrid(videos.take(8).toList()),
+        const SizedBox(width: OrvexMetrics.space),
+        GlassSurface(
+          radius: OrvexMetrics.controlRadius,
+          padding: const EdgeInsets.all(4),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              IconButton(
+                tooltip: '搜索媒体库',
+                onPressed: () => onTab(1),
+                icon: Icon(
+                  Icons.search_rounded,
+                  size: OrvexMetrics.iconSize,
+                  color: colors.secondary,
+                ),
+              ),
+              IconButton(
+                tooltip: '打开本地视频',
+                onPressed: picking ? null : onImport,
+                style: IconButton.styleFrom(
+                  backgroundColor: colors.accent.withValues(alpha: 0.07),
+                  foregroundColor: colors.accent,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(
+                      OrvexMetrics.smallRadius,
+                    ),
+                  ),
+                ),
+                icon: const Icon(
+                  Icons.add_rounded,
+                  size: OrvexMetrics.iconSize,
+                ),
+              ),
+            ],
+          ),
+        ),
       ],
-    ],
-  );
+    );
+  }
 
-  Widget _hero(BuildContext context) {
-    final record = showContinue && continuing.isNotEmpty
+  Widget _home(BuildContext context) {
+    final resume = showContinue && continuing.isNotEmpty
         ? continuing.first
         : null;
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(24),
-      child: Container(
-        constraints: const BoxConstraints(minHeight: 274),
-        width: double.infinity,
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topRight,
-            end: Alignment.bottomLeft,
-            colors: [Color(0xFF39302C), Color(0xFF24232A), Color(0xFF151820)],
+    final others = showContinue
+        ? continuing.skip(1).toList()
+        : <PlaybackRecord>[];
+    final recent = videos
+        .where((video) => video.resumeKey != resume?.media.resumeKey)
+        .take(8)
+        .toList();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (showContinue) ...[
+          _section(context, '继续观看', action: '播放记录', onTap: () => onTab(2)),
+          const SizedBox(height: 12),
+        ],
+        _hero(context, resume),
+        if (others.isNotEmpty) ...[
+          const SizedBox(height: OrvexMetrics.space),
+          SizedBox(
+            height:
+                220 +
+                (MediaQuery.textScalerOf(context).scale(14) / 14 - 1).clamp(
+                      0,
+                      3,
+                    ) *
+                    80,
+            child: ListView.separated(
+              key: const ValueKey('home-continue-rail'),
+              scrollDirection: Axis.horizontal,
+              itemCount: others.length,
+              separatorBuilder: (_, _) =>
+                  const SizedBox(width: OrvexMetrics.space),
+              itemBuilder: (context, index) => SizedBox(
+                width: 248,
+                child: _continueCard(context, others[index]),
+              ),
+            ),
           ),
+        ],
+        const SizedBox(height: 24),
+        _section(context, '我的媒体库', action: '查看全部', onTap: () => onTab(1)),
+        const SizedBox(height: 12),
+        _homeLibrary(context),
+        if (recent.isNotEmpty) ...[
+          const SizedBox(height: 24),
+          _section(context, '最近添加', action: '全部', onTap: () => onTab(1)),
+          const SizedBox(height: 14),
+          _posterGrid(context, recent, home: true),
+        ],
+      ],
+    );
+  }
+
+  Widget _homeLibrary(BuildContext context) {
+    final colors = OrvexColors.of(context);
+    final text = Theme.of(context).textTheme;
+    return Material(
+      color: colors.surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(OrvexMetrics.cardRadius),
+        side: BorderSide(
+          color: colors.divider.withValues(alpha: 0.7),
+          width: 0.7,
         ),
-        child: Stack(
-          children: [
-            const Positioned.fill(child: _CinemaArtwork()),
-            Padding(
-              padding: const EdgeInsets.all(26),
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 540),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        key: const ValueKey('home-library'),
+        onTap: () => onTab(1),
+        child: Padding(
+          padding: const EdgeInsets.all(OrvexMetrics.space),
+          child: Row(
+            children: [
+              if (videos.isEmpty)
+                _tileIcon(context, Icons.video_library_outlined)
+              else
+                SizedBox(
+                  width: 76,
+                  height: 56,
+                  child: Stack(
+                    children: [
+                      for (var i = videos.take(3).length - 1; i >= 0; i--)
+                        Positioned(
+                          left: i * 14.0,
+                          top: i * 2.0,
+                          bottom: i * 2.0,
+                          width: 38,
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              color: colors.surface,
+                              borderRadius: BorderRadius.circular(
+                                OrvexMetrics.smallRadius,
+                              ),
+                            ),
+                            child: Padding(
+                              padding: const EdgeInsets.all(2),
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(
+                                  OrvexMetrics.small,
+                                ),
+                                child: _cover(videos[i], poster: true),
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              const SizedBox(width: OrvexMetrics.space),
+              Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    Text('本地视频', style: text.titleMedium),
+                    const SizedBox(height: 4),
                     Text(
-                      record == null ? '属于你的私人影院' : '接着上次的故事',
-                      style: const TextStyle(
-                        color: libraryAccent,
-                        fontSize: 12,
-                        letterSpacing: 1,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 22),
-                    Text(
-                      record == null
-                          ? '好故事，\n从这里开始。'
-                          : _mediaTitle(record.media),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 30,
-                        height: 1.35,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: -0.7,
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-                    Text(
-                      record == null
-                          ? '导入喜欢的视频，留一段时间给自己。'
-                          : '已观看 ${formatTime(record.position)} · 共 ${formatTime(record.duration)}',
-                      style: const TextStyle(
-                        color: Color(0xFFBAB7B5),
-                        fontSize: 12,
-                        height: 1.6,
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    FilledButton.icon(
-                      onPressed: picking
-                          ? null
-                          : () => record == null
-                                ? onImport()
-                                : onOpen(record.media),
-                      style: FilledButton.styleFrom(
-                        backgroundColor: libraryAccent,
-                        foregroundColor: const Color(0xFF211A12),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 20,
-                          vertical: 14,
-                        ),
-                        minimumSize: const Size(0, 46),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      icon: Icon(
-                        record == null
-                            ? Icons.add_rounded
-                            : Icons.play_arrow_rounded,
-                        size: 21,
-                      ),
-                      label: Text(
-                        record == null ? '导入视频' : '继续播放',
-                        style: const TextStyle(fontWeight: FontWeight.w700),
-                      ),
+                      '${videos.length} 部视频 · 保存在此设备',
+                      style: text.bodySmall,
                     ),
                   ],
                 ),
               ),
-            ),
-          ],
+              const SizedBox(width: OrvexMetrics.gap),
+              Icon(
+                Icons.arrow_forward_rounded,
+                size: OrvexMetrics.iconSize,
+                color: colors.accent,
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _continueCard(PlaybackRecord record) => InkWell(
-    borderRadius: BorderRadius.circular(14),
+  Widget _homeProgress(BuildContext context, double progress) => ClipRRect(
+    borderRadius: BorderRadius.circular(OrvexMetrics.pillRadius),
+    child: LinearProgressIndicator(
+      value: progress,
+      minHeight: 2,
+      backgroundColor: OrvexColors.of(context).divider.withValues(alpha: 0.6),
+      color: OrvexColors.of(context).accent.withValues(alpha: 0.9),
+    ),
+  );
+
+  Widget _hero(BuildContext context, PlaybackRecord? record) {
+    final colors = OrvexColors.of(context);
+    final text = Theme.of(context).textTheme;
+    if (record == null) {
+      return GlassSurface(
+        radius: OrvexMetrics.cardRadius,
+        padding: const EdgeInsets.all(OrvexMetrics.section),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _tileIcon(context, Icons.video_library_outlined),
+            const SizedBox(height: OrvexMetrics.space),
+            Text('从这里开始观看', style: text.titleLarge),
+            const SizedBox(height: OrvexMetrics.small),
+            Text(
+              '添加本地视频，字幕与观看进度会留在这里。',
+              style: text.bodyMedium?.copyWith(color: colors.secondary),
+            ),
+            const SizedBox(height: OrvexMetrics.space),
+            FilledButton.icon(
+              onPressed: picking ? null : onImport,
+              icon: const Icon(Icons.add_rounded, size: 20),
+              label: const Text('导入视频'),
+            ),
+          ],
+        ),
+      );
+    }
+    final subject = metadata.subjectFor(record.media);
+    final episode = AnimeFilename.parse(record.media.name).episodeLabel;
+    return GlassSurface(
+      radius: OrvexMetrics.cardRadius,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final wide = constraints.maxWidth >= 640;
+          final footerRow =
+              wide && MediaQuery.textScalerOf(context).scale(12) <= 18;
+          final progress = Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                '${formatTime(record.position)} / ${formatTime(record.duration)}',
+                style: text.bodySmall,
+              ),
+              const SizedBox(height: 3),
+              Text(
+                '已观看 ${(record.progress * 100).round()}%',
+                style: text.labelSmall,
+              ),
+            ],
+          );
+          final play = FilledButton.icon(
+            key: const ValueKey('home-resume'),
+            onPressed: () => onOpen(record.media),
+            style: FilledButton.styleFrom(
+              minimumSize: const Size(0, OrvexMetrics.hitSize),
+              padding: const EdgeInsets.symmetric(
+                horizontal: OrvexMetrics.space,
+              ),
+              shape: const StadiumBorder(),
+            ),
+            icon: const Icon(
+              Icons.play_arrow_rounded,
+              size: OrvexMetrics.iconSize,
+            ),
+            label: const Text('继续播放'),
+          );
+          return ConstrainedBox(
+            constraints: BoxConstraints(minHeight: wide ? 196 : 190),
+            child: IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  SizedBox(
+                    width: wide ? 132 : 88,
+                    child: Stack(
+                      children: [
+                        Positioned.fill(
+                          child: _cover(record.media, poster: true),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Expanded(
+                    child: Padding(
+                      padding: EdgeInsets.all(
+                        wide ? OrvexMetrics.page : OrvexMetrics.space,
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            episode.isEmpty ? '本地媒体' : episode,
+                            style: text.labelMedium?.copyWith(
+                              color: colors.accent,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            subject?.title ?? _mediaTitle(record.media),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: text.titleLarge?.copyWith(
+                              fontSize: wide ? 22 : 18,
+                              height: 1.25,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            _mediaCaption(record.media),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: text.labelSmall,
+                          ),
+                          const SizedBox(height: OrvexMetrics.space),
+                          _homeProgress(context, record.progress),
+                          const SizedBox(height: OrvexMetrics.gap),
+                          if (footerRow)
+                            Row(
+                              children: [
+                                Expanded(child: progress),
+                                const SizedBox(width: OrvexMetrics.space),
+                                play,
+                              ],
+                            )
+                          else ...[
+                            progress,
+                            const SizedBox(height: OrvexMetrics.gap),
+                            play,
+                          ],
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _continueCard(BuildContext context, PlaybackRecord record) => InkWell(
+    key: ValueKey('home-continue-${record.media.resumeKey}'),
+    borderRadius: BorderRadius.circular(OrvexMetrics.coverRadius),
     onTap: () => onOpen(record.media),
     onLongPress: () => onMetadata(record.media),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         ClipRRect(
-          borderRadius: BorderRadius.circular(14),
-          child: Stack(
-            children: [
-              AspectRatio(
-                aspectRatio: 16 / 9,
-                child: MediaCover(
-                  media: record.media,
-                  posterPath: metadata.posterPath(
-                    metadata.subjectFor(record.media)?.id ?? 0,
-                  ),
-                ),
-              ),
-              const Positioned.fill(
-                child: Center(
-                  child: Icon(
-                    Icons.play_circle_fill_rounded,
-                    size: 38,
-                    color: Colors.white70,
-                  ),
-                ),
-              ),
-              Positioned(
-                left: 0,
-                right: 0,
-                bottom: 0,
-                child: LinearProgressIndicator(
-                  value: record.progress,
-                  color: libraryAccent,
-                  backgroundColor: Colors.white12,
-                  minHeight: 3,
-                ),
-              ),
-            ],
-          ),
+          borderRadius: BorderRadius.circular(OrvexMetrics.coverRadius),
+          child: AspectRatio(aspectRatio: 16 / 9, child: _cover(record.media)),
         ),
-        const SizedBox(height: 10),
-        Text(
-          _mediaTitle(record.media),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: const TextStyle(fontWeight: FontWeight.w600),
+        const SizedBox(height: OrvexMetrics.small),
+        SizedBox(
+          height: MediaQuery.textScalerOf(context).scale(14) * 1.3 * 2,
+          child: Text(
+            _mediaTitle(record.media),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.titleSmall
+                ?.copyWith(height: 1.3),
+          ),
         ),
         const SizedBox(height: 4),
         Text(
           '${formatTime(record.position)} / ${formatTime(record.duration)}',
-          style: const TextStyle(color: _muted, fontSize: 12),
+          style: Theme.of(context).textTheme.labelSmall,
         ),
+        const SizedBox(height: OrvexMetrics.small),
+        _homeProgress(context, record.progress),
       ],
     ),
   );
@@ -395,106 +546,133 @@ class LibraryViews extends StatelessWidget {
         TextFormField(
           initialValue: query,
           onChanged: onQuery,
-          decoration: InputDecoration(
+          decoration: const InputDecoration(
             hintText: '搜索视频名称',
-            hintStyle: const TextStyle(color: _muted),
-            prefixIcon: const Icon(Icons.search_rounded, color: _muted),
-            filled: true,
-            fillColor: _panel,
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(14),
-              borderSide: BorderSide.none,
-            ),
-            contentPadding: const EdgeInsets.symmetric(vertical: 14),
+            prefixIcon: Icon(Icons.search_rounded),
           ),
         ),
         const SizedBox(height: 12),
-        _metadataStatus(),
-        const SizedBox(height: 18),
-        _section('全部视频', detail: '${filtered.length} 部'),
+        _metadataStatus(context),
+        const SizedBox(height: 20),
+        _section(context, '全部视频', detail: '${filtered.length} 部'),
         const SizedBox(height: 16),
         if (videos.isEmpty)
           _emptyState(
+            context,
             Icons.video_library_outlined,
-            '收藏，从第一部开始',
-            '把“文件”里的视频导入 Orvex，\n在这里整理你的私人片库。',
+            '媒体库，等你开场',
+            '导入本地视频，建立自己的片库。',
             import: true,
           )
         else if (filtered.isEmpty)
-          _emptyState(Icons.search_rounded, '没有找到视频', '试试其他名称，或导入新的视频。')
+          _emptyState(
+            context,
+            Icons.search_rounded,
+            '没有找到视频',
+            '试试其他名称，或导入新的视频。',
+          )
         else
-          _posterGrid(filtered),
+          _posterGrid(context, filtered),
       ],
     );
   }
 
-  Widget _posterGrid(List<LocalMedia> items) => LayoutBuilder(
+  Widget _posterGrid(
+    BuildContext context,
+    List<LocalMedia> items, {
+    bool home = false,
+  }) => LayoutBuilder(
     builder: (context, constraints) {
-      final columns = (constraints.maxWidth / 155).floor().clamp(2, 6);
+      final columns = (constraints.maxWidth / 174).floor().clamp(2, 6);
       final width = (constraints.maxWidth - (columns - 1) * 16) / columns;
       return Wrap(
         spacing: 16,
-        runSpacing: 24,
+        runSpacing: 22,
         children: [
           for (final media in items)
             SizedBox(
               width: width,
               child: InkWell(
-                borderRadius: BorderRadius.circular(13),
+                key: home ? ValueKey('home-recent-${media.resumeKey}') : null,
+                borderRadius: BorderRadius.circular(OrvexMetrics.coverRadius),
                 onTap: () => onOpen(media),
                 onLongPress: () => onMetadata(media),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     ClipRRect(
-                      borderRadius: BorderRadius.circular(13),
+                      borderRadius: BorderRadius.circular(
+                        OrvexMetrics.coverRadius,
+                      ),
                       child: AspectRatio(
                         aspectRatio: 2 / 3,
                         child: Stack(
                           fit: StackFit.expand,
                           children: [
-                            MediaCover(
-                              media: media,
-                              poster: true,
-                              posterPath: metadata.posterPath(
-                                metadata.subjectFor(media)?.id ?? 0,
-                              ),
-                            ),
+                            _cover(media, poster: true),
                             Positioned(
-                              top: 0,
-                              right: 0,
-                              child: IconButton(
-                                tooltip: '番剧资料',
-                                onPressed: () => onMetadata(media),
-                                icon: const Icon(
-                                  Icons.info_outline_rounded,
-                                  size: 20,
-                                ),
-                                style: IconButton.styleFrom(
-                                  foregroundColor: Colors.white,
-                                  backgroundColor: Colors.black38,
-                                ),
-                              ),
+                              top: 6,
+                              right: 6,
+                              child: home
+                                  ? IconButton(
+                                      tooltip: '番剧资料',
+                                      onPressed: () => onMetadata(media),
+                                      icon: DecoratedBox(
+                                        decoration: BoxDecoration(
+                                          color: OrvexColors.player.overlay,
+                                          borderRadius: BorderRadius.circular(
+                                            OrvexMetrics.pillRadius,
+                                          ),
+                                        ),
+                                        child: Padding(
+                                          padding: const EdgeInsets.all(6),
+                                          child: Icon(
+                                            Icons.info_outline_rounded,
+                                            size: 18,
+                                            color: OrvexColors.player.text,
+                                          ),
+                                        ),
+                                      ),
+                                    )
+                                  : GlassIconButton(
+                                      immersive: true,
+                                      icon: Icons.info_outline_rounded,
+                                      tooltip: '番剧资料',
+                                      onPressed: () => onMetadata(media),
+                                    ),
                             ),
                           ],
                         ),
                       ),
                     ),
                     const SizedBox(height: 10),
-                    Text(
-                      _mediaTitle(media),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        height: 1.4,
+                    if (home)
+                      SizedBox(
+                        height:
+                            MediaQuery.textScalerOf(context).scale(14) *
+                            1.3 *
+                            2,
+                        child: Text(
+                          _mediaTitle(media),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.titleSmall
+                              ?.copyWith(height: 1.3),
+                        ),
+                      )
+                    else
+                      Text(
+                        _mediaTitle(media),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.titleSmall,
                       ),
-                    ),
                     const SizedBox(height: 4),
                     Text(
                       _mediaCaption(media),
-                      style: const TextStyle(color: _muted, fontSize: 11),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.labelSmall,
                     ),
                   ],
                 ),
@@ -510,79 +688,82 @@ class LibraryViews extends StatelessWidget {
     children: [
       if (history.isEmpty)
         _emptyState(
+          context,
           Icons.history_rounded,
           '下一段故事，等你开始',
-          '播放过的视频会留在这里，\n想重温时，随时回来。',
+          '播放记录会自动保存在此设备。',
           import: true,
         )
       else ...[
-        _section('最近播放', detail: '${history.length} 部'),
-        const SizedBox(height: 16),
+        _section(context, '最近播放', detail: '${history.length} 部'),
+        const SizedBox(height: 14),
         for (final record in history) ...[
-          InkWell(
-            borderRadius: BorderRadius.circular(14),
-            onTap: () => onOpen(record.media),
-            onLongPress: () => onMetadata(record.media),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 10),
-              child: Row(
-                children: [
-                  SizedBox(
-                    width: 104,
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(10),
-                      child: AspectRatio(
-                        aspectRatio: 16 / 9,
-                        child: MediaCover(
-                          media: record.media,
-                          posterPath: metadata.posterPath(
-                            metadata.subjectFor(record.media)?.id ?? 0,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          _mediaTitle(record.media),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w600,
-                            fontSize: 14,
-                          ),
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          record.completed
-                              ? '已看完'
-                              : '看到 ${formatTime(record.position)}',
-                          style: const TextStyle(color: _muted, fontSize: 12),
-                        ),
-                        const SizedBox(height: 7),
-                        LinearProgressIndicator(
-                          value: record.progress,
-                          minHeight: 2,
-                          color: libraryAccent,
-                          backgroundColor: Colors.white10,
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  const Icon(Icons.play_arrow_rounded, color: libraryAccent),
-                ],
-              ),
-            ),
-          ),
-          const Divider(color: Color(0xFF25272E), height: 14),
+          _recordTile(context, record),
+          const SizedBox(height: 10),
         ],
       ],
     ],
+  );
+
+  Widget _recordTile(
+    BuildContext context,
+    PlaybackRecord record,
+  ) => GlassSurface(
+    child: InkWell(
+      onTap: () => onOpen(record.media),
+      onLongPress: () => onMetadata(record.media),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Row(
+          children: [
+            SizedBox(
+              width: 96,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(OrvexMetrics.smallRadius),
+                child: AspectRatio(
+                  aspectRatio: 16 / 9,
+                  child: _cover(record.media),
+                ),
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    _mediaTitle(record.media),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.titleSmall,
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    record.completed
+                        ? '已看完'
+                        : '看到 ${formatTime(record.position)}',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                  const SizedBox(height: 8),
+                  LinearProgressIndicator(value: record.progress, minHeight: 2),
+                ],
+              ),
+            ),
+            const SizedBox(width: 10),
+            Icon(
+              Icons.play_arrow_rounded,
+              color: OrvexColors.of(context).accent,
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+
+  Widget _cover(LocalMedia media, {bool poster = false}) => MediaCover(
+    media: media,
+    poster: poster,
+    posterPath: metadata.posterPath(metadata.subjectFor(media)?.id ?? 0),
   );
 
   String _mediaTitle(LocalMedia media) {
@@ -610,28 +791,30 @@ class LibraryViews extends StatelessWidget {
     };
   }
 
-  Widget _metadataStatus() => Row(
+  Widget _metadataStatus(BuildContext context) => Row(
     children: [
-      if (metadata.busy) ...[
+      if (metadata.busy)
         const SizedBox(
-          width: 12,
-          height: 12,
+          width: 14,
+          height: 14,
           child: CircularProgressIndicator(strokeWidth: 1.5),
+        )
+      else
+        Icon(
+          Icons.auto_awesome_outlined,
+          size: 15,
+          color: OrvexColors.of(context).accent,
         ),
-        const SizedBox(width: 8),
-      ] else ...[
-        const Icon(Icons.auto_awesome_outlined, size: 14, color: libraryAccent),
-        const SizedBox(width: 8),
-      ],
+      const SizedBox(width: 8),
       Expanded(
         child: Text(
           metadata.error ??
               (metadata.busy
                   ? 'Bangumi 正在匹配番剧资料'
                   : metadata.automatic
-                  ? 'Bangumi 自动匹配 · 点击封面上的 ⓘ 查看资料'
+                  ? 'Bangumi 自动匹配 · ⓘ 查看或更正资料'
                   : 'Bangumi 自动匹配已关闭'),
-          style: const TextStyle(color: _muted, fontSize: 11, height: 1.6),
+          style: Theme.of(context).textTheme.bodySmall,
         ),
       ),
       if (metadata.error != null ||
@@ -641,7 +824,7 @@ class LibraryViews extends StatelessWidget {
           ))
         TextButton(
           onPressed: metadata.busy ? null : () => metadata.retry(),
-          child: const Text('重试', style: TextStyle(fontSize: 12)),
+          child: const Text('重试'),
         ),
     ],
   );
@@ -649,93 +832,118 @@ class LibraryViews extends StatelessWidget {
   Widget _settings(BuildContext context) => Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
-      _section('首页'),
+      _section(context, '外观'),
+      const SizedBox(height: 12),
+      _group([
+        RadioGroup<ThemeMode>(
+          groupValue: appearance.mode,
+          onChanged: (value) {
+            if (value != null) appearance.setMode(value);
+          },
+          child: Column(
+            children: [
+              for (final mode in ThemeMode.values)
+                RadioListTile<ThemeMode>(
+                  key: ValueKey('theme-${mode.name}'),
+                  value: mode,
+                  title: Text(switch (mode) {
+                    ThemeMode.system => '跟随系统',
+                    ThemeMode.light => '浅色',
+                    ThemeMode.dark => '深色',
+                  }),
+                  secondary: Icon(switch (mode) {
+                    ThemeMode.system => Icons.brightness_auto_outlined,
+                    ThemeMode.light => Icons.light_mode_outlined,
+                    ThemeMode.dark => Icons.dark_mode_outlined,
+                  }),
+                ),
+            ],
+          ),
+        ),
+        const Divider(indent: 18, endIndent: 18),
+        SwitchListTile.adaptive(
+          key: const ValueKey('reduce-transparency'),
+          value: appearance.reduceTransparency,
+          onChanged: appearance.setReduceTransparency,
+          title: const Text('减少透明效果'),
+          subtitle: Text(
+            appearance.systemReduceTransparency ? '系统已启用减少透明度' : '使用更清晰的不透明表面',
+          ),
+        ),
+        if (appearance.error != null)
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Text(
+              appearance.error!,
+              style: TextStyle(color: OrvexColors.of(context).error),
+            ),
+          ),
+      ]),
+      const SizedBox(height: 24),
+      _section(context, '首页'),
       const SizedBox(height: 12),
       _group([
         SwitchListTile.adaptive(
-          title: const Text('显示继续观看', style: TextStyle(fontSize: 15)),
-          subtitle: const Text(
-            '在首页接着上次的进度',
-            style: TextStyle(color: _muted, fontSize: 12),
-          ),
-          activeTrackColor: libraryAccent,
+          title: const Text('显示继续观看'),
+          subtitle: const Text('在首页接着上次的进度'),
           value: showContinue,
           onChanged: onShowContinue,
         ),
       ]),
-      const SizedBox(height: 26),
-      _section('番剧资料'),
+      const SizedBox(height: 24),
+      _section(context, '番剧资料'),
       const SizedBox(height: 12),
       _group([
         SwitchListTile.adaptive(
           key: const ValueKey('automatic-bangumi'),
-          title: const Text('自动匹配番剧', style: TextStyle(fontSize: 15)),
-          subtitle: const Text(
-            '向 Bangumi 查询整理后的片名，不上传媒体文件',
-            style: TextStyle(color: _muted, fontSize: 12),
-          ),
-          activeTrackColor: libraryAccent,
+          title: const Text('自动匹配番剧'),
+          subtitle: const Text('向 Bangumi 查询整理后的片名，不上传媒体文件'),
           value: metadata.automatic,
           onChanged: metadata.setAutomatic,
         ),
-        const Divider(height: 1, indent: 16, color: Color(0xFF292B32)),
+        const Divider(indent: 18, endIndent: 18),
         const ListTile(
-          title: Text('数据来源：Bangumi', style: TextStyle(fontSize: 14)),
-          subtitle: Text(
-            '资料缓存在本机；点击视频封面上的 ⓘ 可纠正匹配',
-            style: TextStyle(color: _muted, fontSize: 12),
-          ),
+          title: Text('数据来源：Bangumi'),
+          subtitle: Text('资料缓存在本机；封面上的 ⓘ 可更正匹配'),
         ),
       ]),
-      const SizedBox(height: 26),
-      _section('文件与播放'),
+      const SizedBox(height: 24),
+      _section(context, '文件与播放'),
       const SizedBox(height: 12),
       _group([
         ListTile(
-          leading: const Icon(
-            Icons.create_new_folder_outlined,
-            color: libraryAccent,
-          ),
-          title: const Text('导入本地视频', style: TextStyle(fontSize: 15)),
-          trailing: const Icon(Icons.chevron_right_rounded, color: _muted),
+          leading: const Icon(Icons.create_new_folder_outlined),
+          title: const Text('导入本地视频'),
+          trailing: const Icon(Icons.chevron_right_rounded),
           onTap: picking ? null : onImport,
         ),
-        const Divider(height: 1, indent: 56, color: Color(0xFF292B32)),
+        const Divider(indent: 18, endIndent: 18),
         const ListTile(
-          leading: Icon(Icons.subtitles_outlined, color: _muted),
-          title: Text('外挂字幕', style: TextStyle(fontSize: 15)),
-          subtitle: Text(
-            '在播放界面添加 SRT、ASS、SSA 或 VTT',
-            style: TextStyle(color: _muted, fontSize: 12),
-          ),
+          leading: Icon(Icons.subtitles_outlined),
+          title: Text('外挂字幕'),
+          subtitle: Text('在播放设置添加 SRT、ASS、SSA 或 VTT'),
         ),
-        const Divider(height: 1, indent: 56, color: Color(0xFF292B32)),
+        const Divider(indent: 18, endIndent: 18),
         const ListTile(
-          leading: Icon(Icons.bookmark_border_rounded, color: _muted),
-          title: Text('自动保存播放进度', style: TextStyle(fontSize: 15)),
-          subtitle: Text(
-            '重新打开同一视频时，从上次继续',
-            style: TextStyle(color: _muted, fontSize: 12),
-          ),
+          leading: Icon(Icons.bookmark_border_rounded),
+          title: Text('自动保存播放进度'),
+          subtitle: Text('重新打开同一视频时，从上次继续'),
         ),
       ]),
-      const SizedBox(height: 26),
-      _section('关于'),
+      const SizedBox(height: 24),
+      _section(context, '关于'),
       const SizedBox(height: 12),
       _group([
         const ListTile(
-          leading: Icon(
-            Icons.play_circle_outline_rounded,
-            color: libraryAccent,
-          ),
-          title: Text('Orvex', style: TextStyle(fontSize: 15)),
-          trailing: Text('0.1.0', style: TextStyle(color: _muted)),
+          leading: OrvexBrand(compact: true),
+          title: Text('Orvex'),
+          trailing: Text('0.1.0'),
         ),
-        const Divider(height: 1, indent: 56, color: Color(0xFF292B32)),
+        const Divider(indent: 18, endIndent: 18),
         ListTile(
-          leading: const Icon(Icons.description_outlined, color: _muted),
-          title: const Text('开源许可', style: TextStyle(fontSize: 15)),
-          trailing: const Icon(Icons.chevron_right_rounded, color: _muted),
+          leading: const Icon(Icons.description_outlined),
+          title: const Text('开源许可'),
+          trailing: const Icon(Icons.chevron_right_rounded),
           onTap: () => showLicensePage(
             context: context,
             applicationName: 'Orvex',
@@ -743,24 +951,13 @@ class LibraryViews extends StatelessWidget {
           ),
         ),
       ]),
-      const SizedBox(height: 32),
-      const Center(
-        child: Text(
-          '留一点时间，给喜欢的故事。',
-          style: TextStyle(color: _muted, fontSize: 12),
-        ),
-      ),
     ],
   );
 
-  Widget _group(List<Widget> children) => Material(
-    color: _panel,
-    borderRadius: BorderRadius.circular(16),
-    clipBehavior: Clip.antiAlias,
-    child: Column(children: children),
-  );
-
+  Widget _group(List<Widget> children) =>
+      GlassSurface(child: Column(children: children));
   Widget _section(
+    BuildContext context,
     String title, {
     String? action,
     String? detail,
@@ -770,101 +967,84 @@ class LibraryViews extends StatelessWidget {
       Expanded(
         child: Text(
           title,
-          style: const TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.w700,
-            letterSpacing: -0.4,
-          ),
+          style: tab == 0
+              ? Theme.of(context).textTheme.titleMedium
+              : Theme.of(context).textTheme.titleLarge,
         ),
       ),
       if (detail != null)
-        Text(detail, style: const TextStyle(color: _muted, fontSize: 12)),
+        Text(detail, style: Theme.of(context).textTheme.bodySmall),
       if (action != null)
         TextButton(
           onPressed: onTap,
-          style: TextButton.styleFrom(
-            foregroundColor: libraryAccent,
-            minimumSize: const Size(44, 40),
-            padding: EdgeInsets.zero,
-          ),
-          child: Text(action, style: const TextStyle(fontSize: 12)),
-        ),
-    ],
-  );
-
-  Widget _quietCard(IconData icon, String title, String subtitle) => Container(
-    padding: const EdgeInsets.all(18),
-    decoration: BoxDecoration(
-      color: _panel,
-      borderRadius: BorderRadius.circular(16),
-    ),
-    child: Row(
-      children: [
-        Icon(icon, color: _muted, size: 26),
-        const SizedBox(width: 15),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          style: tab == 0
+              ? TextButton.styleFrom(
+                  foregroundColor: OrvexColors.of(context).secondary,
+                  textStyle: Theme.of(context).textTheme.labelMedium,
+                )
+              : null,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Text(
-                title,
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                subtitle,
-                style: const TextStyle(
-                  color: _muted,
-                  fontSize: 12,
-                  height: 1.6,
-                ),
-              ),
+              Text(action),
+              if (tab == 0) ...[
+                const SizedBox(width: 2),
+                const Icon(Icons.chevron_right_rounded, size: 16),
+              ],
             ],
           ),
         ),
-      ],
-    ),
+    ],
   );
+  Widget _tileIcon(BuildContext context, IconData icon) {
+    final colors = OrvexColors.of(context);
+    return Container(
+      width: 46,
+      height: 46,
+      decoration: BoxDecoration(
+        color: colors.accent.withValues(alpha: 0.09),
+        borderRadius: BorderRadius.circular(OrvexMetrics.coverRadius),
+      ),
+      child: Icon(icon, color: colors.accent),
+    );
+  }
 
   Widget _emptyState(
+    BuildContext context,
     IconData icon,
     String title,
     String subtitle, {
     bool import = false,
-  }) => Container(
-    width: double.infinity,
-    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 44),
-    decoration: BoxDecoration(
-      color: _panel,
-      borderRadius: BorderRadius.circular(20),
-    ),
-    child: Column(
-      children: [
-        Icon(icon, size: 42, color: libraryAccent),
-        const SizedBox(height: 20),
-        Text(
-          title,
-          textAlign: TextAlign.center,
-          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
-        ),
-        const SizedBox(height: 10),
-        Text(
-          subtitle,
-          textAlign: TextAlign.center,
-          style: const TextStyle(color: _muted, height: 1.7, fontSize: 13),
-        ),
-        if (import) ...[
-          const SizedBox(height: 26),
-          FilledButton.icon(
-            onPressed: picking ? null : onImport,
-            icon: const Icon(Icons.add_rounded),
-            label: const Text('导入视频'),
+  }) => GlassSurface(
+    radius: OrvexMetrics.panelRadius,
+    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+    child: SizedBox(
+      width: double.infinity,
+      child: Column(
+        children: [
+          _tileIcon(context, icon),
+          const SizedBox(height: 18),
+          Text(
+            title,
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.titleLarge,
           ),
+          const SizedBox(height: 8),
+          Text(
+            subtitle,
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+          if (import) ...[
+            const SizedBox(height: 20),
+            FilledButton.icon(
+              onPressed: picking ? null : onImport,
+              icon: const Icon(Icons.add_rounded),
+              label: const Text('导入视频'),
+            ),
+          ],
         ],
-      ],
+      ),
     ),
   );
 }
@@ -874,7 +1054,6 @@ String mediaTitle(String name) {
   return dot > 0 ? name.substring(0, dot) : name;
 }
 
-/// Use a locally cached Bangumi cover, or original artwork when unmatched.
 class MediaCover extends StatelessWidget {
   const MediaCover({
     super.key,
@@ -885,123 +1064,58 @@ class MediaCover extends StatelessWidget {
   final LocalMedia media;
   final bool poster;
   final String? posterPath;
-
   @override
   Widget build(BuildContext context) {
-    const palettes = [
-      [Color(0xFF465468), Color(0xFF1A2537)],
-      [Color(0xFF7C6250), Color(0xFF302A32)],
-      [Color(0xFF4B6867), Color(0xFF1C2F35)],
-      [Color(0xFF655D7D), Color(0xFF272739)],
-    ];
-    final hash = media.name.codeUnits.fold(0, (sum, unit) => sum + unit);
-    final fallback = DecoratedBox(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: palettes[hash % palettes.length],
-        ),
-      ),
+    final colors = OrvexColors.of(context);
+    final fallback = ColoredBox(
+      color: colors.elevated,
       child: Stack(
         children: [
-          const Positioned.fill(child: _CinemaArtwork(subtle: true)),
-          if (poster)
-            Center(
-              child: Icon(
-                Icons.movie_outlined,
-                size: 34,
-                color: Colors.white.withValues(alpha: 0.3),
-              ),
+          Center(
+            child: Icon(
+              Icons.movie_outlined,
+              size: poster ? 34 : 28,
+              color: colors.secondary.withValues(alpha: 0.6),
             ),
+          ),
           Positioned(
             top: 10,
             left: 10,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-              decoration: BoxDecoration(
-                color: Colors.black26,
-                borderRadius: BorderRadius.circular(4),
-              ),
-              child: Text(
-                media.name.split('.').last.toUpperCase(),
-                style: const TextStyle(
-                  color: Colors.white70,
-                  fontSize: 9,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
+            child: Text(
+              media.name.split('.').last.toUpperCase(),
+              style: Theme.of(context).textTheme.labelSmall,
             ),
           ),
         ],
       ),
     );
-    if (posterPath == null) return fallback;
-    return Image.file(
-      File(posterPath!),
-      fit: BoxFit.cover,
-      errorBuilder: (_, _, _) => fallback,
-      frameBuilder: (context, child, frame, synchronous) =>
-          frame == null ? fallback : child,
-    );
+    return posterPath == null
+        ? fallback
+        : Image.file(
+            File(posterPath!),
+            fit: BoxFit.cover,
+            cacheWidth: 600,
+            gaplessPlayback: true,
+            errorBuilder: (_, _, _) => fallback,
+            frameBuilder: (context, child, frame, _) =>
+                frame == null ? fallback : child,
+          );
   }
 }
 
-class _CinemaArtwork extends StatelessWidget {
-  const _CinemaArtwork({this.subtle = false});
-  final bool subtle;
-
-  @override
-  Widget build(BuildContext context) =>
-      CustomPaint(painter: _CinemaPainter(subtle));
-}
-
-class _CinemaPainter extends CustomPainter {
-  const _CinemaPainter(this.subtle);
-  final bool subtle;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final center = Offset(size.width * 0.96, size.height * 0.29);
-    final radius = size.height * 0.8;
-    canvas.drawCircle(
-      center,
-      radius,
-      Paint()
-        ..shader = RadialGradient(
-          colors: [
-            const Color(0xFFF4B763).withValues(alpha: subtle ? 0.1 : 0.18),
-            Colors.transparent,
-          ],
-        ).createShader(Rect.fromCircle(center: center, radius: radius)),
-    );
-    for (var i = 0; i < 5; i++) {
-      final rect = Rect.fromCenter(
-        center: center,
-        width: radius * (0.65 + i * 0.34),
-        height: radius * (1.2 + i * 0.34),
-      );
-      canvas.drawOval(
-        rect,
-        Paint()
-          ..color = Colors.white.withValues(alpha: subtle ? 0.04 : 0.07)
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 1,
-      );
-    }
-    canvas.drawLine(
-      Offset(size.width * 0.4, size.height),
-      Offset(size.width, size.height * 0.05),
-      Paint()
-        ..color = libraryAccent.withValues(alpha: 0.08)
-        ..strokeWidth = 28,
-    );
-  }
-
-  @override
-  bool shouldRepaint(_CinemaPainter oldDelegate) =>
-      oldDelegate.subtle != subtle;
-}
+const _tabLabels = ['首页', '媒体库', '播放记录', '设置'];
+const _tabIcons = [
+  Icons.home_outlined,
+  Icons.video_library_outlined,
+  Icons.history_rounded,
+  Icons.settings_outlined,
+];
+const _tabSelectedIcons = [
+  Icons.home_rounded,
+  Icons.video_library_rounded,
+  Icons.history_rounded,
+  Icons.settings_rounded,
+];
 
 class LibraryTabBar extends StatelessWidget {
   const LibraryTabBar({
@@ -1013,79 +1127,202 @@ class LibraryTabBar extends StatelessWidget {
   final ValueChanged<int> onSelected;
 
   @override
-  Widget build(BuildContext context) => DecoratedBox(
-    decoration: const BoxDecoration(
-      color: Color(0xFF111319),
-      border: Border(top: BorderSide(color: Color(0xFF23252C), width: 0.5)),
-    ),
-    child: SafeArea(
+  Widget build(BuildContext context) {
+    final colors = OrvexColors.of(context);
+    return SafeArea(
       top: false,
+      minimum: const EdgeInsets.fromLTRB(12, 8, 12, 12),
       child: Center(
         heightFactor: 1,
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 650),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            child: Row(
-              children: [
-                for (var index = 0; index < 4; index++)
-                  Expanded(
-                    child: Semantics(
-                      selected: selected == index,
-                      button: true,
-                      label: const ['首页', '媒体库', '播放记录', '设置'][index],
-                      excludeSemantics: true,
-                      child: InkResponse(
-                        key: ValueKey('tab-$index'),
-                        onTap: () => onSelected(index),
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 4),
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                selected == index
-                                    ? const [
-                                        Icons.home_rounded,
-                                        Icons.video_library_rounded,
-                                        Icons.history_rounded,
-                                        Icons.settings_rounded,
-                                      ][index]
-                                    : const [
-                                        Icons.home_outlined,
-                                        Icons.video_library_outlined,
-                                        Icons.history_rounded,
-                                        Icons.settings_outlined,
-                                      ][index],
-                                size: 25,
-                                color: selected == index
-                                    ? libraryAccent
-                                    : _muted,
+          constraints: const BoxConstraints(maxWidth: 500),
+          child: GlassSurface(
+            blur: true,
+            subtle: true,
+            radius: OrvexMetrics.navigationRadius,
+            padding: const EdgeInsets.all(4),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final horizontal =
+                    constraints.maxWidth >= 460 &&
+                    MediaQuery.textScalerOf(context).scale(11) <= 16;
+                return Row(
+                  children: [
+                    for (var index = 0; index < 4; index++)
+                      Expanded(
+                        child: Semantics(
+                          selected: selected == index,
+                          button: true,
+                          child: Material(
+                            color: Colors.transparent,
+                            child: InkWell(
+                              key: ValueKey('tab-$index'),
+                              onTap: () => onSelected(index),
+                              borderRadius: BorderRadius.circular(
+                                OrvexMetrics.controlRadius,
                               ),
-                              const SizedBox(height: 5),
-                              Text(
-                                const ['首页', '媒体库', '播放记录', '设置'][index],
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: selected == index
-                                      ? FontWeight.w600
-                                      : FontWeight.w400,
-                                  color: selected == index
-                                      ? libraryAccent
-                                      : _muted,
+                              child: ConstrainedBox(
+                                constraints: const BoxConstraints(
+                                  minHeight: OrvexMetrics.hitSize,
+                                ),
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 4,
+                                    horizontal: 2,
+                                  ),
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      if (horizontal)
+                                        Row(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.center,
+                                          children: [
+                                            Icon(
+                                              selected == index
+                                                  ? _tabSelectedIcons[index]
+                                                  : _tabIcons[index],
+                                              size: OrvexMetrics.iconSize,
+                                              color: selected == index
+                                                  ? colors.accent
+                                                  : colors.secondary,
+                                            ),
+                                            const SizedBox(width: 6),
+                                            Text(
+                                              _tabLabels[index],
+                                              style: TextStyle(
+                                                fontSize: 12,
+                                                fontWeight: selected == index
+                                                    ? FontWeight.w600
+                                                    : FontWeight.w400,
+                                                color: selected == index
+                                                    ? colors.accent
+                                                    : colors.secondary,
+                                              ),
+                                            ),
+                                          ],
+                                        )
+                                      else ...[
+                                        Icon(
+                                          selected == index
+                                              ? _tabSelectedIcons[index]
+                                              : _tabIcons[index],
+                                          size: OrvexMetrics.iconSize,
+                                          color: selected == index
+                                              ? colors.accent
+                                              : colors.secondary,
+                                        ),
+                                        const SizedBox(height: 3),
+                                        Text(
+                                          _tabLabels[index],
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            fontWeight: selected == index
+                                                ? FontWeight.w600
+                                                : FontWeight.w400,
+                                            color: selected == index
+                                                ? colors.accent
+                                                : colors.secondary,
+                                          ),
+                                        ),
+                                      ],
+                                      const SizedBox(height: 3),
+                                      AnimatedContainer(
+                                        duration: OrvexMetrics.duration(
+                                          context,
+                                        ),
+                                        curve: OrvexMetrics.curve,
+                                        width: selected == index ? 12 : 0,
+                                        height: 2,
+                                        decoration: BoxDecoration(
+                                          color: colors.accent,
+                                          borderRadius: BorderRadius.circular(
+                                            OrvexMetrics.pillRadius,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ),
                               ),
-                            ],
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                  ),
-              ],
+                  ],
+                );
+              },
             ),
           ),
         ),
       ),
-    ),
-  );
+    );
+  }
+}
+
+class LibrarySidebar extends StatelessWidget {
+  const LibrarySidebar({
+    super.key,
+    required this.selected,
+    required this.onSelected,
+  });
+  final int selected;
+  final ValueChanged<int> onSelected;
+  @override
+  Widget build(BuildContext context) {
+    final colors = OrvexColors.of(context);
+    return SizedBox(
+      width: 190,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(14, 24, 14, 16),
+        child: Column(
+          children: [
+            const Padding(
+              padding: EdgeInsets.only(bottom: 30),
+              child: OrvexBrand(),
+            ),
+            for (var index = 0; index < 4; index++)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Material(
+                  color: selected == index
+                      ? colors.accent.withValues(alpha: 0.1)
+                      : Colors.transparent,
+                  borderRadius: BorderRadius.circular(OrvexMetrics.coverRadius),
+                  child: ListTile(
+                    key: ValueKey('tab-$index'),
+                    selected: selected == index,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(
+                        OrvexMetrics.coverRadius,
+                      ),
+                    ),
+                    leading: Icon(
+                      selected == index
+                          ? _tabSelectedIcons[index]
+                          : _tabIcons[index],
+                      size: 22,
+                      color: selected == index
+                          ? colors.accent
+                          : colors.secondary,
+                    ),
+                    title: Text(
+                      _tabLabels[index],
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        color: selected == index
+                            ? colors.accent
+                            : colors.secondary,
+                      ),
+                    ),
+                    onTap: () => onSelected(index),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
 }

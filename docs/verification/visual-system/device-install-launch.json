@@ -1,0 +1,14 @@
+{
+  "date": "2026-11-06",
+  "deviceModel": "iPhone 17 Pro Max",
+  "bundleIdentifier": "dev.orvex.orvex",
+  "entrypoint": "lib/main.dart",
+  "buildMode": "Release",
+  "existingSigningTeamRetained": true,
+  "codesignVerification": "Passed",
+  "testDefinesIncluded": false,
+  "installation": "success; in-place update without uninstall",
+  "launch": "success",
+  "userMediaAccessedOrDeleted": false,
+  "newVisualAcceptance": "Not Tested; awaiting user feedback"
+}

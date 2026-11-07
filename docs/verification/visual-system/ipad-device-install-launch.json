@@ -1,0 +1,17 @@
+{
+  "date": "2026-11-06",
+  "deviceModel": "iPad Pro 11-inch (4th generation, 2022)",
+  "bundleIdentifier": "dev.orvex.orvex",
+  "entrypoint": "lib/main.dart",
+  "buildMode": "Release",
+  "developerMode": "enabled by user",
+  "existingSigningTeamRetained": true,
+  "deviceIncludedInProvisioningProfile": true,
+  "codesignVerification": "Passed",
+  "testDefinesIncluded": false,
+  "installation": "success; no uninstall or data clearing",
+  "launch": "success",
+  "generatedMediaImported": false,
+  "userMediaAccessedOrDeleted": false,
+  "visualAndPlaybackAcceptance": "Not Tested; awaiting user feedback"
+}

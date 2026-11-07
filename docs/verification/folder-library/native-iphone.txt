@@ -1,0 +1,6 @@
+Test Case '-[RunnerTests.MediaFolderAccessTests testBookmarkTraversalThumbnailAndRelease]' started.
+Test Case '-[RunnerTests.MediaFolderAccessTests testBookmarkTraversalThumbnailAndRelease]' passed (1.681 seconds).
+	 Executed 1 test, with 0 failures (0 unexpected) in 1.681 (1.685) seconds
+	 Executed 1 test, with 0 failures (0 unexpected) in 1.681 (1.685) seconds
+	 Executed 1 test, with 0 failures (0 unexpected) in 1.681 (1.687) seconds
+** TEST SUCCEEDED **

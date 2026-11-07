@@ -1,0 +1,4 @@
+Repeated import and store restart: same stable identity, no additional video.
+App-owned Imports relative path -> native AVAssetImageGenerator -> decodable JPEG -> real row Image, both themes.
+Cached duration survives the second request.
+Physical device, sound and MKV preview: Not Tested.

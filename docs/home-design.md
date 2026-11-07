@@ -18,3 +18,7 @@
 模拟器播放仍使用明确标记的无声预览。iPad 真机、新首页真机交互和长期性能为 **Not Tested**；此前 iPhone 用户自备媒体通过的核心播放验收记录独立保留。截图和日志见 `verification/home-stage1/`。
 
 本文保留首页第一版设计及当时验证范围；后续功能和当前完成度见 [ROADMAP](ROADMAP.md)，不在此重复维护能力清单。
+
+2026-11-06 已完成首轮视觉升级，当前配色、材质与组件规范以 [DESIGN_SYSTEM](DESIGN_SYSTEM.md) 为准；本文的暖金配色仅保留为历史，不作为后续实现依据。
+
+首页第一轮像素精修已在上述信息结构上完成：收紧主卡和标题层级，统一续播/网格节奏，以真实封面强化媒体库入口，并减轻共享浮动导航。当前交付专注 iPad，iPhone 自动安装已暂停。规范见 [DESIGN_SYSTEM](DESIGN_SYSTEM.md)，真实前后截图和验证见 [首页精修](verification/home-polish/README.md)；本文第一版内容继续作为历史保留。

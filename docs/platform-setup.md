@@ -12,7 +12,7 @@
 
 该入口使用项目 Dart SDK 检查四个 Dart 源码目录，再执行 analyze 和普通测试；不改格式、不安装依赖、不启动设备，也不执行联网集成测试。首次缺少 SDK 或依赖时按根 README 准备。
 
-本轮只运行上述轻量检查，下面的构建/设备命令没有在本轮执行。
+工程基线任务只运行上述轻量检查；后续构建/设备执行记录见验证目录，例如 [播放器控制层](verification/player-controls/README.md)。下面给出命令与限制，不代表每次任务都会运行。
 
 ## Apple 平台
 
@@ -34,7 +34,7 @@ Xcode 27.2、iOS 27.2 模拟器和 CocoaPods 已可用。
   --dart-define=ORVEX_SILENT_SIMULATOR_TEST=true
 ```
 
-该脚本会自动导入生成素材，目前没有类似 Bangumi 脚本的运行时真机断言，因此不能把设备 ID 换成用户 iPhone。真机用正式 `lib/main.dart` 入口和用户自备媒体。
+该脚本会自动导入生成素材，已增加 iOS 运行时模拟器断言，不能把设备 ID 换成用户 iPhone。真机用正式 `lib/main.dart` 入口和用户自备媒体；断言不替代调用前核对目标，也不授权在其他物理设备导入生成素材。
 
 Bangumi 联网实验是另一条独立命令，脚本自身断言模拟器；代理参数仅供测试：
 
@@ -46,7 +46,7 @@ Bangumi 联网实验是另一条独立命令，脚本自身断言模拟器；代
 
 这条实验用 FakeEngine 验证元数据与界面，不验收播放/声音。模拟器无声预览、历史设备结果见 [验证状态](verification/STATUS.md)。
 
-macOS Release 的出站网络授权目前未配置，Bangumi 发布联网未验收，不能仅凭旧播放构建记录认定联网功能可用。
+macOS Debug/Profile 和 Release 的出站网络授权目前都未配置。本轮联网封面验证失败，离线 UI、主题持久化和原生播放分别通过；尚未修改权限并复验联网，不能仅凭播放构建成功认定 Bangumi 联网可用。结果见 [视觉验证](verification/visual-system/README.md)。
 
 ## Android
 

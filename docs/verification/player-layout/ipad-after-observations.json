@@ -1,0 +1,322 @@
+{
+  "portrait-light": {
+    "window": [
+      834.0,
+      1210.0
+    ],
+    "safeInsets": [
+      0.0,
+      32.0,
+      0.0,
+      20.0
+    ],
+    "videoRect": [
+      12.0,
+      117.0,
+      810.0,
+      455.625
+    ],
+    "engineCount": 1,
+    "positionMs": 4125
+  },
+  "portrait-dark": {
+    "window": [
+      834.0,
+      1210.0
+    ],
+    "safeInsets": [
+      0.0,
+      32.0,
+      0.0,
+      20.0
+    ],
+    "videoRect": [
+      12.0,
+      117.0,
+      810.0,
+      455.625
+    ],
+    "engineCount": 1,
+    "positionMs": 4125
+  },
+  "portrait-scrolled-back": {
+    "window": [
+      834.0,
+      1210.0
+    ],
+    "safeInsets": [
+      0.0,
+      32.0,
+      0.0,
+      20.0
+    ],
+    "videoRect": [
+      12.0,
+      117.0,
+      810.0,
+      455.625
+    ],
+    "engineCount": 1,
+    "positionMs": 4125
+  },
+  "landscape-light": {
+    "window": [
+      834.0,
+      1210.0
+    ],
+    "safeInsets": [
+      0.0,
+      32.0,
+      0.0,
+      20.0
+    ],
+    "videoRect": [
+      12.0,
+      117.0,
+      810.0,
+      455.625
+    ],
+    "engineCount": 1,
+    "positionMs": 4125
+  },
+  "landscape-dark": {
+    "window": [
+      834.0,
+      1210.0
+    ],
+    "safeInsets": [
+      0.0,
+      32.0,
+      0.0,
+      20.0
+    ],
+    "videoRect": [
+      12.0,
+      117.0,
+      810.0,
+      455.625
+    ],
+    "engineCount": 1,
+    "positionMs": 4125
+  },
+  "fullscreen-light": {
+    "window": [
+      834.0,
+      1210.0
+    ],
+    "safeInsets": [
+      0.0,
+      0.0,
+      0.0,
+      20.0
+    ],
+    "videoRect": [
+      0.0,
+      0.0,
+      834.0,
+      1210.0
+    ],
+    "engineCount": 1,
+    "positionMs": 4125
+  },
+  "fullscreen-dark": {
+    "window": [
+      834.0,
+      1210.0
+    ],
+    "safeInsets": [
+      0.0,
+      0.0,
+      0.0,
+      20.0
+    ],
+    "videoRect": [
+      0.0,
+      0.0,
+      834.0,
+      1210.0
+    ],
+    "engineCount": 1,
+    "positionMs": 4125
+  },
+  "portrait-restored": {
+    "window": [
+      834.0,
+      1210.0
+    ],
+    "safeInsets": [
+      0.0,
+      32.0,
+      0.0,
+      20.0
+    ],
+    "videoRect": [
+      12.0,
+      117.0,
+      810.0,
+      455.625
+    ],
+    "engineCount": 1,
+    "positionMs": 4125
+  },
+  "resized-1210-light": {
+    "window": [
+      1210.0,
+      834.0
+    ],
+    "safeInsets": [
+      0.0,
+      32.0,
+      0.0,
+      20.0
+    ],
+    "videoRect": [
+      20.0,
+      117.0,
+      1170.0,
+      658.125
+    ],
+    "engineCount": 1,
+    "positionMs": 4125
+  },
+  "resized-1210-dark": {
+    "window": [
+      1210.0,
+      834.0
+    ],
+    "safeInsets": [
+      0.0,
+      32.0,
+      0.0,
+      20.0
+    ],
+    "videoRect": [
+      20.0,
+      117.0,
+      1170.0,
+      658.125
+    ],
+    "engineCount": 1,
+    "positionMs": 4125
+  },
+  "resized-landscape-fullscreen-dark": {
+    "window": [
+      1210.0,
+      834.0
+    ],
+    "safeInsets": [
+      0.0,
+      0.0,
+      0.0,
+      20.0
+    ],
+    "videoRect": [
+      0.0,
+      0.0,
+      1210.0,
+      834.0
+    ],
+    "engineCount": 1,
+    "positionMs": 4125
+  },
+  "resized-430-light": {
+    "window": [
+      430.0,
+      800.0
+    ],
+    "safeInsets": [
+      0.0,
+      32.0,
+      0.0,
+      20.0
+    ],
+    "videoRect": [
+      0.0,
+      117.0,
+      430.0,
+      241.875
+    ],
+    "engineCount": 1,
+    "positionMs": 4125
+  },
+  "resized-430-dark": {
+    "window": [
+      430.0,
+      800.0
+    ],
+    "safeInsets": [
+      0.0,
+      32.0,
+      0.0,
+      20.0
+    ],
+    "videoRect": [
+      0.0,
+      117.0,
+      430.0,
+      241.875
+    ],
+    "engineCount": 1,
+    "positionMs": 4125
+  },
+  "resized-600-light": {
+    "window": [
+      600.0,
+      480.0
+    ],
+    "safeInsets": [
+      0.0,
+      32.0,
+      0.0,
+      20.0
+    ],
+    "videoRect": [
+      12.888888888888914,
+      117.0,
+      574.2222222222222,
+      323.0
+    ],
+    "engineCount": 1,
+    "positionMs": 4125
+  },
+  "resized-600-dark": {
+    "window": [
+      600.0,
+      480.0
+    ],
+    "safeInsets": [
+      0.0,
+      32.0,
+      0.0,
+      20.0
+    ],
+    "videoRect": [
+      12.888888888888914,
+      117.0,
+      574.2222222222222,
+      323.0
+    ],
+    "engineCount": 1,
+    "positionMs": 4125
+  },
+  "window-restored": {
+    "window": [
+      834.0,
+      1210.0
+    ],
+    "safeInsets": [
+      0.0,
+      32.0,
+      0.0,
+      20.0
+    ],
+    "videoRect": [
+      12.0,
+      117.0,
+      810.0,
+      455.625
+    ],
+    "engineCount": 1,
+    "positionMs": 4125
+  }
+}

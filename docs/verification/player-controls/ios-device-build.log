@@ -1,0 +1,9 @@
+Warning: Building for device with codesigning disabled. You will have to manually codesign before deploying to device.
+Building dev.orvex.orvex for device (ios-release)...
+The following plugins do not support Swift Package Manager for ios:
+  - media_kit_libs_ios_video
+  - media_kit_video
+This will become an error in a future version of Flutter. Please contact the plugin maintainers to request Swift Package Manager adoption.
+Running Xcode build...                                          
+Xcode build done.                                           17.8s
+✓ Built build/ios/iphoneos/Runner.app (57.3MB)

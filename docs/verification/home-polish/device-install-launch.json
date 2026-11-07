@@ -1,0 +1,14 @@
+{
+  "bundle": "dev.orvex.orvex",
+  "team": "B42C727YGN",
+  "iPad": {
+    "firstInstall": "failed: remote connection interrupted (IXRemoteErrorDomain 6)",
+    "retryInstall": "success",
+    "launch": "success"
+  },
+  "iPhone": "not attempted per user instruction",
+  "uninstalled": false,
+  "appDataCleared": false,
+  "generatedFixturesOnPhysicalDevices": false,
+  "actualDeviceVisualAcceptance": "Not Tested; installed and launched only"
+}

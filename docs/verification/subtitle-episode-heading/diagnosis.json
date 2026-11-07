@@ -1,0 +1,13 @@
+{
+  "device": "iPad Pro 2022",
+  "videoFilename": "[Fabre-RAW] Detective Conan 0615 [NetflixJP] [1080p].mkv",
+  "subtitleFilenameProvidedByUser": "615集 日志奏出的秘密（下集）.ass",
+  "videoSource": "indexed authorized folder",
+  "videoIndexAvailable": true,
+  "manualPreferenceFor615": "absent",
+  "automaticMatchingPreference": "unset; defaults to true",
+  "observedComparableSubtitleName": "609集 背叛的白色情人节（下集）.ass",
+  "cause": "subtitle episode parser omitted a leading bare numeric episode label followed by 集/话/話",
+  "externalSubtitleDirectoryReadInThisDiagnosis": false,
+  "deviceDataModifiedDuringDiagnosis": false
+}

@@ -138,6 +138,9 @@ class MediaKitEngine implements PlaybackEngine {
     // The bundled libass builds do not consistently discover system CJK fonts.
     // Register our OFL font directory before opening any subtitle decoder.
     final native = _player.platform as NativePlayer;
+    // Orvex owns matching and explicit off/manual choices, rather than mpv's
+    // independent default filename autoloading. Internal tracks remain intact.
+    await native.setProperty('sub-auto', 'no');
     await native.setProperty('sub-fonts-dir', await _prepareSubtitleFonts());
     await native.setProperty('sub-font', 'Noto Sans CJK SC');
     if (Platform.isIOS) {

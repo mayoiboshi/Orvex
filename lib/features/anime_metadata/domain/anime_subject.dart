@@ -120,7 +120,7 @@ enum AnimeMatchStatus {
   ignored,
 }
 
-const animeMatcherVersion = 2;
+const animeMatcherVersion = 3;
 
 class AnimeMatch {
   const AnimeMatch({
@@ -167,6 +167,7 @@ class AnimeMatch {
 }
 
 String animeMediaKey(LocalMedia media) {
+  if (media.folderRoot != null) return media.resumeKey;
   final marker = media.uri.path.lastIndexOf('/Imports/');
   return media.uri.scheme == 'file' && marker >= 0
       ? media.uri.path.substring(marker + 1)

@@ -1,0 +1,274 @@
+{
+  "phone-before-portrait-light.png": {
+    "size": [
+      402,
+      874
+    ],
+    "cornerPixels": [
+      [
+        244,
+        246,
+        250
+      ],
+      [
+        244,
+        246,
+        250
+      ],
+      [
+        244,
+        246,
+        250
+      ],
+      [
+        244,
+        246,
+        250
+      ]
+    ],
+    "expectedThemeBackground": [
+      244,
+      246,
+      250
+    ],
+    "allMatch": true
+  },
+  "phone-before-portrait-dark.png": {
+    "size": [
+      402,
+      874
+    ],
+    "cornerPixels": [
+      [
+        12,
+        16,
+        24
+      ],
+      [
+        12,
+        16,
+        24
+      ],
+      [
+        12,
+        16,
+        24
+      ],
+      [
+        12,
+        16,
+        24
+      ]
+    ],
+    "expectedThemeBackground": [
+      12,
+      16,
+      24
+    ],
+    "allMatch": true
+  },
+  "phone-after-portrait-light.png": {
+    "size": [
+      402,
+      874
+    ],
+    "cornerPixels": [
+      [
+        244,
+        246,
+        250
+      ],
+      [
+        244,
+        246,
+        250
+      ],
+      [
+        244,
+        246,
+        250
+      ],
+      [
+        244,
+        246,
+        250
+      ]
+    ],
+    "expectedThemeBackground": [
+      244,
+      246,
+      250
+    ],
+    "allMatch": true
+  },
+  "phone-after-portrait-dark.png": {
+    "size": [
+      402,
+      874
+    ],
+    "cornerPixels": [
+      [
+        12,
+        16,
+        24
+      ],
+      [
+        12,
+        16,
+        24
+      ],
+      [
+        12,
+        16,
+        24
+      ],
+      [
+        12,
+        16,
+        24
+      ]
+    ],
+    "expectedThemeBackground": [
+      12,
+      16,
+      24
+    ],
+    "allMatch": true
+  },
+  "ipad-before-portrait-light.png": {
+    "size": [
+      834,
+      1210
+    ],
+    "cornerPixels": [
+      [
+        244,
+        246,
+        250
+      ],
+      [
+        244,
+        246,
+        250
+      ],
+      [
+        244,
+        246,
+        250
+      ],
+      [
+        244,
+        246,
+        250
+      ]
+    ],
+    "expectedThemeBackground": [
+      244,
+      246,
+      250
+    ],
+    "allMatch": true
+  },
+  "ipad-before-portrait-dark.png": {
+    "size": [
+      834,
+      1210
+    ],
+    "cornerPixels": [
+      [
+        12,
+        16,
+        24
+      ],
+      [
+        12,
+        16,
+        24
+      ],
+      [
+        12,
+        16,
+        24
+      ],
+      [
+        12,
+        16,
+        24
+      ]
+    ],
+    "expectedThemeBackground": [
+      12,
+      16,
+      24
+    ],
+    "allMatch": true
+  },
+  "ipad-after-portrait-light.png": {
+    "size": [
+      834,
+      1210
+    ],
+    "cornerPixels": [
+      [
+        244,
+        246,
+        250
+      ],
+      [
+        244,
+        246,
+        250
+      ],
+      [
+        244,
+        246,
+        250
+      ],
+      [
+        244,
+        246,
+        250
+      ]
+    ],
+    "expectedThemeBackground": [
+      244,
+      246,
+      250
+    ],
+    "allMatch": true
+  },
+  "ipad-after-portrait-dark.png": {
+    "size": [
+      834,
+      1210
+    ],
+    "cornerPixels": [
+      [
+        12,
+        16,
+        24
+      ],
+      [
+        12,
+        16,
+        24
+      ],
+      [
+        12,
+        16,
+        24
+      ],
+      [
+        12,
+        16,
+        24
+      ]
+    ],
+    "expectedThemeBackground": [
+      12,
+      16,
+      24
+    ],
+    "allMatch": true
+  }
+}

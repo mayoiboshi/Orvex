@@ -1,0 +1,22 @@
+{
+  "date": "2026-11-06",
+  "deviceModel": "iPhone 17 Pro Max",
+  "bundleIdentifier": "dev.orvex.orvex",
+  "entrypoint": "lib/main.dart",
+  "buildMode": "Release",
+  "existingSigningTeamRetained": true,
+  "codesignVerification": "Passed",
+  "testDefinesIncluded": false,
+  "installation": "success; in-place update without uninstall",
+  "launch": "success",
+  "userMediaAccessedOrDeleted": false,
+  "playbackAndNewGesturesAcceptance": "Passed (user-reported overall acceptance on iPhone 17 Pro Max)",
+  "userFeedback": "本轮验收通过，下一轮做 ui 优化",
+  "remainingNotTested": [
+    "Physical iPad",
+    "Individually confirmed brightness restoration on exit/background",
+    "Actual phone-call and headphone interruption events",
+    "Android/Windows",
+    "Performance and long-duration stability"
+  ]
+}

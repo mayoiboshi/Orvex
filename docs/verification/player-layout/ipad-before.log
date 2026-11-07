@@ -1,0 +1,101 @@
+00:00 +0: loading /Users/wanzhenyu/CodexProjects/Orvex/integration_test/player_layout_test.dart
+The following plugins do not support Swift Package Manager for ios:
+  - media_kit_libs_ios_video
+  - media_kit_video
+This will become an error in a future version of Flutter. Please contact the plugin maintainers to request Swift Package Manager adoption.
+Running Xcode build...                                          
+Xcode build done.                                           18.7s
+00:00 +0: player window background, themes, rotation and session continuity
+media_kit: NativeReferenceHolder: Allocated 4405899264
+VideoOutput.Resize
+{id: 0, rect: {width: 0.0, height: 0.0, left: 0.0, top: 0.0}, handle: 4937083600}
+NativeVideoController: Texture ID: 0
+VideoOutput.Resize
+{id: 0, rect: {width: 480.0, top: 0.0, left: 0.0, height: 270.0}, handle: 4937083600}
+VideoOutput.Resize
+{id: 0, rect: {top: 0.0, left: 0.0, width: 640.0, height: 360.0}, handle: 4937083600}
+VideoOutput.Resize
+{rect: {width: 0.0, top: 0.0, left: 0.0, height: 0.0}, handle: 4937084880, id: 1}
+NativeVideoController: Texture ID: 1
+VideoOutput.Resize
+{id: 1, rect: {top: 0.0, left: 0.0, width: 480.0, height: 270.0}, handle: 4937084880}
+VideoOutput.Resize
+{handle: 4937084880, rect: {top: 0.0, left: 0.0, height: 360.0, width: 640.0}, id: 1}
+VideoOutput.Resize
+{id: 2, handle: 4937086160, rect: {height: 0.0, width: 0.0, top: 0.0, left: 0.0}}
+NativeVideoController: Texture ID: 2
+VideoOutput.Resize
+{handle: 4937086160, rect: {height: 270.0, width: 480.0, top: 0.0, left: 0.0}, id: 2}
+VideoOutput.Resize
+{id: 2, rect: {left: 0.0, width: 640.0, height: 360.0, top: 0.0}, handle: 4937086160}
+VideoOutput.Resize
+{id: 3, rect: {left: 0.0, width: 0.0, height: 0.0, top: 0.0}, handle: 4937086800}
+NativeVideoController: Texture ID: 3
+VideoOutput.Resize
+{id: 3, rect: {top: 0.0, height: 270.0, left: 0.0, width: 480.0}, handle: 4937086800}
+VideoOutput.Resize
+{id: 3, rect: {height: 360.0, top: 0.0, left: 0.0, width: 640.0}, handle: 4937086800}
+VideoOutput.Resize
+{id: 4, rect: {top: 0.0, width: 0.0, left: 0.0, height: 0.0}, handle: 4937087440}
+NativeVideoController: Texture ID: 4
+VideoOutput.Resize
+{id: 4, rect: {height: 270.0, top: 0.0, left: 0.0, width: 480.0}, handle: 4937087440}
+VideoOutput.Resize
+{handle: 4937087440, id: 4, rect: {left: 0.0, width: 640.0, height: 360.0, top: 0.0}}
+VideoOutput.Resize
+{handle: 4764403024, id: 5, rect: {top: 0.0, left: 0.0, height: 0.0, width: 0.0}}
+NativeVideoController: Texture ID: 5
+VideoOutput.Resize
+{handle: 4764403024, rect: {width: 480.0, left: 0.0, height: 270.0, top: 0.0}, id: 5}
+VideoOutput.Resize
+{handle: 4764403024, rect: {left: 0.0, width: 640.0, height: 360.0, top: 0.0}, id: 5}
+VideoOutput.Resize
+{handle: 4937088080, rect: {left: 0.0, height: 0.0, width: 0.0, top: 0.0}, id: 6}
+NativeVideoController: Texture ID: 6
+VideoOutput.Resize
+{handle: 4937088080, rect: {width: 480.0, height: 270.0, left: 0.0, top: 0.0}, id: 6}
+VideoOutput.Resize
+{id: 6, rect: {left: 0.0, top: 0.0, width: 640.0, height: 360.0}, handle: 4937088080}
+VideoOutput.Resize
+{rect: {width: 0.0, height: 0.0, left: 0.0, top: 0.0}, handle: 5032018000, id: 7}
+NativeVideoController: Texture ID: 7
+VideoOutput.Resize
+{handle: 5032018000, id: 7, rect: {left: 0.0, height: 270.0, width: 480.0, top: 0.0}}
+VideoOutput.Resize
+{id: 7, rect: {left: 0.0, top: 0.0, width: 640.0, height: 360.0}, handle: 5032018000}
+VideoOutput.Resize
+{handle: 5032018640, id: 8, rect: {width: 0.0, top: 0.0, height: 0.0, left: 0.0}}
+NativeVideoController: Texture ID: 8
+VideoOutput.Resize
+{handle: 5032018640, rect: {height: 270.0, top: 0.0, left: 0.0, width: 480.0}, id: 8}
+VideoOutput.Resize
+{rect: {height: 360.0, top: 0.0, left: 0.0, width: 640.0}, handle: 5032018640, id: 8}
+VideoOutput.Resize
+{id: 9, rect: {top: 0.0, height: 0.0, left: 0.0, width: 0.0}, handle: 5032019280}
+NativeVideoController: Texture ID: 9
+VideoOutput.Resize
+{id: 9, rect: {height: 270.0, top: 0.0, left: 0.0, width: 480.0}, handle: 5032019280}
+VideoOutput.Resize
+{rect: {top: 0.0, height: 360.0, left: 0.0, width: 640.0}, handle: 5032019280, id: 9}
+VideoOutput.Resize
+{handle: 5032019920, id: 10, rect: {top: 0.0, left: 0.0, height: 0.0, width: 0.0}}
+NativeVideoController: Texture ID: 10
+VideoOutput.Resize
+{handle: 5032019920, rect: {width: 480.0, height: 270.0, left: 0.0, top: 0.0}, id: 10}
+VideoOutput.Resize
+{id: 10, handle: 5032019920, rect: {height: 360.0, width: 640.0, top: 0.0, left: 0.0}}
+VideoOutput.Resize
+{rect: {width: 0.0, top: 0.0, height: 0.0, left: 0.0}, handle: 5032020560, id: 11}
+NativeVideoController: Texture ID: 11
+VideoOutput.Resize
+{handle: 5032020560, rect: {top: 0.0, width: 480.0, left: 0.0, height: 270.0}, id: 11}
+VideoOutput.Resize
+{id: 11, handle: 5032020560, rect: {top: 0.0, left: 0.0, width: 640.0, height: 360.0}}
+VideoOutput.Resize
+{id: 12, handle: 5032021200, rect: {top: 0.0, width: 0.0, left: 0.0, height: 0.0}}
+NativeVideoController: Texture ID: 12
+VideoOutput.Resize
+{rect: {width: 640.0, left: 0.0, height: 360.0, top: 0.0}, id: 12, handle: 5032021200}
+ORVEX_LAYOUT_EVIDENCE=/Users/wanzhenyu/Library/Developer/CoreSimulator/Devices/139B061B-ED02-4594-A56A-1AAC3A7AF574/data/Containers/Data/Application/184E1CCF-61F3-4863-B2D3-A88F0CC6DBE3/tmp/orvex-layout-before-lu9NsK
+00:07 +1: (tearDownAll)
+00:07 +1: All tests passed!

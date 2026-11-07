@@ -1,0 +1,147 @@
+{
+  "player-light": {
+    "window": [
+      402.0,
+      874.0
+    ],
+    "safeInsets": [
+      0.0,
+      62.0,
+      0.0,
+      34.0
+    ],
+    "videoRect": [
+      0.0,
+      147.0,
+      402.0,
+      226.125
+    ],
+    "engineCount": 1,
+    "positionMs": 4000
+  },
+  "player-dark": {
+    "window": [
+      402.0,
+      874.0
+    ],
+    "safeInsets": [
+      0.0,
+      62.0,
+      0.0,
+      34.0
+    ],
+    "videoRect": [
+      0.0,
+      147.0,
+      402.0,
+      226.125
+    ],
+    "engineCount": 1,
+    "positionMs": 4000
+  },
+  "edge-drag-dark": {
+    "window": [
+      402.0,
+      874.0
+    ],
+    "safeInsets": [
+      0.0,
+      62.0,
+      0.0,
+      34.0
+    ],
+    "videoRect": [
+      59.99999999999999,
+      147.0,
+      402.0,
+      226.125
+    ],
+    "engineCount": 1,
+    "positionMs": 4750
+  },
+  "edge-cancelled-dark": {
+    "window": [
+      402.0,
+      874.0
+    ],
+    "safeInsets": [
+      0.0,
+      62.0,
+      0.0,
+      34.0
+    ],
+    "videoRect": [
+      0.0,
+      147.0,
+      402.0,
+      226.125
+    ],
+    "engineCount": 1,
+    "positionMs": 6416
+  },
+  "returned-series-scroll-dark": {
+    "window": [
+      402.0,
+      874.0
+    ],
+    "safeInsets": [
+      0.0,
+      62.0,
+      0.0,
+      34.0
+    ],
+    "videoRect": null,
+    "engineCount": 1,
+    "positionMs": 6708
+  },
+  "returned-series-dark": {
+    "window": [
+      402.0,
+      874.0
+    ],
+    "safeInsets": [
+      0.0,
+      62.0,
+      0.0,
+      34.0
+    ],
+    "videoRect": null,
+    "engineCount": 1,
+    "positionMs": 6708
+  },
+  "returned-library-light": {
+    "window": [
+      402.0,
+      874.0
+    ],
+    "safeInsets": [
+      0.0,
+      62.0,
+      0.0,
+      34.0
+    ],
+    "videoRect": null,
+    "engineCount": 1,
+    "positionMs": 6708
+  },
+  "fullscreen-edge-remains-player": {
+    "window": [
+      874.0,
+      402.0
+    ],
+    "safeInsets": [
+      62.0,
+      0.0,
+      62.0,
+      20.0
+    ],
+    "videoRect": [
+      0.0,
+      0.0,
+      874.0,
+      402.0
+    ],
+    "engineCount": 1,
+    "positionMs": 17958
+  }
+}

@@ -1,0 +1,44 @@
+The following plugins do not support Swift Package Manager for macos:
+  - media_kit_libs_macos_video
+  - media_kit_video
+This will become an error in a future version of Flutter. Please contact the plugin maintainers to request Swift Package Manager adoption.
+Building macOS application...                                   
+2026-11-06 08:21:25.027 xcodebuild[28291:5330487] [MT] IDESchemeActionsInvocationRecord: Device <IDEOSXSupportCore.IDEMacPlaceholder: 0x7baa081400 (Any Mac | undefined_arch)> is missing operatingSystemVersion, operatingSystemVersionWithBuildNumber.
+✓ Built build/macos/Build/Products/Profile/Orvex.app (136.6MB)
+[local debugging endpoint omitted]
+VMServiceFlutterDriver: Isolate found with number: 1664595288938787
+VMServiceFlutterDriver: Isolate 1664595288938787 is runnable.
+VMServiceFlutterDriver: Isolate is paused at start.
+VMServiceFlutterDriver: Attempting to resume isolate
+flutter: 00:00 +0: offline light/dark UI and themes during native playback (network NOT TESTED)
+VMServiceFlutterDriver: Connected to Flutter application.
+2026-11-06 08:21:55.180 Orvex[29583:5336272] VideoOutput: enableHardwareAcceleration: true
+flutter: VideoOutput.Resize
+flutter: {handle: 531263137232, id: 531230207008, rect: {width: 0.0, top: 0.0, left: 0.0, height: 0.0}}
+flutter: NativeVideoController: Texture ID: 531230207008
+2026-11-06 08:21:55.498 Orvex[29583:5336272] TextureGL: resize: 640.0x360.0
+flutter: VideoOutput.Resize
+flutter: {id: 531230207008, rect: {left: 0.0, width: 640.0, height: 360.0, top: 0.0}, handle: 531263137232}
+2026-11-06 08:21:55.527 Orvex[29583:5336318] VideoOutput: enableHardwareAcceleration: true
+flutter: VideoOutput.Resize
+flutter: {id: 531233345056, handle: 531258702288, rect: {width: 0.0, top: 0.0, left: 0.0, height: 0.0}}
+flutter: NativeVideoController: Texture ID: 531233345056
+2026-11-06 08:21:55.743 Orvex[29583:5336318] TextureGL: resize: 640.0x360.0
+flutter: VideoOutput.Resize
+flutter: {rect: {width: 640.0, height: 360.0, top: 0.0, left: 0.0}, id: 531233345056, handle: 531258702288}
+flutter: ORVEX_VISUAL_EVIDENCE=/Users/wanzhenyu/Library/Containers/dev.orvex.orvex/Data/tmp/orvex-visual-azZAaL
+flutter: 00:16 +1: (tearDownAll)
+flutter: Warning: integration_test plugin was not detected.
+flutter: 
+flutter: If you're running the tests with `flutter drive`, please make sure your tests
+flutter: are in the `integration_test/` directory of your package and use
+flutter: `flutter test $path_to_test` to run it instead.
+flutter: 
+flutter: If you're running the tests with Android instrumentation or XCTest, this means
+flutter: that you are not capturing test results properly! See the following link for
+flutter: how to set up the integration_test plugin:
+flutter: 
+flutter: https://docs.flutter.dev/testing/integration-tests
+flutter: 
+flutter: 00:16 +2: All tests passed!
+All tests passed.

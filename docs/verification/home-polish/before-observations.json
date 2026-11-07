@@ -1,0 +1,10 @@
+{
+  "stage": "before",
+  "fixtureVideos": 8,
+  "cachedPosters": 2,
+  "navigationSize": [
+    560.0,
+    71.0
+  ],
+  "passed": true
+}

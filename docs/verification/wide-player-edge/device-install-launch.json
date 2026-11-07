@@ -1,0 +1,19 @@
+{
+  "date": "2026-11-06",
+  "bundle": "dev.orvex.orvex",
+  "team": "B42C727YGN",
+  "devices": {
+    "iphone": {
+      "install": "success",
+      "launch": "success"
+    },
+    "ipad": {
+      "install": "success",
+      "launch": "success"
+    }
+  },
+  "uninstalled": false,
+  "appDataCleared": false,
+  "generatedFixturesOnPhysicalDevices": false,
+  "actualDeviceVisualAcceptance": "Not Tested; installed and launched only"
+}

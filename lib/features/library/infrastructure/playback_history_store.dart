@@ -34,6 +34,8 @@ class PlaybackHistoryStore {
               uri: Uri.parse(data['uri'] as String),
               name: data['name'] as String,
               importPath: relative,
+              folderRoot: data['folderRoot'] as String?,
+              folderFile: data['folderFile'] as String?,
             ),
             position: Duration(milliseconds: data['position'] as int),
             duration: Duration(milliseconds: data['duration'] as int),
@@ -66,6 +68,10 @@ class PlaybackHistoryStore {
         'name': record.media.name,
         if (record.media.relativeImportPath != null)
           'importPath': record.media.relativeImportPath,
+        if (record.media.folderRoot != null)
+          'folderRoot': record.media.folderRoot,
+        if (record.media.folderFile != null)
+          'folderFile': record.media.folderFile,
         'position': record.position.inMilliseconds,
         'duration': record.duration.inMilliseconds,
         'updatedAt': record.updatedAt.toUtc().toIso8601String(),

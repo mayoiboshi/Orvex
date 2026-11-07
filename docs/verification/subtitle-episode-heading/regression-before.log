@@ -1,0 +1,14 @@
+00:00 +0: loading /Users/wanzhenyu/CodexProjects/Orvex/test/subtitle_matching_test.dart
+00:00 +0: Conan subtitles headed by a bare episode label match zero-padded video episodes
+00:00 +0 -1: Conan subtitles headed by a bare episode label match zero-padded video episodes [E]
+  Expected: SubtitleMatch:<SubtitleMatch.episode>
+    Actual: SubtitleMatch:<SubtitleMatch.none>
+  
+  package:matcher                                     expect
+  package:flutter_test/src/widget_tester.dart 473:18  expect
+  test/subtitle_matching_test.dart 111:7              main.<fn>
+  
+00:00 +0 -1: Some tests failed.
+
+Failing tests:
+  /Users/wanzhenyu/CodexProjects/Orvex/test/subtitle_matching_test.dart: Conan subtitles headed by a bare episode label match zero-padded video episodes

@@ -1,0 +1,134 @@
+Formatted 65 files (0 changed) in 0.25 seconds.
+Analyzing Orvex...                                              
+No issues found! (ran in 3.4s)
+00:00 +0: loading /Users/wanzhenyu/CodexProjects/Orvex/test/folder_browser_test.dart
+00:00 +0: /Users/wanzhenyu/CodexProjects/Orvex/test/bangumi_client_test.dart: franchise fallback requires two independent main-story links (ambiguous=false)
+00:00 +1: /Users/wanzhenyu/CodexProjects/Orvex/test/bangumi_client_test.dart: franchise fallback requires two independent main-story links (ambiguous=false)
+00:00 +2: /Users/wanzhenyu/CodexProjects/Orvex/test/imported_file_store_test.dart: same-name imports preserve both files without overwrite
+00:00 +3: /Users/wanzhenyu/CodexProjects/Orvex/test/imported_file_store_test.dart: same-name imports preserve both files without overwrite
+00:00 +4: /Users/wanzhenyu/CodexProjects/Orvex/test/player_brightness_test.dart: iOS brightness reads capability, clamps, and restores (variant: TargetPlatform.iOS)
+00:00 +5: /Users/wanzhenyu/CodexProjects/Orvex/test/player_brightness_test.dart: iOS brightness reads capability, clamps, and restores (variant: TargetPlatform.iOS)
+00:00 +6: /Users/wanzhenyu/CodexProjects/Orvex/test/player_brightness_test.dart: iOS brightness reads capability, clamps, and restores (variant: TargetPlatform.iOS)
+00:00 +7: /Users/wanzhenyu/CodexProjects/Orvex/test/player_brightness_test.dart: iOS brightness reads capability, clamps, and restores (variant: TargetPlatform.iOS)
+00:00 +8: /Users/wanzhenyu/CodexProjects/Orvex/test/player_brightness_test.dart: iOS brightness reads capability, clamps, and restores (variant: TargetPlatform.iOS)
+00:00 +9: /Users/wanzhenyu/CodexProjects/Orvex/test/player_brightness_test.dart: iOS brightness reads capability, clamps, and restores (variant: TargetPlatform.iOS)
+00:00 +10: /Users/wanzhenyu/CodexProjects/Orvex/test/player_brightness_test.dart: iOS brightness reads capability, clamps, and restores (variant: TargetPlatform.iOS)
+00:00 +11: /Users/wanzhenyu/CodexProjects/Orvex/test/player_brightness_test.dart: iOS brightness reads capability, clamps, and restores (variant: TargetPlatform.iOS)
+00:00 +12: /Users/wanzhenyu/CodexProjects/Orvex/test/player_brightness_test.dart: iOS brightness reads capability, clamps, and restores (variant: TargetPlatform.iOS)
+00:00 +13: /Users/wanzhenyu/CodexProjects/Orvex/test/player_brightness_test.dart: iOS brightness reads capability, clamps, and restores (variant: TargetPlatform.iOS)
+00:00 +14: /Users/wanzhenyu/CodexProjects/Orvex/test/player_brightness_test.dart: iOS brightness reads capability, clamps, and restores (variant: TargetPlatform.iOS)
+00:00 +15: /Users/wanzhenyu/CodexProjects/Orvex/test/folder_browser_test.dart: standalone folders keep navigation history and parent search on iOS edge back (variant: TargetPlatform.iOS)
+00:00 +16: /Users/wanzhenyu/CodexProjects/Orvex/test/folder_browser_test.dart: standalone folders keep navigation history and parent search on iOS edge back (variant: TargetPlatform.iOS)
+00:00 +17: /Users/wanzhenyu/CodexProjects/Orvex/test/folder_browser_test.dart: standalone folders keep navigation history and parent search on iOS edge back (variant: TargetPlatform.iOS)
+00:00 +18: /Users/wanzhenyu/CodexProjects/Orvex/test/folder_browser_test.dart: standalone folders keep navigation history and parent search on iOS edge back (variant: TargetPlatform.iOS)
+00:00 +19: /Users/wanzhenyu/CodexProjects/Orvex/test/folder_browser_test.dart: standalone folders keep navigation history and parent search on iOS edge back (variant: TargetPlatform.iOS)
+00:00 +20: /Users/wanzhenyu/CodexProjects/Orvex/test/folder_browser_test.dart: standalone folders keep navigation history and parent search on iOS edge back (variant: TargetPlatform.iOS)
+00:00 +21: /Users/wanzhenyu/CodexProjects/Orvex/test/folder_browser_test.dart: standalone folders keep navigation history and parent search on iOS edge back (variant: TargetPlatform.iOS)
+00:00 +22: /Users/wanzhenyu/CodexProjects/Orvex/test/folder_browser_test.dart: standalone folders keep navigation history and parent search on iOS edge back (variant: TargetPlatform.iOS)
+00:00 +23: /Users/wanzhenyu/CodexProjects/Orvex/test/folder_browser_test.dart: standalone folders keep navigation history and parent search on iOS edge back (variant: TargetPlatform.iOS)
+00:00 +24: /Users/wanzhenyu/CodexProjects/Orvex/test/folder_browser_test.dart: standalone folders keep navigation history and parent search on iOS edge back (variant: TargetPlatform.iOS)
+00:00 +25: /Users/wanzhenyu/CodexProjects/Orvex/test/folder_browser_test.dart: standalone folders keep navigation history and parent search on iOS edge back (variant: TargetPlatform.iOS)
+00:00 +26: /Users/wanzhenyu/CodexProjects/Orvex/test/folder_browser_test.dart: standalone folders keep navigation history and parent search on iOS edge back (variant: TargetPlatform.iOS)
+00:00 +27: /Users/wanzhenyu/CodexProjects/Orvex/test/folder_browser_test.dart: standalone folders keep navigation history and parent search on iOS edge back (variant: TargetPlatform.iOS)
+00:00 +28: /Users/wanzhenyu/CodexProjects/Orvex/test/folder_browser_test.dart: standalone folders keep navigation history and parent search on iOS edge back (variant: TargetPlatform.iOS)
+00:00 +29: /Users/wanzhenyu/CodexProjects/Orvex/test/folder_browser_test.dart: standalone folders keep navigation history and parent search on iOS edge back (variant: TargetPlatform.iOS)
+00:00 +30: /Users/wanzhenyu/CodexProjects/Orvex/test/folder_browser_test.dart: standalone folders keep navigation history and parent search on iOS edge back (variant: TargetPlatform.iOS)
+00:00 +31: /Users/wanzhenyu/CodexProjects/Orvex/test/folder_browser_test.dart: standalone folders keep navigation history and parent search on iOS edge back (variant: TargetPlatform.iOS)
+00:00 +32: /Users/wanzhenyu/CodexProjects/Orvex/test/folder_browser_test.dart: standalone folders keep navigation history and parent search on iOS edge back (variant: TargetPlatform.iOS)
+00:01 +33: /Users/wanzhenyu/CodexProjects/Orvex/test/folder_browser_test.dart: large lazy folder playlist, location, browsing and text scaling Brightness.dark
+00:01 +34: /Users/wanzhenyu/CodexProjects/Orvex/test/folder_browser_test.dart: large lazy folder playlist, location, browsing and text scaling Brightness.light
+00:02 +35: /Users/wanzhenyu/CodexProjects/Orvex/test/anime_metadata_test.dart: reported four-digit Conan episode is removed without treating release years as episodes
+00:02 +36: /Users/wanzhenyu/CodexProjects/Orvex/test/anime_metadata_test.dart: main-story evidence requires two sources, a TV series and an episodic file
+00:02 +37: /Users/wanzhenyu/CodexProjects/Orvex/test/anime_metadata_test.dart: old automatic review cache is retried after update while manual selections survive
+00:02 +38: /Users/wanzhenyu/CodexProjects/Orvex/test/anime_metadata_test.dart: release names keep title and episode while stripping group and quality
+00:02 +39: /Users/wanzhenyu/CodexProjects/Orvex/test/anime_metadata_test.dart: exact aliases match; alternate seasons, years, ambiguity and partial names do not
+00:02 +40: /Users/wanzhenyu/CodexProjects/Orvex/test/anime_metadata_test.dart: episodes share a query and cached matches survive app container relocation
+00:02 +41: /Users/wanzhenyu/CodexProjects/Orvex/test/anime_metadata_test.dart: manual correction and ignore win over an in-flight automatic result
+00:02 +42: /Users/wanzhenyu/CodexProjects/Orvex/test/playback_surface_test.dart: controls fade after idle, pause retains them, taps toggle
+00:02 +43: /Users/wanzhenyu/CodexProjects/Orvex/test/playback_surface_test.dart: controls fade after idle, pause retains them, taps toggle
+00:02 +44: /Users/wanzhenyu/CodexProjects/Orvex/test/playback_surface_test.dart: controls fade after idle, pause retains them, taps toggle
+00:02 +45: /Users/wanzhenyu/CodexProjects/Orvex/test/playback_surface_test.dart: controls fade after idle, pause retains them, taps toggle
+00:02 +46: /Users/wanzhenyu/CodexProjects/Orvex/test/playback_surface_test.dart: controls fade after idle, pause retains them, taps toggle
+00:02 +47: /Users/wanzhenyu/CodexProjects/Orvex/test/playback_surface_test.dart: controls fade after idle, pause retains them, taps toggle
+00:02 +48: /Users/wanzhenyu/CodexProjects/Orvex/test/playback_surface_test.dart: controls fade after idle, pause retains them, taps toggle
+00:02 +49: /Users/wanzhenyu/CodexProjects/Orvex/test/playback_surface_test.dart: controls fade after idle, pause retains them, taps toggle
+00:02 +50: /Users/wanzhenyu/CodexProjects/Orvex/test/playback_surface_test.dart: controls fade after idle, pause retains them, taps toggle
+00:03 +51: /Users/wanzhenyu/CodexProjects/Orvex/test/playback_surface_test.dart: controls fade after idle, pause retains them, taps toggle
+00:03 +52: /Users/wanzhenyu/CodexProjects/Orvex/test/playback_surface_test.dart: controls fade after idle, pause retains them, taps toggle
+00:03 +53: /Users/wanzhenyu/CodexProjects/Orvex/test/playback_surface_test.dart: controls fade after idle, pause retains them, taps toggle
+00:03 +54: /Users/wanzhenyu/CodexProjects/Orvex/test/playback_surface_test.dart: controls fade after idle, pause retains them, taps toggle
+00:03 +55: /Users/wanzhenyu/CodexProjects/Orvex/test/playback_surface_test.dart: controls fade after idle, pause retains them, taps toggle
+00:03 +56: /Users/wanzhenyu/CodexProjects/Orvex/test/playback_surface_test.dart: controls fade after idle, pause retains them, taps toggle
+00:03 +57: /Users/wanzhenyu/CodexProjects/Orvex/test/playback_surface_test.dart: controls fade after idle, pause retains them, taps toggle
+00:03 +58: /Users/wanzhenyu/CodexProjects/Orvex/test/playback_surface_test.dart: controls fade after idle, pause retains them, taps toggle
+00:03 +59: /Users/wanzhenyu/CodexProjects/Orvex/test/playback_surface_test.dart: controls fade after idle, pause retains them, taps toggle
+00:03 +60: /Users/wanzhenyu/CodexProjects/Orvex/test/playback_surface_test.dart: controls fade after idle, pause retains them, taps toggle
+00:03 +61: /Users/wanzhenyu/CodexProjects/Orvex/test/playback_surface_test.dart: controls fade after idle, pause retains them, taps toggle
+00:03 +62: /Users/wanzhenyu/CodexProjects/Orvex/test/playback_surface_test.dart: controls fade after idle, pause retains them, taps toggle
+00:03 +63: /Users/wanzhenyu/CodexProjects/Orvex/test/playback_surface_test.dart: controls fade after idle, pause retains them, taps toggle
+00:03 +64: /Users/wanzhenyu/CodexProjects/Orvex/test/playback_surface_test.dart: controls fade after idle, pause retains them, taps toggle
+00:03 +65: /Users/wanzhenyu/CodexProjects/Orvex/test/playback_surface_test.dart: controls fade after idle, pause retains them, taps toggle
+00:03 +66: /Users/wanzhenyu/CodexProjects/Orvex/test/playback_surface_test.dart: controls fade after idle, pause retains them, taps toggle
+00:03 +67: /Users/wanzhenyu/CodexProjects/Orvex/test/playback_surface_test.dart: controls fade after idle, pause retains them, taps toggle
+00:03 +68: /Users/wanzhenyu/CodexProjects/Orvex/test/playback_surface_test.dart: controls fade after idle, pause retains them, taps toggle
+00:03 +69: /Users/wanzhenyu/CodexProjects/Orvex/test/playback_surface_test.dart: controls fade after idle, pause retains them, taps toggle
+00:03 +70: /Users/wanzhenyu/CodexProjects/Orvex/test/playback_surface_test.dart: controls fade after idle, pause retains them, taps toggle
+00:03 +71: /Users/wanzhenyu/CodexProjects/Orvex/test/playback_surface_test.dart: controls fade after idle, pause retains them, taps toggle
+00:03 +72: /Users/wanzhenyu/CodexProjects/Orvex/test/playback_surface_test.dart: controls fade after idle, pause retains them, taps toggle
+00:03 +73: /Users/wanzhenyu/CodexProjects/Orvex/test/playback_surface_test.dart: controls fade after idle, pause retains them, taps toggle
+00:03 +74: /Users/wanzhenyu/CodexProjects/Orvex/test/playback_surface_test.dart: controls fade after idle, pause retains them, taps toggle
+00:03 +75: /Users/wanzhenyu/CodexProjects/Orvex/test/playback_surface_test.dart: controls fade after idle, pause retains them, taps toggle
+00:03 +76: /Users/wanzhenyu/CodexProjects/Orvex/test/playback_surface_test.dart: controls fade after idle, pause retains them, taps toggle
+00:03 +77: /Users/wanzhenyu/CodexProjects/Orvex/test/playback_surface_test.dart: controls fade after idle, pause retains them, taps toggle
+00:03 +78: /Users/wanzhenyu/CodexProjects/Orvex/test/playback_surface_test.dart: controls fade after idle, pause retains them, taps toggle
+00:03 +79: /Users/wanzhenyu/CodexProjects/Orvex/test/playback_surface_test.dart: controls fade after idle, pause retains them, taps toggle
+00:03 +80: /Users/wanzhenyu/CodexProjects/Orvex/test/playback_surface_test.dart: controls fade after idle, pause retains them, taps toggle
+00:03 +81: /Users/wanzhenyu/CodexProjects/Orvex/test/playback_surface_test.dart: controls fade after idle, pause retains them, taps toggle
+00:03 +82: /Users/wanzhenyu/CodexProjects/Orvex/test/widget_test.dart: four tabs fit phone and iPad layout 360.0
+00:03 +83: /Users/wanzhenyu/CodexProjects/Orvex/test/widget_test.dart: four tabs fit phone and iPad layout 360.0
+00:03 +84: /Users/wanzhenyu/CodexProjects/Orvex/test/widget_test.dart: four tabs fit phone and iPad layout 360.0
+00:03 +85: /Users/wanzhenyu/CodexProjects/Orvex/test/widget_test.dart: four tabs fit phone and iPad layout 360.0
+00:03 +86: /Users/wanzhenyu/CodexProjects/Orvex/test/widget_test.dart: four tabs fit phone and iPad layout 360.0
+00:03 +87: /Users/wanzhenyu/CodexProjects/Orvex/test/widget_test.dart: four tabs fit phone and iPad layout 360.0
+00:03 +88: /Users/wanzhenyu/CodexProjects/Orvex/test/widget_test.dart: four tabs fit phone and iPad layout 360.0
+00:03 +89: /Users/wanzhenyu/CodexProjects/Orvex/test/widget_test.dart: four tabs fit phone and iPad layout 360.0
+00:03 +90: /Users/wanzhenyu/CodexProjects/Orvex/test/widget_test.dart: four tabs fit phone and iPad layout 360.0
+00:03 +91: /Users/wanzhenyu/CodexProjects/Orvex/test/widget_test.dart: four tabs fit phone and iPad layout 360.0
+00:03 +92: /Users/wanzhenyu/CodexProjects/Orvex/test/widget_test.dart: four tabs fit phone and iPad layout 360.0
+00:03 +93: /Users/wanzhenyu/CodexProjects/Orvex/test/widget_test.dart: four tabs fit phone and iPad layout 360.0
+00:03 +94: /Users/wanzhenyu/CodexProjects/Orvex/test/widget_test.dart: four tabs fit phone and iPad layout 360.0
+00:04 +95: /Users/wanzhenyu/CodexProjects/Orvex/test/widget_test.dart: four tabs fit phone and iPad layout 360.0
+00:04 +96: /Users/wanzhenyu/CodexProjects/Orvex/test/widget_test.dart: four tabs fit phone and iPad layout 360.0
+00:04 +97: /Users/wanzhenyu/CodexProjects/Orvex/test/design_system_test.dart: settings change theme immediately, persist, and follow system changes
+00:04 +98: /Users/wanzhenyu/CodexProjects/Orvex/test/design_system_test.dart: settings change theme immediately, persist, and follow system changes
+00:04 +99: /Users/wanzhenyu/CodexProjects/Orvex/test/design_system_test.dart: settings change theme immediately, persist, and follow system changes
+00:04 +100: /Users/wanzhenyu/CodexProjects/Orvex/test/subtitle_session_test.dart: subtitle settings allow choosing, disabling and resetting on small screens Brightness.dark
+00:04 +101: /Users/wanzhenyu/CodexProjects/Orvex/test/widget_test.dart: four tabs fit phone and iPad layout 430.0
+00:04 +102: /Users/wanzhenyu/CodexProjects/Orvex/test/playback_surface_test.dart: unsupported brightness degrades and settings operate real controls
+00:04 +103: /Users/wanzhenyu/CodexProjects/Orvex/test/playback_surface_test.dart: unsupported brightness degrades and settings operate real controls
+00:04 +104: /Users/wanzhenyu/CodexProjects/Orvex/test/playback_surface_test.dart: unsupported brightness degrades and settings operate real controls
+00:04 +105: /Users/wanzhenyu/CodexProjects/Orvex/test/playback_surface_test.dart: unsupported brightness degrades and settings operate real controls
+00:04 +106: /Users/wanzhenyu/CodexProjects/Orvex/test/design_system_test.dart: theme changes preserve the active playback engine and progress
+00:04 +107: /Users/wanzhenyu/CodexProjects/Orvex/test/design_system_test.dart: theme changes preserve the active playback engine and progress
+00:04 +108: /Users/wanzhenyu/CodexProjects/Orvex/test/design_system_test.dart: theme changes preserve the active playback engine and progress
+00:04 +109: /Users/wanzhenyu/CodexProjects/Orvex/test/design_system_test.dart: theme changes preserve the active playback engine and progress
+00:04 +110: /Users/wanzhenyu/CodexProjects/Orvex/test/design_system_test.dart: theme changes preserve the active playback engine and progress
+00:04 +111: /Users/wanzhenyu/CodexProjects/Orvex/test/design_system_test.dart: theme changes preserve the active playback engine and progress
+00:04 +112: /Users/wanzhenyu/CodexProjects/Orvex/test/playback_surface_test.dart: desktop double click, hover and keyboard respect input focus (variant: TargetPlatform.macOS)
+00:04 +113: /Users/wanzhenyu/CodexProjects/Orvex/test/playback_surface_test.dart: desktop double click, hover and keyboard respect input focus (variant: TargetPlatform.macOS)
+00:05 +114: /Users/wanzhenyu/CodexProjects/Orvex/test/playback_surface_test.dart: desktop double click, hover and keyboard respect input focus (variant: TargetPlatform.macOS)
+00:05 +115: /Users/wanzhenyu/CodexProjects/Orvex/test/back_navigation_test.dart: desktop back shortcuts navigate but leave editable inputs alone (variant: TargetPlatform.macOS)
+00:05 +116: /Users/wanzhenyu/CodexProjects/Orvex/test/back_navigation_test.dart: desktop back shortcuts navigate but leave editable inputs alone (variant: TargetPlatform.macOS)
+00:05 +117: /Users/wanzhenyu/CodexProjects/Orvex/test/back_navigation_test.dart: desktop back shortcuts navigate but leave editable inputs alone (variant: TargetPlatform.macOS)
+00:05 +118: /Users/wanzhenyu/CodexProjects/Orvex/test/back_navigation_test.dart: desktop back shortcuts navigate but leave editable inputs alone (variant: TargetPlatform.macOS)
+00:05 +119: /Users/wanzhenyu/CodexProjects/Orvex/test/widget_test.dart: library search opens media and returning shows real persisted history
+00:05 +120: /Users/wanzhenyu/CodexProjects/Orvex/test/design_system_test.dart: small landscape and larger text keep navigation and settings usable
+00:05 +121: /Users/wanzhenyu/CodexProjects/Orvex/test/back_navigation_test.dart: desktop back shortcuts navigate but leave editable inputs alone (variant: TargetPlatform.windows)
+00:05 +122: /Users/wanzhenyu/CodexProjects/Orvex/test/widget_test.dart: watch page fills the window and survives safe-area window resizing
+00:05 +123: /Users/wanzhenyu/CodexProjects/Orvex/test/widget_test.dart: watch page fills the window and survives safe-area window resizing
+00:06 +124: /Users/wanzhenyu/CodexProjects/Orvex/test/widget_test.dart: iOS interactive back cancels safely then returns one level at a time (variant: TargetPlatform.iOS)
+00:06 +125: /Users/wanzhenyu/CodexProjects/Orvex/test/widget_test.dart: Android system back returns player then series without popping the application (variant: TargetPlatform.android)
+00:07 +126: /Users/wanzhenyu/CodexProjects/Orvex/test/widget_test.dart: matched titles are searchable and the details sheet permits correction and ignore
+00:07 +127: /Users/wanzhenyu/CodexProjects/Orvex/test/widget_test.dart: series groups open a sorted queue and restore the episode list on return
+00:07 +128: /Users/wanzhenyu/CodexProjects/Orvex/test/widget_test.dart: time label distinguishes long videos
+00:07 +129: All tests passed!

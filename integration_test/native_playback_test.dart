@@ -32,6 +32,11 @@ void main() {
         ? 'simulator visuals, imports and controls (audio NOT TESTED)'
         : 'native local playback, tracks, subtitles, resume and cleanup',
     (tester) async {
+      if (Platform.isIOS) {
+        final simulator = await const MethodChannel('dev.orvex/audio-session')
+            .invokeMethod<bool>('isSimulator');
+        expect(simulator, isTrue, reason: 'Generated media is simulator-only');
+      }
       MediaKit.ensureInitialized();
       final directory = await Directory.systemTemp.createTemp(
         'orvex-playback-',
@@ -144,6 +149,18 @@ void main() {
 
         await session.togglePause();
         await until(() => !session.frame.playing, 'pause is acknowledged');
+        if (!Platform.isIOS && !Platform.isAndroid) {
+          await tester.sendKeyEvent(LogicalKeyboardKey.space);
+          await until(
+            () => session.frame.playing,
+            'desktop space starts playback',
+          );
+          await tester.sendKeyEvent(LogicalKeyboardKey.space);
+          await until(
+            () => !session.frame.playing,
+            'desktop space pauses playback',
+          );
+        }
         await tester.pump(const Duration(milliseconds: 400));
         final paused = session.frame.position;
         await tester.pump(const Duration(milliseconds: 700));
@@ -246,16 +263,45 @@ void main() {
         checks.add('full-screen controls rendered');
         final surface = find.byType(PlaybackSurface);
         final rect = tester.getRect(surface);
-        final press = await tester.startGesture(
-          Offset(rect.left + 12, rect.top + rect.height * 0.4),
-        );
-        await tester.pump(const Duration(milliseconds: 700));
-        await until(() => session.frame.rate == 2, 'long press enters 2x');
-        await press.up();
-        await until(
-          () => session.frame.rate == 1,
-          'release restores normal speed',
-        );
+        if (Platform.isIOS || Platform.isAndroid) {
+          await session.togglePause();
+          await until(
+            () => session.frame.playing,
+            'play before temporary speed',
+          );
+          final press = await tester.startGesture(
+            Offset(rect.center.dx, rect.top + rect.height * 0.32),
+          );
+          await tester.pump(const Duration(milliseconds: 700));
+          await until(() => session.frame.rate == 2, 'long press enters 2x');
+          await press.up();
+          await until(
+            () => session.frame.rate == 1,
+            'release restores normal speed',
+          );
+          await session.pauseForInterruption();
+          await session.seek(const Duration(seconds: 6));
+          await until(
+            () =>
+                !session.frame.playing &&
+                (session.frame.position.inMilliseconds - 6000).abs() < 700,
+            'pause and seek before resume checkpoint',
+          );
+        } else {
+          final point = Offset(rect.left + 20, rect.top + rect.height * 0.4);
+          await tester.tapAt(point);
+          await tester.pump(const Duration(milliseconds: 100));
+          await tester.tapAt(point);
+          await until(
+            () => find.byTooltip('全屏播放').evaluate().isNotEmpty,
+            'desktop double click exits full screen',
+          );
+          await tester.tap(find.byTooltip('全屏播放'));
+          await until(
+            () => find.byTooltip('退出全屏').evaluate().isNotEmpty,
+            'desktop full screen re-entry',
+          );
+        }
         await tester.tap(find.byTooltip('退出全屏').first);
         await tester.pumpAndSettle();
         expect(find.byTooltip('退出全屏'), findsNothing);

@@ -1,0 +1,36 @@
+00:00 +0: loading /Users/wanzhenyu/CodexProjects/Orvex/integration_test/subtitle_memory_test.dart
+The following plugins do not support Swift Package Manager for ios:
+  - media_kit_libs_ios_video
+  - media_kit_video
+This will become an error in a future version of Flutter. Please contact the plugin maintainers to request Swift Package Manager adoption.
+Running Xcode build...                                          
+Xcode build done.                                           18.2s
+00:00 +0: native local subtitle memory and matching: remember
+media_kit: NativeReferenceHolder: Allocated 4778876928
+VideoOutput.Resize
+{rect: {height: 0.0, top: 0.0, width: 0.0, left: 0.0}, id: 0, handle: 4847691216}
+NativeVideoController: Texture ID: 0
+VideoOutput.Resize
+{id: 0, rect: {top: 0.0, height: 360.0, left: 0.0, width: 640.0}, handle: 4847691216}
+00:47 +0: native local subtitle memory and matching: remember - did not complete [E]
+00:47 +0: (tearDownAll) - did not complete [E]
+00:47 +0: Some tests failed.
+
+Failing tests:
+  /Users/wanzhenyu/CodexProjects/Orvex/integration_test/subtitle_memory_test.dart: (tearDownAll) (did not complete)
+  /Users/wanzhenyu/CodexProjects/Orvex/integration_test/subtitle_memory_test.dart: native local subtitle memory and matching: remember (did not complete)
+unhandled error during finalization of test:
+/Users/wanzhenyu/CodexProjects/Orvex/integration_test/subtitle_memory_test.dart
+PathNotFoundException: Deletion failed, path = '/var/folders/gz/3f_8bkx531n_82gk6grm1lyc0000gn/T/flutter_tools.oit6GW/flutter_test_listener.gZ68mw' (OS Error: No such file or directory, errno = 2)
+#0      _Directory._deleteSync (dart:io/directory_impl.dart:216:7)
+#1      FileSystemEntity.deleteSync (dart:io/file_system_entity.dart:425:7)
+#2      ForwardingFileSystemEntity.deleteSync (package:file/src/forwarding/forwarding_file_system_entity.dart:70:16)
+#3      ErrorHandlingDirectory.deleteSync.<anonymous closure> (package:flutter_tools/src/base/error_handling_io.dart:717:22)
+#4      _runSync (package:flutter_tools/src/base/error_handling_io.dart:1118:16)
+#5      ErrorHandlingDirectory.deleteSync (package:flutter_tools/src/base/error_handling_io.dart:716:12)
+#6      FlutterPlatform._createListenerDart.<anonymous closure> (package:flutter_tools/src/test/flutter_platform.dart:786:15)
+#7      FlutterPlatform._startTest.finalize (package:flutter_tools/src/test/flutter_platform.dart:591:26)
+<asynchronous suspension>
+#8      asyncGuard.<anonymous closure> (package:flutter_tools/src/base/async_guard.dart:108:24)
+<asynchronous suspension>
+

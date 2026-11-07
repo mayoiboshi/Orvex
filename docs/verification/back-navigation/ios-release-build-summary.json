@@ -1,0 +1,8 @@
+{
+  "entrypoint": "lib/main.dart",
+  "mode": "Release",
+  "build": "Passed",
+  "codesigning": "not performed (--no-codesign)",
+  "orvexTestOrProxyFlagsIncluded": false,
+  "physicalDevicesUpdated": false
+}

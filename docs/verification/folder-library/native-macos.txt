@@ -1,0 +1,2 @@
+** TEST SUCCEEDED **
+Test case 'MediaFolderAccessTests.testBookmarkTraversalThumbnailAndRelease()' passed on 'My Mac - Orvex (64951)' (0.279 seconds)

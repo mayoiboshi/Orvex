@@ -1,0 +1,56 @@
+The following plugins do not support Swift Package Manager for macos:
+  - media_kit_libs_macos_video
+  - media_kit_video
+This will become an error in a future version of Flutter. Please contact the plugin maintainers to request Swift Package Manager adoption.
+Building macOS application...                                   
+warning: Stale file '/Users/wanzhenyu/Library/Developer/Xcode/DerivedData/Runner-catrlrjysnwwthdcikdwttocujfj/Build/Products/Debug/App.framework/Versions/A/App' is located outside of the allowed root paths.
+
+warning: Stale file '/Users/wanzhenyu/Library/Developer/Xcode/DerivedData/Runner-catrlrjysnwwthdcikdwttocujfj/Build/Products/Debug/App.framework/Versions/A/Resources/Info.plist' is located outside of the allowed root paths.
+
+warning: Stale file '/Users/wanzhenyu/Library/Developer/Xcode/DerivedData/Runner-catrlrjysnwwthdcikdwttocujfj/Build/Products/Debug/App.framework/Versions/A/Resources/flutter_assets/AssetManifest.bin' is located outside of the allowed root paths.
+
+warning: Stale file '/Users/wanzhenyu/Library/Developer/Xcode/DerivedData/Runner-catrlrjysnwwthdcikdwttocujfj/Build/Products/Debug/App.framework/Versions/A/Resources/flutter_assets/FontManifest.json' is located outside of the allowed root paths.
+
+warning: Stale file '/Users/wanzhenyu/Library/Developer/Xcode/DerivedData/Runner-catrlrjysnwwthdcikdwttocujfj/Build/Products/Debug/App.framework/Versions/A/Resources/flutter_assets/NOTICES.Z' is located outside of the allowed root paths.
+
+warning: Stale file '/Users/wanzhenyu/Library/Developer/Xcode/DerivedData/Runner-catrlrjysnwwthdcikdwttocujfj/Build/Products/Debug/App.framework/Versions/A/Resources/flutter_assets/NativeAssetsManifest.json' is located outside of the allowed root paths.
+
+warning: Stale file '/Users/wanzhenyu/Library/Developer/Xcode/DerivedData/Runner-catrlrjysnwwthdcikdwttocujfj/Build/Products/Debug/App.framework/Versions/A/Resources/flutter_assets/assets/fonts/NotoSansCJK-OFL.txt' is located outside of the allowed root paths.
+
+warning: Stale file '/Users/wanzhenyu/Library/Developer/Xcode/DerivedData/Runner-catrlrjysnwwthdcikdwttocujfj/Build/Products/Debug/App.framework/Versions/A/Resources/flutter_assets/assets/fonts/NotoSansCJKsc-Regular.otf' is located outside of the allowed root paths.
+
+warning: Stale file '/Users/wanzhenyu/Library/Developer/Xcode/DerivedData/Runner-catrlrjysnwwthdcikdwttocujfj/Build/Products/Debug/App.framework/Versions/A/Resources/flutter_assets/fonts/MaterialIcons-Regular.otf' is located outside of the allowed root paths.
+
+warning: Stale file '/Users/wanzhenyu/Library/Developer/Xcode/DerivedData/Runner-catrlrjysnwwthdcikdwttocujfj/Build/Products/Debug/App.framework/Versions/A/Resources/flutter_assets/isolate_snapshot_data' is located outside of the allowed root paths.
+
+warning: Stale file '/Users/wanzhenyu/Library/Developer/Xcode/DerivedData/Runner-catrlrjysnwwthdcikdwttocujfj/Build/Products/Debug/App.framework/Versions/A/Resources/flutter_assets/kernel_blob.bin' is located outside of the allowed root paths.
+
+warning: Stale file '/Users/wanzhenyu/Library/Developer/Xcode/DerivedData/Runner-catrlrjysnwwthdcikdwttocujfj/Build/Products/Debug/App.framework/Versions/A/Resources/flutter_assets/packages/media_kit/assets/web/hls1.4.10.js' is located outside of the allowed root paths.
+
+warning: Stale file '/Users/wanzhenyu/Library/Developer/Xcode/DerivedData/Runner-catrlrjysnwwthdcikdwttocujfj/Build/Products/Debug/App.framework/Versions/A/Resources/flutter_assets/shaders/ink_sparkle.frag' is located outside of the allowed root paths.
+
+warning: Stale file '/Users/wanzhenyu/Library/Developer/Xcode/DerivedData/Runner-catrlrjysnwwthdcikdwttocujfj/Build/Products/Debug/App.framework/Versions/A/Resources/flutter_assets/shaders/stretch_effect.frag' is located outside of the allowed root paths.
+
+warning: Stale file '/Users/wanzhenyu/Library/Developer/Xcode/DerivedData/Runner-catrlrjysnwwthdcikdwttocujfj/Build/Products/Debug/App.framework/Versions/A/Resources/flutter_assets/test/fixtures/generated.mp4' is located outside of the allowed root paths.
+
+warning: Stale file '/Users/wanzhenyu/Library/Developer/Xcode/DerivedData/Runner-catrlrjysnwwthdcikdwttocujfj/Build/Products/Debug/App.framework/Versions/A/Resources/flutter_assets/test/fixtures/sample.ass' is located outside of the allowed root paths.
+
+warning: Stale file '/Users/wanzhenyu/Library/Developer/Xcode/DerivedData/Runner-catrlrjysnwwthdcikdwttocujfj/Build/Products/Debug/App.framework/Versions/A/Resources/flutter_assets/test/fixtures/sample.srt' is located outside of the allowed root paths.
+
+warning: Stale file '/Users/wanzhenyu/Library/Developer/Xcode/DerivedData/Runner-catrlrjysnwwthdcikdwttocujfj/Build/Products/Debug/App.framework/Versions/A/Resources/flutter_assets/vm_snapshot_data' is located outside of the allowed root paths.
+
+warning: Stale file '/Users/wanzhenyu/Library/Developer/Xcode/DerivedData/Runner-catrlrjysnwwthdcikdwttocujfj/Build/Products/Debug/FlutterMacOS.framework/Versions/A/FlutterMacOS' is located outside of the allowed root paths.
+
+warning: Stale file '/Users/wanzhenyu/Library/Developer/Xcode/DerivedData/Runner-catrlrjysnwwthdcikdwttocujfj/Build/Products/Debug/native_assets/objective_c.framework/Resources/Info.plist' is located outside of the allowed root paths.
+
+warning: Stale file '/Users/wanzhenyu/Library/Developer/Xcode/DerivedData/Runner-catrlrjysnwwthdcikdwttocujfj/Build/Products/Debug/native_assets/objective_c.framework/Versions/A/Resources/Info.plist' is located outside of the allowed root paths.
+
+warning: Stale file '/Users/wanzhenyu/Library/Developer/Xcode/DerivedData/Runner-catrlrjysnwwthdcikdwttocujfj/Build/Products/Debug/native_assets/objective_c.framework/Versions/A/objective_c' is located outside of the allowed root paths.
+
+warning: Stale file '/Users/wanzhenyu/Library/Developer/Xcode/DerivedData/Runner-catrlrjysnwwthdcikdwttocujfj/Build/Products/Debug/native_assets/objective_c.framework/Versions/Current/Resources/Info.plist' is located outside of the allowed root paths.
+
+warning: Stale file '/Users/wanzhenyu/Library/Developer/Xcode/DerivedData/Runner-catrlrjysnwwthdcikdwttocujfj/Build/Products/Debug/native_assets/objective_c.framework/Versions/Current/objective_c' is located outside of the allowed root paths.
+
+warning: Stale file '/Users/wanzhenyu/Library/Developer/Xcode/DerivedData/Runner-catrlrjysnwwthdcikdwttocujfj/Build/Products/Debug/native_assets/objective_c.framework/objective_c' is located outside of the allowed root paths.
+
+✓ Built build/macos/Build/Products/Debug/Orvex.app

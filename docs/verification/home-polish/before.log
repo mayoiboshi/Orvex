@@ -1,0 +1,12 @@
+00:00 +0: loading /Users/wanzhenyu/CodexProjects/Orvex/integration_test/home_polish_test.dart
+The following plugins do not support Swift Package Manager for ios:
+  - media_kit_libs_ios_video
+  - media_kit_video
+This will become an error in a future version of Flutter. Please contact the plugin maintainers to request Swift Package Manager adoption.
+Running Xcode build...                                          
+Xcode build done.                                           25.3s
+00:00 +0: home polish before: themes, sections, actions and resume
+media_kit: NativeReferenceHolder: Allocated 4379435008
+ORVEX_HOME_EVIDENCE=/Users/wanzhenyu/Library/Developer/CoreSimulator/Devices/139B061B-ED02-4594-A56A-1AAC3A7AF574/data/Containers/Data/Application/2DD52D94-7336-444C-B091-A36B03691CDA/tmp/orvex-home-ui-before-vQoVrF
+00:09 +1: (tearDownAll)
+00:09 +1: All tests passed!

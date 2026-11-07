@@ -1,0 +1,24 @@
+{
+  "date": "2026-11-06",
+  "entrypoint": "lib/main.dart",
+  "buildMode": "Release",
+  "existingSigningTeamRetained": true,
+  "codesignVerification": "Passed",
+  "bothDevicesIncludedInProvisioning": true,
+  "orvexTestOrProxyFlagsIncluded": false,
+  "operation": "in-place installation; no uninstall, data clearing or generated fixture experiments",
+  "devices": [
+    {
+      "device": "iPhone 17 Pro Max",
+      "installation": "Passed",
+      "launch": "Passed",
+      "physicalFeatureAcceptance": "Not Tested; user feedback pending"
+    },
+    {
+      "device": "iPad Pro 2022 (11-inch, 4th generation)",
+      "installation": "Passed",
+      "launch": "Passed",
+      "physicalFeatureAcceptance": "Not Tested; user feedback pending"
+    }
+  ]
+}

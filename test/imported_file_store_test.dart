@@ -50,10 +50,75 @@ void main() {
       throwsA(isA<FileSystemException>()),
     );
     expect(await File.fromUri(imported.uri).exists(), isTrue);
-    final folders = await Directory('${directory.path}/Imports')
-        .list()
-        .toList();
+    final folders = (await Directory(
+      '${directory.path}/Imports',
+    ).list().toList()).whereType<Directory>().toList();
     expect(folders.length, 1);
+  });
+
+  test(
+    'identical videos reuse an existing import across rename and store restart',
+    () async {
+      final source = await File('${directory.path}/episode.mp4')
+          .writeAsBytes([1, 2, 3]);
+      final first = await store.import(XFile(source.path));
+      final renamed = await File('${directory.path}/renamed.mp4')
+          .writeAsBytes([1, 2, 3]);
+      final reopened = ImportedFileStore(
+        directoryProvider: () async => directory,
+      );
+      final again = await reopened.import(XFile(renamed.path));
+      expect(again.uri, first.uri);
+      expect(again.resumeKey, first.resumeKey);
+      expect(again.name, first.name);
+      expect((await store.listVideos()).length, 1);
+    },
+  );
+
+  test('concurrent identical imports only create one video', () async {
+    final source = await File('${directory.path}/episode.mp4')
+        .writeAsBytes([7, 8, 9]);
+    final results = await Future.wait([
+      store.import(XFile(source.path)),
+      store.import(XFile(source.path)),
+    ]);
+    expect(results[0].resumeKey, results[1].resumeKey);
+    expect((await store.listVideos()).length, 1);
+  });
+
+  test(
+    'pre-hash legacy imports are reused without moving or deleting the file',
+    () async {
+      final legacy = File('${directory.path}/Imports/media-old/episode.mp4');
+      await legacy.parent.create(recursive: true);
+      await legacy.writeAsBytes([4, 5, 6]);
+      final source = await File('${directory.path}/episode.mp4')
+          .writeAsBytes([4, 5, 6]);
+      final result = await store.import(XFile(source.path));
+      expect(result.uri, legacy.uri);
+      expect(result.relativeImportPath, 'Imports/media-old/episode.mp4');
+      expect((await store.listVideos()).length, 1);
+      await File('${directory.path}/Imports/.video-hashes-v1.json')
+          .writeAsString('{broken');
+      expect(
+        (await store.import(XFile(source.path))).resumeKey,
+        result.resumeKey,
+      );
+    },
+  );
+
+  test('changing an existing file invalidates its cached digest', () async {
+    final source = await File('${directory.path}/episode.mp4')
+        .writeAsBytes([1]);
+    final first = await store.import(XFile(source.path));
+    final existing = File.fromUri(first.uri);
+    await existing.writeAsBytes([2]);
+    await existing.setLastModified(DateTime(2020));
+    final next = await store.import(XFile(source.path));
+    expect(next.resumeKey, isNot(first.resumeKey));
+    expect(await existing.readAsBytes(), [2]);
+    expect(await File.fromUri(next.uri).readAsBytes(), [1]);
+    expect((await store.listVideos()).length, 2);
   });
 
   test('repeated subtitle import keeps one stable identity', () async {

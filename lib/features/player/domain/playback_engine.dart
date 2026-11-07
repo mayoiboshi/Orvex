@@ -1,12 +1,21 @@
 import 'package:flutter/widgets.dart';
 
 class LocalMedia {
-  const LocalMedia({required this.uri, required this.name, this.importPath});
+  const LocalMedia({
+    required this.uri,
+    required this.name,
+    this.importPath,
+    this.folderRoot,
+    this.folderFile,
+  });
   final Uri uri;
   final String name;
   final String? importPath;
+  final String? folderRoot, folderFile;
   String? get relativeImportPath => importPath ?? legacyImportedPath(uri);
-  String get resumeKey => relativeImportPath == null
+  String get resumeKey => folderRoot != null && folderFile != null
+      ? 'orvex.folder.v1:$folderRoot:$folderFile'
+      : relativeImportPath == null
       ? uri.toString()
       : 'orvex.import.v1:$relativeImportPath';
 }

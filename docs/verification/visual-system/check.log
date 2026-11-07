@@ -1,0 +1,76 @@
+Formatted 39 files (0 changed) in 0.19 seconds.
+Analyzing Orvex...                                              
+No issues found! (ran in 3.8s)
+00:00 +0: loading /Users/wanzhenyu/CodexProjects/Orvex/test/player_brightness_test.dart
+00:00 +0: /Users/wanzhenyu/CodexProjects/Orvex/test/imported_file_store_test.dart: import survives source deletion and remains discoverable after restart
+00:00 +1: /Users/wanzhenyu/CodexProjects/Orvex/test/imported_file_store_test.dart: import survives source deletion and remains discoverable after restart
+00:00 +2: /Users/wanzhenyu/CodexProjects/Orvex/test/imported_file_store_test.dart: import survives source deletion and remains discoverable after restart
+00:00 +3: /Users/wanzhenyu/CodexProjects/Orvex/test/imported_file_store_test.dart: import survives source deletion and remains discoverable after restart
+00:00 +4: /Users/wanzhenyu/CodexProjects/Orvex/test/playback_history_store_test.dart: completion remains in history and corrupt entries do not hide valid records
+00:00 +5: /Users/wanzhenyu/CodexProjects/Orvex/test/imported_file_store_test.dart: same-name imports preserve both files without overwrite
+00:00 +6: /Users/wanzhenyu/CodexProjects/Orvex/test/imported_file_store_test.dart: failed import cleans only its own partial directory
+00:00 +7: /Users/wanzhenyu/CodexProjects/Orvex/test/imported_file_store_test.dart: repeated subtitle import keeps one stable identity
+00:00 +8: /Users/wanzhenyu/CodexProjects/Orvex/test/bangumi_client_test.dart: franchise fallback requires two independent main-story links (ambiguous=false)
+00:00 +9: /Users/wanzhenyu/CodexProjects/Orvex/test/bangumi_client_test.dart: franchise fallback requires two independent main-story links (ambiguous=false)
+00:00 +10: /Users/wanzhenyu/CodexProjects/Orvex/test/player_brightness_test.dart: iOS brightness reads capability, clamps, and restores (variant: TargetPlatform.iOS)
+00:00 +11: /Users/wanzhenyu/CodexProjects/Orvex/test/player_brightness_test.dart: iOS brightness reads capability, clamps, and restores (variant: TargetPlatform.iOS)
+00:00 +12: /Users/wanzhenyu/CodexProjects/Orvex/test/player_brightness_test.dart: iOS brightness reads capability, clamps, and restores (variant: TargetPlatform.iOS)
+00:00 +13: /Users/wanzhenyu/CodexProjects/Orvex/test/player_brightness_test.dart: iOS brightness reads capability, clamps, and restores (variant: TargetPlatform.iOS)
+00:00 +14: /Users/wanzhenyu/CodexProjects/Orvex/test/player_brightness_test.dart: iOS brightness reads capability, clamps, and restores (variant: TargetPlatform.iOS)
+00:00 +15: /Users/wanzhenyu/CodexProjects/Orvex/test/player_brightness_test.dart: iOS brightness reads capability, clamps, and restores (variant: TargetPlatform.iOS)
+00:00 +16: /Users/wanzhenyu/CodexProjects/Orvex/test/design_system_test.dart: settings change theme immediately, persist, and follow system changes
+00:00 +17: /Users/wanzhenyu/CodexProjects/Orvex/test/design_system_test.dart: settings change theme immediately, persist, and follow system changes
+00:00 +18: /Users/wanzhenyu/CodexProjects/Orvex/test/design_system_test.dart: settings change theme immediately, persist, and follow system changes
+00:00 +19: /Users/wanzhenyu/CodexProjects/Orvex/test/design_system_test.dart: settings change theme immediately, persist, and follow system changes
+00:00 +20: /Users/wanzhenyu/CodexProjects/Orvex/test/design_system_test.dart: settings change theme immediately, persist, and follow system changes
+00:00 +21: /Users/wanzhenyu/CodexProjects/Orvex/test/design_system_test.dart: settings change theme immediately, persist, and follow system changes
+00:00 +22: /Users/wanzhenyu/CodexProjects/Orvex/test/design_system_test.dart: settings change theme immediately, persist, and follow system changes
+00:00 +23: /Users/wanzhenyu/CodexProjects/Orvex/test/design_system_test.dart: settings change theme immediately, persist, and follow system changes
+00:00 +24: /Users/wanzhenyu/CodexProjects/Orvex/test/design_system_test.dart: settings change theme immediately, persist, and follow system changes
+00:00 +25: /Users/wanzhenyu/CodexProjects/Orvex/test/design_system_test.dart: settings change theme immediately, persist, and follow system changes
+00:00 +26: /Users/wanzhenyu/CodexProjects/Orvex/test/design_system_test.dart: settings change theme immediately, persist, and follow system changes
+00:00 +27: /Users/wanzhenyu/CodexProjects/Orvex/test/design_system_test.dart: settings change theme immediately, persist, and follow system changes
+00:00 +28: /Users/wanzhenyu/CodexProjects/Orvex/test/design_system_test.dart: settings change theme immediately, persist, and follow system changes
+00:00 +29: /Users/wanzhenyu/CodexProjects/Orvex/test/design_system_test.dart: settings change theme immediately, persist, and follow system changes
+00:01 +30: /Users/wanzhenyu/CodexProjects/Orvex/test/design_system_test.dart: settings change theme immediately, persist, and follow system changes
+00:01 +31: /Users/wanzhenyu/CodexProjects/Orvex/test/design_system_test.dart: settings change theme immediately, persist, and follow system changes
+00:01 +32: /Users/wanzhenyu/CodexProjects/Orvex/test/design_system_test.dart: settings change theme immediately, persist, and follow system changes
+00:01 +33: /Users/wanzhenyu/CodexProjects/Orvex/test/design_system_test.dart: settings change theme immediately, persist, and follow system changes
+00:01 +34: /Users/wanzhenyu/CodexProjects/Orvex/test/design_system_test.dart: settings change theme immediately, persist, and follow system changes
+00:01 +35: /Users/wanzhenyu/CodexProjects/Orvex/test/design_system_test.dart: settings change theme immediately, persist, and follow system changes
+00:01 +36: /Users/wanzhenyu/CodexProjects/Orvex/test/design_system_test.dart: settings change theme immediately, persist, and follow system changes
+00:01 +37: /Users/wanzhenyu/CodexProjects/Orvex/test/design_system_test.dart: settings change theme immediately, persist, and follow system changes
+00:01 +38: /Users/wanzhenyu/CodexProjects/Orvex/test/design_system_test.dart: settings change theme immediately, persist, and follow system changes
+00:01 +39: /Users/wanzhenyu/CodexProjects/Orvex/test/design_system_test.dart: settings change theme immediately, persist, and follow system changes
+00:01 +40: /Users/wanzhenyu/CodexProjects/Orvex/test/design_system_test.dart: settings change theme immediately, persist, and follow system changes
+00:01 +41: /Users/wanzhenyu/CodexProjects/Orvex/test/design_system_test.dart: settings change theme immediately, persist, and follow system changes
+00:01 +42: /Users/wanzhenyu/CodexProjects/Orvex/test/design_system_test.dart: settings change theme immediately, persist, and follow system changes
+00:01 +43: /Users/wanzhenyu/CodexProjects/Orvex/test/design_system_test.dart: settings change theme immediately, persist, and follow system changes
+00:01 +44: /Users/wanzhenyu/CodexProjects/Orvex/test/design_system_test.dart: settings change theme immediately, persist, and follow system changes
+00:01 +45: /Users/wanzhenyu/CodexProjects/Orvex/test/design_system_test.dart: settings change theme immediately, persist, and follow system changes
+00:01 +46: /Users/wanzhenyu/CodexProjects/Orvex/test/widget_test.dart: four tabs fit phone and iPad layout 360.0
+00:01 +47: /Users/wanzhenyu/CodexProjects/Orvex/test/playback_surface_test.dart: mobile double tap seeks once without single tap or speed
+00:01 +48: /Users/wanzhenyu/CodexProjects/Orvex/test/design_system_test.dart: theme changes preserve the active playback engine and progress
+00:02 +49: /Users/wanzhenyu/CodexProjects/Orvex/test/design_system_test.dart: theme changes preserve the active playback engine and progress
+00:03 +50: /Users/wanzhenyu/CodexProjects/Orvex/test/design_system_test.dart: theme changes preserve the active playback engine and progress
+00:03 +51: /Users/wanzhenyu/CodexProjects/Orvex/test/design_system_test.dart: theme changes preserve the active playback engine and progress
+00:03 +52: /Users/wanzhenyu/CodexProjects/Orvex/test/playback_surface_test.dart: background before long press recognition cannot start 2x
+00:03 +53: /Users/wanzhenyu/CodexProjects/Orvex/test/playback_surface_test.dart: background before long press recognition cannot start 2x
+00:03 +54: /Users/wanzhenyu/CodexProjects/Orvex/test/widget_test.dart: four tabs fit phone and iPad layout 744.0
+00:03 +55: /Users/wanzhenyu/CodexProjects/Orvex/test/widget_test.dart: four tabs fit phone and iPad layout 744.0
+00:03 +56: /Users/wanzhenyu/CodexProjects/Orvex/test/widget_test.dart: four tabs fit phone and iPad layout 744.0
+00:03 +57: /Users/wanzhenyu/CodexProjects/Orvex/test/widget_test.dart: four tabs fit phone and iPad layout 744.0
+00:03 +58: /Users/wanzhenyu/CodexProjects/Orvex/test/widget_test.dart: four tabs fit phone and iPad layout 744.0
+00:03 +59: /Users/wanzhenyu/CodexProjects/Orvex/test/design_system_test.dart: desktop uses a sidebar and keeps all four destinations (variant: TargetPlatform.macOS)
+00:03 +60: /Users/wanzhenyu/CodexProjects/Orvex/test/design_system_test.dart: desktop uses a sidebar and keeps all four destinations (variant: TargetPlatform.macOS)
+00:04 +61: /Users/wanzhenyu/CodexProjects/Orvex/test/widget_test.dart: four tabs fit phone and iPad layout 1194.0
+00:04 +62: /Users/wanzhenyu/CodexProjects/Orvex/test/widget_test.dart: four tabs fit phone and iPad layout 1194.0
+00:04 +63: /Users/wanzhenyu/CodexProjects/Orvex/test/design_system_test.dart: small landscape and larger text keep navigation and settings usable
+00:04 +64: /Users/wanzhenyu/CodexProjects/Orvex/test/playback_surface_test.dart: unsupported brightness degrades and settings operate real controls
+00:04 +65: /Users/wanzhenyu/CodexProjects/Orvex/test/widget_test.dart: library search opens media and returning shows real persisted history
+00:04 +66: /Users/wanzhenyu/CodexProjects/Orvex/test/widget_test.dart: library search opens media and returning shows real persisted history
+00:04 +67: /Users/wanzhenyu/CodexProjects/Orvex/test/playback_surface_test.dart: desktop double click, hover and keyboard respect input focus (variant: TargetPlatform.macOS)
+00:04 +68: /Users/wanzhenyu/CodexProjects/Orvex/test/widget_test.dart: matched titles are searchable and the details sheet permits correction and ignore
+00:05 +69: /Users/wanzhenyu/CodexProjects/Orvex/test/widget_test.dart: matched titles are searchable and the details sheet permits correction and ignore
+00:05 +70: /Users/wanzhenyu/CodexProjects/Orvex/test/widget_test.dart: time label distinguishes long videos
+00:05 +71: All tests passed!

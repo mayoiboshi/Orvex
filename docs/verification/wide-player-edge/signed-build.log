@@ -1,0 +1,9 @@
+Building dev.orvex.orvex for device (ios-release)...
+The following plugins do not support Swift Package Manager for ios:
+  - media_kit_libs_ios_video
+  - media_kit_video
+This will become an error in a future version of Flutter. Please contact the plugin maintainers to request Swift Package Manager adoption.
+Automatically signing iOS for device deployment using specified development team in Xcode project: B42C727YGN
+Running Xcode build...                                          
+Xcode build done.                                           30.4s
+✓ Built build/ios/iphoneos/Runner.app (58.9MB)

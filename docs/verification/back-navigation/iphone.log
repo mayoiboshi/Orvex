@@ -1,0 +1,80 @@
+00:00 +0: loading /Users/wanzhenyu/CodexProjects/Orvex/integration_test/back_navigation_test.dart
+The following plugins do not support Swift Package Manager for ios:
+  - media_kit_libs_ios_video
+  - media_kit_video
+This will become an error in a future version of Flutter. Please contact the plugin maintainers to request Swift Package Manager adoption.
+Running Xcode build...                                          
+Xcode build done.                                           26.5s
+00:00 +0: native edge back cancels, commits, preserves context and respects fullscreen
+media_kit: NativeReferenceHolder: Allocated 4444217344
+VideoOutput.Resize
+{handle: 4938777936, id: 0, rect: {top: 0.0, left: 0.0, width: 0.0, height: 0.0}}
+NativeVideoController: Texture ID: 0
+VideoOutput.Resize
+{id: 0, rect: {top: 0.0, left: 0.0, width: 480.0, height: 270.0}, handle: 4938777936}
+VideoOutput.Resize
+{rect: {left: 0.0, width: 640.0, top: 0.0, height: 360.0}, id: 0, handle: 4938777936}
+VideoOutput.Resize
+{rect: {top: 0.0, left: 0.0, width: 0.0, height: 0.0}, id: 1, handle: 4938780496}
+NativeVideoController: Texture ID: 1
+VideoOutput.Resize
+{rect: {top: 0.0, width: 480.0, height: 270.0, left: 0.0}, id: 1, handle: 4938780496}
+VideoOutput.Resize
+{rect: {height: 360.0, width: 640.0, top: 0.0, left: 0.0}, handle: 4938780496, id: 1}
+VideoOutput.Resize
+{rect: {width: 0.0, top: 0.0, height: 0.0, left: 0.0}, handle: 4938782416, id: 2}
+NativeVideoController: Texture ID: 2
+VideoOutput.Resize
+{rect: {width: 480.0, top: 0.0, height: 270.0, left: 0.0}, id: 2, handle: 4938782416}
+VideoOutput.Resize
+{rect: {left: 0.0, width: 640.0, top: 0.0, height: 360.0}, id: 2, handle: 4938782416}
+VideoOutput.Resize
+{rect: {width: 0.0, height: 0.0, left: 0.0, top: 0.0}, id: 3, handle: 4938784336}
+NativeVideoController: Texture ID: 3
+VideoOutput.Resize
+{rect: {width: 480.0, top: 0.0, height: 270.0, left: 0.0}, id: 3, handle: 4938784336}
+VideoOutput.Resize
+{rect: {width: 640.0, top: 0.0, height: 360.0, left: 0.0}, handle: 4938784336, id: 3}
+VideoOutput.Resize
+{id: 4, rect: {height: 0.0, top: 0.0, width: 0.0, left: 0.0}, handle: 4938786256}
+NativeVideoController: Texture ID: 4
+VideoOutput.Resize
+{handle: 4938786256, id: 4, rect: {height: 270.0, top: 0.0, left: 0.0, width: 480.0}}
+VideoOutput.Resize
+{rect: {width: 640.0, left: 0.0, top: 0.0, height: 360.0}, handle: 4938786256, id: 4}
+VideoOutput.Resize
+{handle: 4938788176, id: 5, rect: {left: 0.0, height: 0.0, top: 0.0, width: 0.0}}
+NativeVideoController: Texture ID: 5
+VideoOutput.Resize
+{rect: {top: 0.0, width: 480.0, left: 0.0, height: 270.0}, handle: 4938788176, id: 5}
+VideoOutput.Resize
+{rect: {top: 0.0, left: 0.0, height: 360.0, width: 640.0}, handle: 4938788176, id: 5}
+VideoOutput.Resize
+{id: 6, handle: 4938790096, rect: {left: 0.0, height: 0.0, top: 0.0, width: 0.0}}
+NativeVideoController: Texture ID: 6
+VideoOutput.Resize
+{rect: {height: 270.0, width: 480.0, top: 0.0, left: 0.0}, handle: 4938790096, id: 6}
+VideoOutput.Resize
+{rect: {left: 0.0, width: 640.0, height: 360.0, top: 0.0}, id: 6, handle: 4938790096}
+VideoOutput.Resize
+{rect: {width: 0.0, top: 0.0, height: 0.0, left: 0.0}, handle: 4938792016, id: 7}
+NativeVideoController: Texture ID: 7
+VideoOutput.Resize
+{rect: {top: 0.0, width: 480.0, left: 0.0, height: 270.0}, id: 7, handle: 4938792016}
+VideoOutput.Resize
+{id: 7, rect: {height: 360.0, left: 0.0, top: 0.0, width: 640.0}, handle: 4938792016}
+VideoOutput.Resize
+{rect: {width: 0.0, left: 0.0, top: 0.0, height: 0.0}, id: 8, handle: 5071930064}
+NativeVideoController: Texture ID: 8
+VideoOutput.Resize
+{rect: {left: 0.0, width: 480.0, height: 270.0, top: 0.0}, handle: 5071930064, id: 8}
+VideoOutput.Resize
+{rect: {left: 0.0, height: 360.0, top: 0.0, width: 640.0}, id: 8, handle: 5071930064}
+VideoOutput.Resize
+{handle: 5071932624, id: 9, rect: {left: 0.0, width: 0.0, top: 0.0, height: 0.0}}
+NativeVideoController: Texture ID: 9
+VideoOutput.Resize
+{handle: 5071932624, rect: {height: 360.0, top: 0.0, left: 0.0, width: 640.0}, id: 9}
+ORVEX_BACK_EVIDENCE=/Users/wanzhenyu/Library/Developer/CoreSimulator/Devices/0D043D06-A86D-44E7-A32A-B72FDCC30299/data/Containers/Data/Application/2390DAEF-DC4C-4A9C-A94D-C191CD114F01/tmp/orvex-back-QGEhiG
+00:19 +1: (tearDownAll)
+00:19 +1: All tests passed!

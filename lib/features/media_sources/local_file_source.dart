@@ -48,8 +48,7 @@ class LocalFileSource {
     if (!const ['srt', 'ass', 'ssa', 'vtt'].contains(extension)) {
       throw const FormatException('请选择 SRT、ASS、SSA 或 VTT 字幕文件');
     }
-    if (Platform.isIOS || Platform.isAndroid) return imports.import(file);
-    return LocalMedia(uri: _uri(file.path), name: file.name);
+    return imports.import(file);
   }
 
   Uri _uri(String path) => path.startsWith('content://')

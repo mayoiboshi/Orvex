@@ -1,0 +1,15 @@
+{
+  "date": "2026-11-06",
+  "device": "iPad Pro 2022",
+  "completedUserMediaPreviews": 2,
+  "backends": [
+    "libmpv",
+    "libmpv"
+  ],
+  "nativeFailureCodes": [
+    "thumbnail_unavailable",
+    "thumbnail_unavailable"
+  ],
+  "userConfirmedThumbnailsVisible": true,
+  "originalVideoOrFrameCopiedIntoRepository": false
+}

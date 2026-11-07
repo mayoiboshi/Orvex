@@ -10,6 +10,8 @@ import 'package:orvex/features/player/domain/playback_engine.dart';
 
 import 'support/fake_metadata.dart';
 
+import 'package:orvex/features/library/domain/media_series.dart';
+
 const frieren = AnimeSubject(
   id: 400602,
   name: '葬送のフリーレン',
@@ -36,6 +38,19 @@ Future<void> idle(AnimeMetadataController controller) async {
     await Future<void>.delayed(const Duration(milliseconds: 1));
   }
   expect(controller.busy, isFalse);
+}
+
+class RenameClient extends FakeBangumiClient {
+  final oldGate = Completer<void>();
+  @override
+  Future<List<AnimeSubject>> search(String query) async {
+    queries.add(query);
+    if (query == '旧作品') {
+      await oldGate.future;
+      return [seasonTwo];
+    }
+    return [frieren];
+  }
 }
 
 void main() {
@@ -410,6 +425,108 @@ void main() {
       } finally {
         await directory.delete(recursive: true);
       }
+    },
+  );
+  test('automatic policy picks the first candidate and batches episodes into one search', () async {
+    final client = FakeBangumiClient()..results = [seasonTwo, frieren];
+    final controller = AnimeMetadataController(
+      client: client,
+      store: MemoryMetadataStore(),
+      groupResolver: (m) => identifySeries(m).key,
+    );
+    final episodes = [media('葬送的芙莉莲 - 01.mp4'), media('葬送的芙莉莲 - 02.mp4')];
+    await controller.scan(episodes);
+    await idle(controller);
+    expect(client.queries, ['葬送的芙莉莲']);
+    expect(
+      episodes.every((m) => controller.subjectFor(m)?.id == seasonTwo.id),
+      isTrue,
+    );
+    await controller.selectMany(episodes, frieren);
+    final third = media('葬送的芙莉莲 - 03.mp4');
+    await controller.scan([...episodes, third]);
+    await idle(controller);
+    expect(controller.subjectFor(third)?.id, frieren.id);
+    expect(controller.matchFor(third)?.manual, isTrue);
+    expect(client.queries.length, 1);
+    controller.dispose();
+  });
+  test('old review candidates adopt first result offline without replacing manual choices', () async {
+    final item = media('葬送的芙莉莲 - 01.mp4');
+    final store = MemoryMetadataStore()
+      ..entries = {
+        animeMediaKey(item): AnimeMatch(
+          query: '葬送的芙莉莲',
+          status: AnimeMatchStatus.needsReview,
+          updatedAt: DateTime.now(),
+          candidates: [seasonTwo, frieren],
+          matcherVersion: 2,
+        ),
+      };
+    final client = FakeBangumiClient()..fail = true;
+    final controller = AnimeMetadataController(client: client, store: store);
+    await controller.scan([item]);
+    await idle(controller);
+    expect(controller.subjectFor(item)?.id, seasonTwo.id);
+    expect(client.queries, isEmpty);
+    controller.dispose();
+  });
+  test('case and punctuation variations share one search without rematching on refresh', () async {
+    final client = FakeBangumiClient()..results = [frieren];
+    final controller = AnimeMetadataController(
+      client: client,
+      store: MemoryMetadataStore(),
+    );
+    final files = [
+      media('[Subs] Example Show - 01.mp4'),
+      media('[Other] EXAMPLE.SHOW - 02.mkv'),
+    ];
+    await controller.scan(files);
+    await idle(controller);
+    expect(client.queries.length, 1);
+    expect(
+      files.every((m) => controller.subjectFor(m)?.id == frieren.id),
+      isTrue,
+    );
+    await controller.scan(files);
+    await idle(controller);
+    expect(client.queries.length, 1);
+    controller.dispose();
+  });
+  test(
+    'a renamed indexed file cannot receive its older in-flight query result',
+    () async {
+      final client = RenameClient();
+      final controller = AnimeMetadataController(
+        client: client,
+        store: MemoryMetadataStore(),
+      );
+      final old = LocalMedia(
+        uri: Uri(scheme: 'orvex-folder', host: 'root', path: '/same'),
+        name: '旧作品 - 01.mkv',
+        folderRoot: 'root',
+        folderFile: 'same',
+      );
+      final renamed = LocalMedia(
+        uri: old.uri,
+        name: '新作品 - 01.mkv',
+        folderRoot: 'root',
+        folderFile: 'same',
+      );
+      final seen = <int>[];
+      controller.addListener(() {
+        final id = controller.subjectFor(renamed)?.id;
+        if (id != null) seen.add(id);
+      });
+      await controller.scan([old]);
+      await Future<void>.delayed(Duration.zero);
+      await controller.scan([renamed]);
+      client.oldGate.complete();
+      await idle(controller);
+      expect(controller.subjectFor(renamed)?.id, frieren.id);
+      expect(seen, isNot(contains(seasonTwo.id)));
+      expect(client.queries, ['旧作品', '新作品']);
+      controller.dispose();
     },
   );
 }

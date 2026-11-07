@@ -1,0 +1,12 @@
+{
+  "bundle": "dev.orvex.orvex",
+  "team": "B42C727YGN",
+  "deviceFamilies": [
+    1,
+    2
+  ],
+  "bothUserDevicesProvisioned": true,
+  "entrypoint": "lib/main.dart",
+  "testOrProxyFlags": false,
+  "signatureVerified": true
+}

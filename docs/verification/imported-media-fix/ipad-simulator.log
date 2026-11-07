@@ -1,0 +1,11 @@
+00:00 +0: loading /Users/wanzhenyu/CodexProjects/Orvex/integration_test/imported_media_test.dart
+The following plugins do not support Swift Package Manager for ios:
+  - media_kit_libs_ios_video
+  - media_kit_video
+This will become an error in a future version of Flutter. Please contact the plugin maintainers to request Swift Package Manager adoption.
+Running Xcode build...                                          
+Xcode build done.                                           23.1s
+00:00 +0: repeated imports reuse identity and actual native thumbnails appear in imported rows
+ORVEX_IMPORT_PREVIEW_EVIDENCE=/Users/wanzhenyu/Library/Developer/CoreSimulator/Devices/139B061B-ED02-4594-A56A-1AAC3A7AF574/data/Containers/Data/Application/340BBD71-74B1-4965-9C4D-AC93DF374EC3/tmp/orvex-import-preview-HtQ1kw
+00:02 +1: (tearDownAll)
+00:03 +1: All tests passed!

@@ -1,0 +1,6 @@
+frames=582
+build_p50_ms=0.781
+build_p95_ms=14.88
+raster_p50_ms=1.224
+raster_p95_ms=2.516
+Includes theme changes, navigation, screenshots and native video initialization.

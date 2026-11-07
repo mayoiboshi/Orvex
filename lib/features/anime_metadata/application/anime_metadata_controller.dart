@@ -9,9 +9,16 @@ import '../infrastructure/bangumi_client.dart';
 import '../infrastructure/metadata_store.dart';
 
 class AnimeMetadataController extends ChangeNotifier {
-  AnimeMetadataController({BangumiClient? client, MetadataStore? store})
-    : client = client ?? BangumiClient(),
-      store = store ?? MetadataStore();
+  AnimeMetadataController({
+    BangumiClient? client,
+    MetadataStore? store,
+    this.queryResolver,
+    this.groupResolver,
+  }) : client = client ?? BangumiClient(),
+       store = store ?? MetadataStore();
+  final String Function(LocalMedia)? queryResolver, groupResolver;
+  String queryFor(LocalMedia media) =>
+      queryResolver?.call(media) ?? AnimeFilename.parse(media.name).query;
   final BangumiClient client;
   final MetadataStore store;
   final Map<String, AnimeMatch> _entries = {};
@@ -52,17 +59,17 @@ class AnimeMetadataController extends ChangeNotifier {
       );
       _posters.addAll(await store.posters());
       for (final entry in _entries.values) {
-        if (entry.matcherVersion < animeMatcherVersion ||
-            entry.manual ||
+        if (entry.manual ||
             entry.status == AnimeMatchStatus.failed ||
             entry.status == AnimeMatchStatus.queued ||
             entry.status == AnimeMatchStatus.ignored) {
           continue;
         }
-        _queries[entry.query] = (
-          date: entry.updatedAt,
-          subjects: entry.candidates,
-        );
+        final key = normalizedAnimeTitle(entry.query);
+        if (_queries[key] == null ||
+            entry.updatedAt.isAfter(_queries[key]!.date)) {
+          _queries[key] = (date: entry.updatedAt, subjects: entry.candidates);
+        }
       }
       _loaded = true;
       error = null;
@@ -76,6 +83,20 @@ class AnimeMetadataController extends ChangeNotifier {
     _media = List.of(media);
     await initialize();
     if (_disposed || !_loaded || !automatic) return;
+    final manualGroups = <String, AnimeMatch>{};
+    if (groupResolver != null) {
+      for (final item in media) {
+        final saved = _entries[animeMediaKey(item)];
+        if (saved?.manual == true) {
+          final group = groupResolver!(item);
+          if (manualGroups[group] == null ||
+              saved!.updatedAt.isAfter(manualGroups[group]!.updatedAt)) {
+            manualGroups[group] = saved!;
+          }
+        }
+      }
+    }
+    var inherited = false;
     for (final video in media) {
       final key = animeMediaKey(video);
       var entry = _entries[key];
@@ -83,9 +104,26 @@ class AnimeMetadataController extends ChangeNotifier {
           !entry.manual &&
           ((entry.matcherVersion < animeMatcherVersion &&
                   entry.status != AnimeMatchStatus.matched) ||
-              entry.query != AnimeFilename.parse(video.name).query)) {
+              normalizedAnimeTitle(entry.query) !=
+                  normalizedAnimeTitle(queryFor(video)))) {
         _entries.remove(key);
+        _revisions[key] = (_revisions[key] ?? 0) + 1;
+        _queue.remove(key);
         entry = null;
+      }
+      final manual = groupResolver == null
+          ? null
+          : manualGroups[groupResolver!(video)];
+      if (entry == null && manual != null) {
+        entry = AnimeMatch(
+          query: queryFor(video),
+          status: manual.status,
+          updatedAt: manual.updatedAt,
+          subject: manual.subject,
+          manual: true,
+        );
+        _entries[key] = entry;
+        inherited = true;
       }
       if (entry?.subject case final AnimeSubject subject) {
         unawaited(_ensurePoster(subject));
@@ -109,6 +147,7 @@ class AnimeMetadataController extends ChangeNotifier {
       }
       _enqueue(video);
     }
+    if (inherited) await _save();
     if (!_running) unawaited(_run());
   }
 
@@ -118,10 +157,10 @@ class AnimeMetadataController extends ChangeNotifier {
         _entries[key]?.status == AnimeMatchStatus.queued) {
       return;
     }
-    final parsed = AnimeFilename.parse(media.name);
-    if (parsed.title.isEmpty) return;
+    final query = queryFor(media);
+    if (query.trim().length < 2) return;
     _entries[key] = AnimeMatch(
-      query: parsed.query,
+      query: query,
       status: AnimeMatchStatus.queued,
       updatedAt: DateTime.now(),
     );
@@ -135,39 +174,40 @@ class AnimeMetadataController extends ChangeNotifier {
       while (_queue.isNotEmpty && !_disposed && automatic) {
         final key = _queue.keys.first;
         final media = _queue.remove(key)!;
-        final revision = _revisions[key] ?? 0;
-        if (_entries[key]?.manual ?? false) continue;
-        final parsed = AnimeFilename.parse(media.name);
+        final query = queryFor(media);
+        final queryKey = normalizedAnimeTitle(query);
+        final batch = <String, int>{key: _revisions[key] ?? 0};
+        for (final other in _queue.entries.toList()) {
+          if (normalizedAnimeTitle(queryFor(other.value)) == queryKey) {
+            batch[other.key] = _revisions[other.key] ?? 0;
+            _queue.remove(other.key);
+          }
+        }
+        AnimeMatch result;
         try {
-          var cached = _queries[parsed.query];
+          var cached = _queries[queryKey];
           if (cached == null ||
               DateTime.now().difference(cached.date) >
                   const Duration(days: 7)) {
-            final subjects = await client.search(parsed.query);
-            cached = (date: DateTime.now(), subjects: subjects);
-            _queries[parsed.query] = cached;
+            cached = (
+              date: DateTime.now(),
+              subjects: await client.search(query),
+            );
+            _queries[queryKey] = cached;
           }
-          if (_disposed || revision != (_revisions[key] ?? 0)) continue;
-          if (!automatic) {
-            _entries.remove(key);
-            continue;
-          }
-          final subject = confidentAnimeMatch(parsed, cached.subjects);
-          _entries[key] = AnimeMatch(
-            query: parsed.query,
-            status: subject != null
-                ? AnimeMatchStatus.matched
-                : cached.subjects.isEmpty
+          final subject = cached.subjects.firstOrNull;
+          result = AnimeMatch(
+            query: query,
+            status: subject == null
                 ? AnimeMatchStatus.notFound
-                : AnimeMatchStatus.needsReview,
+                : AnimeMatchStatus.matched,
             updatedAt: DateTime.now(),
             subject: subject,
             candidates: cached.subjects,
           );
         } catch (exception) {
-          if (_disposed || revision != (_revisions[key] ?? 0)) continue;
-          _entries[key] = AnimeMatch(
-            query: parsed.query,
+          result = AnimeMatch(
+            query: query,
             status: AnimeMatchStatus.failed,
             updatedAt: DateTime.now(),
             error: exception is BangumiException
@@ -175,6 +215,19 @@ class AnimeMetadataController extends ChangeNotifier {
                 : '番剧匹配暂未完成，可稍后重试',
           );
         }
+        for (final item in batch.entries) {
+          if (_disposed ||
+              item.value != (_revisions[item.key] ?? 0) ||
+              (_entries[item.key]?.manual ?? false)) {
+            continue;
+          }
+          if (!automatic) {
+            _entries.remove(item.key);
+            continue;
+          }
+          _entries[item.key] = result;
+        }
+        if (_disposed) break;
         await _save();
         _notify();
         if (_entries[key]?.subject case final AnimeSubject subject) {
@@ -217,21 +270,25 @@ class AnimeMetadataController extends ChangeNotifier {
 
   Future<List<AnimeSubject>> search(String query) => client.search(query);
 
-  Future<void> select(LocalMedia media, AnimeSubject? subject) async {
+  Future<void> select(LocalMedia media, AnimeSubject? subject) =>
+      selectMany([media], subject);
+  Future<void> selectMany(List<LocalMedia> media, AnimeSubject? subject) async {
     await initialize();
     if (!_loaded || _disposed) throw StateError('番剧资料缓存不可用，请重试');
-    final key = animeMediaKey(media);
-    _revisions[key] = (_revisions[key] ?? 0) + 1;
-    _queue.remove(key);
-    _entries[key] = AnimeMatch(
-      query: AnimeFilename.parse(media.name).query,
-      status: subject == null
-          ? AnimeMatchStatus.ignored
-          : AnimeMatchStatus.matched,
-      updatedAt: DateTime.now(),
-      subject: subject,
-      manual: true,
-    );
+    for (final item in media) {
+      final key = animeMediaKey(item);
+      _revisions[key] = (_revisions[key] ?? 0) + 1;
+      _queue.remove(key);
+      _entries[key] = AnimeMatch(
+        query: queryFor(item),
+        status: subject == null
+            ? AnimeMatchStatus.ignored
+            : AnimeMatchStatus.matched,
+        updatedAt: DateTime.now(),
+        subject: subject,
+        manual: true,
+      );
+    }
     try {
       await store.write(automatic, Map.of(_entries));
       error = null;
@@ -293,7 +350,7 @@ class AnimeMetadataController extends ChangeNotifier {
       }
       _revisions[key] = (_revisions[key] ?? 0) + 1;
       _entries.remove(key);
-      _queries.remove(AnimeFilename.parse(item.name).query);
+      _queries.remove(normalizedAnimeTitle(queryFor(item)));
       if (automatic) _enqueue(item);
     }
     if (!_running && automatic) unawaited(_run());
