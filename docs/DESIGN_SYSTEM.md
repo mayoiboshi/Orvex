@@ -14,7 +14,7 @@
 - Apple 的 [UIGlassEffect](https://developer.apple.com/documentation/uikit/uiglasseffect) 从 iOS/iPadOS 26 提供；[SwiftUI glassEffect](https://developer.apple.com/documentation/swiftui/view/glasseffect(_:in:)) 是另一条原生路径。当前 iOS 最低目标为 15.0，需要兼容回退。
 - 嵌入 UIKit/SwiftUI 还需考虑 [Flutter Platform Views 的合成与性能边界](https://docs.flutter.dev/platform-integration/ios/platform-views)，以及视频、命中区域、布局和跨平台差异。本轮没有引入原生玻璃视图或复杂桥接。
 - 第一版 `GlassSurface` 使用裁剪后的 BackdropFilter、半透明底色、轻边缘高光；它是 Flutter 的玻璃风格材质，**不是 Apple 原生 Liquid Glass，没有真实折射或原生材质融合**。未来替换实现保留相同语义入口，届时单独评估，不预先搭插件框架。
-- 根据 [BackdropFilter 官方说明](https://api.flutter.dev/flutter/widgets/BackdropFilter-class.html)，模糊须限制在裁剪区域。列表、海报墙和普通卡片不使用背景模糊；首页通常只有浮动导航一处，播放器可见时只有顶部、中央和底部三个局部区域，隐藏后不绘制。
+- 根据 [BackdropFilter 官方说明](https://api.flutter.dev/flutter/widgets/BackdropFilter-class.html)，模糊须限制在裁剪区域。首页、海报墙、普通卡片和悬浮导航不使用背景模糊。播放器可见时只有顶部、中央和底部三个局部区域使用模糊，隐藏后不绘制。
 
 ## Token 与组件
 
@@ -64,6 +64,13 @@
 - 首页卡片和工具组不使用模糊，只有导航使用受控 Flutter 玻璃，透明底和边界进一步减轻；减少透明度、高对比度与减少动态效果沿用已有规则。不是原生 Liquid Glass，未来材质替换仍通过现有 GlassSurface 抽象进行。
 
 真实前后截图及验证边界见 [首页精修验证](verification/home-polish/README.md)。
+
+### iPad 首页布局与滚动细化
+
+- 根据窗口约束收放页面边距。宽窗口对齐标题与统计的文字基线，窄窗口或大字体时堆叠。搜索和添加共享图标尺寸、圆角及至少 44 点的触控区。
+- 主续播卡在宽窗口并排摆放海报、信息与播放按钮，进度区最多 560 点。紧凑布局将按钮放回信息区。其余续播另列一条横向轨道，时间允许换行。媒体库卡片宽窗口分开放置来源与数量，整卡仍可进入媒体库。
+- 最近添加按内容宽度与文字缩放决定列数，保留 2:3 海报、两行标题和真实元数据。资料按钮缩小图标与底色范围，保留触控面积。
+- 悬浮导航采用语义半透明底色和边框，无实时模糊。减少透明度及高对比度使用实色。首页滚动底距读取 Scaffold 报告的底部占用高度，再留 20 点间距。
 
 ## 播放详情页边界
 

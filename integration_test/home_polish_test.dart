@@ -182,12 +182,32 @@ void main() {
     }
 
     final home = find.byKey(const PageStorageKey('library-tab-0'));
-    Future<void> top() async {
+    Future<void> scrollHome({bool bottom = false}) async {
       final scroll = tester.state<ScrollableState>(
         find.descendant(of: home, matching: find.byType(Scrollable)).first,
       );
-      scroll.position.jumpTo(0);
+      scroll.position.jumpTo(bottom ? scroll.position.maxScrollExtent : 0);
       await tester.pump(const Duration(milliseconds: 450));
+    }
+
+    final recentMedia = (await store.listVideos())
+        .where((media) => media.resumeKey != videos[2].resumeKey)
+        .take(8)
+        .toList();
+    Finder recentCard(LocalMedia media) =>
+        find.byKey(ValueKey('home-recent-${media.resumeKey}'));
+    final lastCard = recentCard(recentMedia.last);
+    void expectLastRowVisible() {
+      final last = tester.getRect(lastCard);
+      final navTop = tester.getTopLeft(find.byType(LibraryTabBar)).dy;
+      final scrollTop = tester.getTopLeft(home).dy;
+      for (final media in recentMedia) {
+        final card = tester.getRect(recentCard(media));
+        if ((card.top - last.top).abs() < 1) {
+          expect(card.top, greaterThanOrEqualTo(scrollTop));
+          expect(card.bottom, lessThan(navTop));
+        }
+      }
     }
 
     var passed = false;
@@ -212,21 +232,30 @@ void main() {
         () => find.text('继续播放').evaluate().isNotEmpty,
         'home records loaded',
       );
-      for (final size in [const Size(1210, 834), const Size(834, 1210)]) {
+      final nativeSize =
+          tester.view.physicalSize / tester.view.devicePixelRatio;
+      final systemLandscape = nativeSize.width > nativeSize.height;
+      final landscape = systemLandscape
+          ? nativeSize
+          : Size(nativeSize.height, nativeSize.width);
+      observations['systemLandscape'] = systemLandscape;
+      observations['landscapeViewport'] = [landscape.width, landscape.height];
+      for (final narrow in [false, true]) {
+        final size = narrow ? Size(438, landscape.height) : landscape;
         tester.view.physicalSize = size * tester.view.devicePixelRatio;
         for (final mode in [ThemeMode.light, ThemeMode.dark]) {
           await appearance.setMode(mode);
-          await top();
-          await capture('${size.width.toInt()}-${mode.name}-top');
-          await tester.drag(home, const Offset(0, -670));
-          await tester.pump(const Duration(milliseconds: 450));
-          await capture('${size.width.toInt()}-${mode.name}-recent');
+          await scrollHome();
+          final name = '${narrow ? 'narrow' : 'landscape'}-${mode.name}';
+          await capture('$name-top');
+          await scrollHome(bottom: true);
+          if (stage != 'before') expectLastRowVisible();
+          await capture('$name-bottom');
         }
       }
-      tester.view.physicalSize =
-          const Size(1210, 834) * tester.view.devicePixelRatio;
+      tester.view.physicalSize = landscape * tester.view.devicePixelRatio;
       await appearance.setMode(ThemeMode.light);
-      await top();
+      await scrollHome();
       final nav = tester.getSize(
         find
             .descendant(
@@ -245,25 +274,39 @@ void main() {
         expect(find.byType(TextFormField), findsWidgets);
         await tester.tap(find.byKey(const ValueKey('tab-0')));
         await tester.pump(const Duration(milliseconds: 450));
-        await top();
+        await scrollHome();
         await tester.tap(find.widgetWithText(TextButton, '播放记录'));
         await tester.pump(const Duration(milliseconds: 450));
         expect(find.text('最近播放'), findsOneWidget);
         await tester.tap(find.byKey(const ValueKey('tab-0')));
         await tester.pump(const Duration(milliseconds: 450));
-        await top();
+        await scrollHome();
         await Scrollable.ensureVisible(
           tester.element(find.byKey(const ValueKey('home-library'))),
           alignment: 0.35,
         );
-        await tester.pump(const Duration(milliseconds: 450));
+        await capture('landscape-light-library');
         await tester.tap(find.byKey(const ValueKey('home-library')));
         await tester.pump(const Duration(milliseconds: 450));
         expect(find.byType(TextFormField), findsWidgets);
         expect(find.byKey(const ValueKey('home-library')), findsNothing);
         await tester.tap(find.byKey(const ValueKey('tab-0')));
         await tester.pump(const Duration(milliseconds: 450));
-        await top();
+        await scrollHome(bottom: true);
+        expectLastRowVisible();
+        await tester.tap(
+          find.descendant(of: lastCard, matching: find.byTooltip('番剧资料')),
+        );
+        await tester.pump(const Duration(milliseconds: 450));
+        expect(find.byTooltip('关闭番剧资料'), findsOneWidget);
+        await tester.tap(find.byTooltip('关闭番剧资料'));
+        await tester.pump(const Duration(milliseconds: 450));
+        await tester.tap(find.byKey(const ValueKey('tab-3')));
+        await tester.pump(const Duration(milliseconds: 450));
+        expect(find.text('显示继续观看'), findsOneWidget);
+        await tester.tap(find.byKey(const ValueKey('tab-0')));
+        await tester.pump(const Duration(milliseconds: 450));
+        await scrollHome();
         await tester.tap(find.text('继续播放'));
         await until(
           () =>
@@ -278,7 +321,7 @@ void main() {
         await tester.tap(find.byTooltip('返回首页'));
         await tester.pump(const Duration(milliseconds: 450));
         await appearance.setReduceTransparency(true);
-        await top();
+        await scrollHome();
         await capture('reduced-transparency');
         expect(find.byType(BackdropFilter), findsNothing);
         observations['actionsAndNativeResume'] = true;

@@ -46,7 +46,7 @@ void main() {
       var imports = 0, details = 0;
       final opened = <LocalMedia>[];
       final tabs = <int>[];
-      for (final width in [360.0, 834.0, 1210.0]) {
+      for (final width in [360.0, 438.0, 834.0, 1210.0]) {
         tester.view.physicalSize = Size(width, 900);
         tester.view.devicePixelRatio = 1;
         for (final brightness in Brightness.values) {
@@ -59,6 +59,8 @@ void main() {
                   data: MediaQueryData(
                     size: Size(width, 900),
                     textScaler: TextScaler.linear(scale),
+                    padding: const EdgeInsets.only(bottom: 34),
+                    viewPadding: const EdgeInsets.only(bottom: 34),
                   ),
                   child: Scaffold(
                     extendBody: true,
@@ -119,8 +121,19 @@ void main() {
             final recent = find.byKey(
               ValueKey('home-recent-${videos.last.resumeKey}'),
             );
-            await tester.ensureVisible(recent);
+            final home = find.byKey(const PageStorageKey('library-tab-0'));
+            final scroll = tester.state<ScrollableState>(
+              find
+                  .descendant(of: home, matching: find.byType(Scrollable))
+                  .first,
+            );
+            scroll.position.jumpTo(scroll.position.maxScrollExtent);
             await tester.pumpAndSettle();
+            expect(
+              tester.getBottomLeft(recent).dy,
+              lessThan(tester.getTopLeft(find.byType(LibraryTabBar)).dy),
+            );
+            expect(tester.getTopLeft(recent).dy, greaterThanOrEqualTo(0));
             await tester.tap(recent);
             expect(opened.last.resumeKey, videos.last.resumeKey);
             final info = find.descendant(
@@ -149,8 +162,8 @@ void main() {
           }
         }
       }
-      expect(imports, 12);
-      expect(details, 24);
+      expect(imports, 16);
+      expect(details, 32);
       await tester.pumpWidget(const SizedBox.shrink());
     },
   );

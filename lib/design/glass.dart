@@ -12,13 +12,14 @@ class GlassSurface extends StatelessWidget {
     super.key,
     required this.child,
     this.blur = false,
+    this.translucent = false,
     this.immersive = false,
     this.subtle = false,
     this.radius = OrvexMetrics.cardRadius,
     this.padding = EdgeInsets.zero,
   });
   final Widget child;
-  final bool blur, immersive, subtle;
+  final bool blur, translucent, immersive, subtle;
   final double radius;
   final EdgeInsetsGeometry padding;
 
@@ -37,6 +38,8 @@ class GlassSurface extends StatelessWidget {
         ? subtle
               ? colors.glass.withValues(alpha: colors.glass.a * 0.8)
               : colors.glass
+        : translucent
+        ? colors.glass
         : colors.surface;
     final panel = DecoratedBox(
       decoration: BoxDecoration(
