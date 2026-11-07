@@ -602,14 +602,14 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
                       }
                       showDialog<void>(
                         context: context,
-                        builder: (_) => AlertDialog(
+                        builder: (dialogContext) => AlertDialog(
                           title: const Text('文件详情'),
                           content: SelectableText(
                             '${media.name}\n\n${root == null ? '本地文件' : '${root.name} / ${_folders.entry(media)?.parent ?? ''}'}',
                           ),
                           actions: [
                             TextButton(
-                              onPressed: () => Navigator.pop(context),
+                              onPressed: () => Navigator.pop(dialogContext),
                               child: const Text('关闭'),
                             ),
                           ],
@@ -625,7 +625,7 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
                     tooltip: '播放手势帮助',
                     onPressed: () => showDialog<void>(
                       context: context,
-                      builder: (_) => AlertDialog(
+                      builder: (dialogContext) => AlertDialog(
                         title: const Text('播放操作'),
                         content: Text(
                           Platform.isIOS || Platform.isAndroid
@@ -634,7 +634,7 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
                         ),
                         actions: [
                           TextButton(
-                            onPressed: () => Navigator.pop(context),
+                            onPressed: () => Navigator.pop(dialogContext),
                             child: const Text('知道了'),
                           ),
                         ],

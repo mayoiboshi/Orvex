@@ -336,6 +336,53 @@ void main() {
     },
   );
 
+  testWidgets('dismissing watch dialogs keeps the current video playing', (
+    tester,
+  ) async {
+    final video = LocalMedia(
+      uri: Uri.file('/local/Show - 01.mp4'),
+      name: 'Show - 01.mp4',
+    );
+    imports.videos = [video];
+    await mount(tester, const Size(1210, 834));
+    await session.open(video);
+    engine.frameController.add(
+      const PlaybackFrame(
+        playing: true,
+        position: Duration(minutes: 3),
+        duration: Duration(minutes: 12),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final surface = tester.state(find.byType(PlaybackSurface));
+    for (final (title, button) in [
+      ('播放操作', '知道了'),
+      ('播放操作', '知道了'),
+      ('文件详情', '关闭'),
+    ]) {
+      if (title == '播放操作') {
+        await tester.tap(find.byTooltip('播放手势帮助'));
+      } else {
+        await tester.tap(find.byTooltip('视频操作'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('文件详情'));
+      }
+      await tester.pumpAndSettle();
+      expect(find.widgetWithText(AlertDialog, title), findsOneWidget);
+      await tester.tap(find.widgetWithText(TextButton, button));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(AlertDialog), findsNothing);
+      expect(tester.state(find.byType(PlaybackSurface)), same(surface));
+      expect(session.engine, same(engine));
+      expect(session.frame.playing, isTrue);
+      expect(session.frame.position, const Duration(minutes: 3));
+      expect(engine.pauses, 0);
+    }
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
   testWidgets('playback progress updates without rebuilding media browsers', (
     tester,
   ) async {
