@@ -433,6 +433,9 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
                                 metadata: _metadata,
                                 onMetadata: _showMetadata,
                                 appearance: ref.read(appearanceProvider),
+                                thumbnails: _tab == 0
+                                    ? ref.read(thumbnailCacheProvider)
+                                    : null,
                               ),
                       ),
                       if (!watching && _session.media != null && !homeHasResume)

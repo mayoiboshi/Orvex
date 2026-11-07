@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -9,6 +10,8 @@ import '../../player/domain/playback_engine.dart';
 import '../../anime_metadata/application/anime_metadata_controller.dart';
 import '../../anime_metadata/domain/anime_filename.dart';
 import '../../anime_metadata/domain/anime_subject.dart';
+import '../../folder_library/folder_models.dart';
+import '../../folder_library/thumbnail_cache.dart';
 import '../../player/presentation/playback_surface.dart';
 import '../domain/playback_record.dart';
 
@@ -31,6 +34,7 @@ class LibraryViews extends StatelessWidget {
     required this.metadata,
     required this.onMetadata,
     required this.appearance,
+    this.thumbnails,
   });
 
   final int tab;
@@ -47,6 +51,7 @@ class LibraryViews extends StatelessWidget {
   final AnimeMetadataController metadata;
   final ValueChanged<LocalMedia> onMetadata;
   final AppearanceController appearance;
+  final ThumbnailCache? thumbnails;
 
   List<PlaybackRecord> get continuing =>
       history.where((record) => record.canContinue).toList();
@@ -147,10 +152,7 @@ class LibraryViews extends StatelessWidget {
   Widget _homeHeader(BuildContext context) {
     final colors = OrvexColors.of(context);
     final text = Theme.of(context).textTheme;
-    final title = Text(
-      '首页',
-      style: text.headlineMedium?.copyWith(fontWeight: FontWeight.w500),
-    );
+    final title = Text('首页', style: text.headlineLarge);
     final count = continuing.length;
     final summary = Text(
       loading
@@ -199,43 +201,24 @@ class LibraryViews extends StatelessWidget {
         ],
       ),
     );
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final wide =
-            constraints.maxWidth >= 620 &&
-            MediaQuery.textScalerOf(context).scale(14) <= 21;
-        return Row(
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const OrvexBrand(),
-                  const SizedBox(height: OrvexMetrics.gap),
-                  if (wide)
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.baseline,
-                      textBaseline: TextBaseline.alphabetic,
-                      children: [
-                        title,
-                        const SizedBox(width: OrvexMetrics.space),
-                        Flexible(child: summary),
-                      ],
-                    )
-                  else ...[
-                    title,
-                    const SizedBox(height: 4),
-                    summary,
-                  ],
-                ],
-              ),
-            ),
-            const SizedBox(width: OrvexMetrics.gap),
-            actions,
-          ],
-        );
-      },
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const OrvexBrand(),
+              const SizedBox(height: OrvexMetrics.gap),
+              title,
+              const SizedBox(height: 4),
+              summary,
+            ],
+          ),
+        ),
+        const SizedBox(width: OrvexMetrics.gap),
+        actions,
+      ],
     );
   }
 
@@ -257,70 +240,88 @@ class LibraryViews extends StatelessWidget {
           _section(context, '继续观看', action: '播放记录', onTap: () => onTab(2)),
           const SizedBox(height: OrvexMetrics.small),
         ],
-        _hero(context, resume),
-        if (others.isNotEmpty) ...[
-          const SizedBox(height: OrvexMetrics.space),
-          Text(
-            '其他继续观看',
-            style: Theme.of(context).textTheme.labelMedium
-                ?.copyWith(color: OrvexColors.of(context).secondary),
-          ),
+        _homeResume(context, resume, others),
+        if (recent.isNotEmpty) ...[
+          const SizedBox(height: OrvexMetrics.section),
+          _section(context, '最近添加', action: '全部', onTap: () => onTab(1)),
           const SizedBox(height: OrvexMetrics.small),
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final cardWidth = (constraints.maxWidth * 0.29).clamp(
-                176.0,
-                248.0,
-              );
-              final scaler = MediaQuery.textScalerOf(context);
-              final timeLines = scaler.scale(12) > 17 ? 2 : 1;
-              return SizedBox(
-                height:
-                    cardWidth * 9 / 16 +
-                    scaler.scale(14) * 2.6 +
-                    scaler.scale(12) * 1.4 * timeLines +
-                    OrvexMetrics.section +
-                    6,
-                child: ListView.separated(
-                  key: const ValueKey('home-continue-rail'),
-                  scrollDirection: Axis.horizontal,
-                  itemCount: others.length,
-                  separatorBuilder: (_, _) =>
-                      const SizedBox(width: OrvexMetrics.space),
-                  itemBuilder: (context, index) => SizedBox(
-                    width: cardWidth,
-                    child: _continueCard(context, others[index]),
-                  ),
-                ),
-              );
-            },
-          ),
+          _posterGrid(context, recent, home: true),
         ],
         const SizedBox(height: OrvexMetrics.section),
         _section(context, '我的媒体库', action: '查看全部', onTap: () => onTab(1)),
         const SizedBox(height: OrvexMetrics.small),
         _homeLibrary(context),
-        if (recent.isNotEmpty) ...[
-          const SizedBox(height: OrvexMetrics.section),
-          _section(context, '最近添加', action: '全部', onTap: () => onTab(1)),
-          const SizedBox(height: OrvexMetrics.gap),
-          _posterGrid(context, recent, home: true),
-        ],
       ],
+    );
+  }
+
+  Widget _homeResume(
+    BuildContext context,
+    PlaybackRecord? resume,
+    List<PlaybackRecord> others,
+  ) {
+    final hero = _hero(context, resume);
+    if (others.isEmpty) return hero;
+    final scaler = MediaQuery.textScalerOf(context);
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final sideBySide =
+            constraints.maxWidth >= 950 && scaler.scale(14) <= 20;
+        final heroWidth = constraints.maxWidth * 0.61;
+        final railWidth = sideBySide
+            ? constraints.maxWidth - heroWidth - OrvexMetrics.space
+            : constraints.maxWidth;
+        final cardWidth = sideBySide
+            ? (railWidth / 2.6).clamp(128.0, 168.0)
+            : (railWidth * 0.42).clamp(148.0, 224.0);
+        final timeLines = cardWidth < 176 || scaler.scale(12) > 17 ? 2 : 1;
+        final rail = SizedBox(
+          height:
+              cardWidth * 9 / 16 +
+              scaler.scale(14) * 2.6 +
+              scaler.scale(12) * 1.4 * timeLines +
+              OrvexMetrics.section +
+              6,
+          child: ListView.separated(
+            key: const ValueKey('home-continue-rail'),
+            scrollDirection: Axis.horizontal,
+            itemCount: others.length,
+            separatorBuilder: (_, _) => const SizedBox(width: OrvexMetrics.gap),
+            itemBuilder: (context, index) => SizedBox(
+              width: cardWidth,
+              child: _continueCard(context, others[index]),
+            ),
+          ),
+        );
+        return sideBySide
+            ? Row(
+                children: [
+                  SizedBox(width: heroWidth, child: hero),
+                  const SizedBox(width: OrvexMetrics.space),
+                  Expanded(child: rail),
+                ],
+              )
+            : Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  hero,
+                  const SizedBox(height: OrvexMetrics.space),
+                  rail,
+                ],
+              );
+      },
     );
   }
 
   Widget _homeLibrary(BuildContext context) {
     final colors = OrvexColors.of(context);
     final text = Theme.of(context).textTheme;
+    final previews = videos.take(3).toList();
     return Material(
       color: colors.surface,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(OrvexMetrics.cardRadius),
-        side: BorderSide(
-          color: colors.divider.withValues(alpha: 0.7),
-          width: 0.7,
-        ),
+        side: BorderSide(color: colors.divider),
       ),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
@@ -328,92 +329,65 @@ class LibraryViews extends StatelessWidget {
         onTap: () => onTab(1),
         child: Padding(
           padding: const EdgeInsets.all(OrvexMetrics.space),
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              final wide =
-                  constraints.maxWidth >= 560 &&
-                  MediaQuery.textScalerOf(context).scale(14) <= 22;
-              final count = '${videos.length} 部视频';
-              final previews = videos.take(3).toList();
-              return Row(
-                children: [
-                  if (previews.isEmpty)
-                    _tileIcon(context, Icons.video_library_outlined)
-                  else
-                    SizedBox(
-                      width: wide ? 94 : 76,
-                      height: wide ? 64 : 54,
-                      child: Stack(
-                        children: [
-                          for (var i = previews.length - 1; i >= 0; i--)
-                            Positioned(
-                              left: i * (wide ? 21.0 : 14.0),
-                              top: i * 3.0,
-                              bottom: i * 3.0,
-                              width: wide ? 46 : 38,
-                              child: DecoratedBox(
-                                decoration: BoxDecoration(
-                                  color: colors.surface,
-                                  borderRadius: BorderRadius.circular(
-                                    OrvexMetrics.smallRadius,
-                                  ),
-                                  border: Border.all(color: colors.divider),
+          child: Row(
+            children: [
+              if (previews.isEmpty)
+                _tileIcon(context, Icons.video_library_outlined)
+              else
+                SizedBox(
+                  width: 42 + (previews.length - 1) * 16,
+                  height: 58,
+                  child: Stack(
+                    children: [
+                      for (var i = previews.length - 1; i >= 0; i--)
+                        Positioned(
+                          left: i * 16.0,
+                          top: i * 4.0,
+                          bottom: i * 4.0,
+                          width: 42,
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              color: colors.surface,
+                              borderRadius: BorderRadius.circular(
+                                OrvexMetrics.smallRadius,
+                              ),
+                              border: Border.all(color: colors.divider),
+                            ),
+                            child: Padding(
+                              padding: const EdgeInsets.all(2),
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(
+                                  OrvexMetrics.small,
                                 ),
-                                child: Padding(
-                                  padding: const EdgeInsets.all(2),
-                                  child: ClipRRect(
-                                    borderRadius: BorderRadius.circular(
-                                      OrvexMetrics.small,
-                                    ),
-                                    child: _cover(previews[i], poster: true),
-                                  ),
-                                ),
+                                child: _cover(previews[i], poster: true),
                               ),
                             ),
-                        ],
-                      ),
-                    ),
-                  const SizedBox(width: OrvexMetrics.space),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('本地视频', style: text.titleMedium),
-                        const SizedBox(height: 4),
-                        Text(
-                          wide ? '保存在此设备' : '$count · 保存在此设备',
-                          style: text.bodySmall,
+                          ),
                         ),
-                      ],
-                    ),
+                    ],
                   ),
-                  if (wide) ...[
-                    DecoratedBox(
-                      decoration: BoxDecoration(
-                        color: colors.elevated,
-                        borderRadius: BorderRadius.circular(
-                          OrvexMetrics.pillRadius,
-                        ),
-                      ),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: OrvexMetrics.gap,
-                          vertical: OrvexMetrics.small,
-                        ),
-                        child: Text(count, style: text.labelMedium),
-                      ),
+                ),
+              const SizedBox(width: OrvexMetrics.space),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('本地视频', style: text.titleMedium),
+                    const SizedBox(height: 4),
+                    Text(
+                      '${videos.length} 部视频 · 保存在此设备',
+                      style: text.bodySmall?.copyWith(color: colors.secondary),
                     ),
-                    const SizedBox(width: OrvexMetrics.space),
-                  ] else
-                    const SizedBox(width: OrvexMetrics.gap),
-                  Icon(
-                    Icons.arrow_forward_rounded,
-                    size: OrvexMetrics.iconSize,
-                    color: colors.accent,
-                  ),
-                ],
-              );
-            },
+                  ],
+                ),
+              ),
+              const SizedBox(width: OrvexMetrics.gap),
+              Icon(
+                Icons.chevron_right_rounded,
+                size: OrvexMetrics.iconSize,
+                color: colors.secondary,
+              ),
+            ],
           ),
         ),
       ),
@@ -460,126 +434,139 @@ class LibraryViews extends StatelessWidget {
     }
     final subject = metadata.subjectFor(record.media);
     final episode = AnimeFilename.parse(record.media.name).episodeLabel;
-    return GlassSurface(
-      radius: OrvexMetrics.cardRadius,
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final width = constraints.maxWidth;
-          final wide =
-              width >= 740 && MediaQuery.textScalerOf(context).scale(14) <= 22;
-          final inset = width >= 540 ? OrvexMetrics.section : OrvexMetrics.gap;
-          final progress = ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 560),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _homeProgress(context, record.progress),
-                const SizedBox(height: OrvexMetrics.small),
-                Wrap(
-                  spacing: OrvexMetrics.gap,
-                  runSpacing: 4,
-                  children: [
-                    Text(
-                      '${formatTime(record.position)} / ${formatTime(record.duration)}',
-                      style: text.bodySmall,
-                    ),
-                    Text(
-                      '已观看 ${(record.progress * 100).round()}%',
-                      style: text.bodySmall?.copyWith(color: colors.secondary),
-                    ),
-                  ],
+    return Align(
+      alignment: AlignmentDirectional.centerStart,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 860),
+        child: GlassSurface(
+          key: const ValueKey('home-resume-card'),
+          radius: OrvexMetrics.cardRadius,
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final width = constraints.maxWidth;
+              final wide =
+                  width >= 560 &&
+                  MediaQuery.textScalerOf(context).scale(14) <= 22;
+              final inset = wide ? OrvexMetrics.space : OrvexMetrics.gap;
+              final posterWidth = (width * 0.24).clamp(
+                72.0,
+                wide ? 128.0 : 112.0,
+              );
+              final progress = Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _homeProgress(context, record.progress),
+                  const SizedBox(height: OrvexMetrics.small),
+                  Wrap(
+                    spacing: OrvexMetrics.gap,
+                    runSpacing: 4,
+                    children: [
+                      Text(
+                        '${formatTime(record.position)} / ${formatTime(record.duration)}',
+                        style: text.bodySmall,
+                      ),
+                      Text(
+                        '已观看 ${(record.progress * 100).round()}%',
+                        style: text.bodySmall?.copyWith(
+                          color: colors.secondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              );
+              final play = FilledButton.icon(
+                key: const ValueKey('home-resume'),
+                onPressed: () => onOpen(record.media),
+                style: FilledButton.styleFrom(
+                  minimumSize: const Size(0, OrvexMetrics.hitSize),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: OrvexMetrics.gap,
+                  ),
+                  shape: const StadiumBorder(),
                 ),
-              ],
-            ),
-          );
-          final play = FilledButton.icon(
-            key: const ValueKey('home-resume'),
-            onPressed: () => onOpen(record.media),
-            style: FilledButton.styleFrom(
-              minimumSize: Size(wide ? 140 : 0, OrvexMetrics.hitSize),
-              padding: const EdgeInsets.symmetric(horizontal: OrvexMetrics.gap),
-              shape: const StadiumBorder(),
-            ),
-            icon: const Icon(
-              Icons.play_arrow_rounded,
-              size: OrvexMetrics.iconSize,
-            ),
-            label: const Text('继续播放'),
-          );
-          return Padding(
-            padding: EdgeInsets.all(inset),
-            child: ConstrainedBox(
-              constraints: BoxConstraints(minHeight: wide ? 206 : 148),
-              child: IntrinsicHeight(
+                icon: const Icon(
+                  Icons.play_arrow_rounded,
+                  size: OrvexMetrics.iconSize,
+                ),
+                label: const Text('继续播放'),
+              );
+              return Padding(
+                padding: EdgeInsets.all(inset),
                 child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     SizedBox(
-                      width: (width * (wide ? 0.18 : 0.24)).clamp(
-                        72.0,
-                        wide ? 146.0 : 118.0,
-                      ),
+                      width: posterWidth,
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(
                           OrvexMetrics.coverRadius,
                         ),
-                        child: Stack(
-                          children: [
-                            Positioned.fill(
-                              child: _cover(record.media, poster: true),
-                            ),
-                          ],
+                        child: AspectRatio(
+                          aspectRatio: 2 / 3,
+                          child: _cover(
+                            record.media,
+                            poster: true,
+                            fit: BoxFit.contain,
+                          ),
                         ),
                       ),
                     ),
-                    SizedBox(width: inset),
+                    SizedBox(
+                      width: wide ? OrvexMetrics.page : OrvexMetrics.gap,
+                    ),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Text(
-                            episode.isEmpty ? '本地媒体' : episode,
-                            style: text.labelMedium?.copyWith(
-                              color: colors.accent,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
                           Text(
                             subject?.title ?? _mediaTitle(record.media),
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
-                            style: text.titleLarge?.copyWith(
-                              fontSize: wide ? 22 : 18,
-                              height: 1.25,
-                            ),
+                            style: wide ? text.titleLarge : text.titleMedium,
                           ),
                           const SizedBox(height: 4),
-                          Text(
-                            _mediaCaption(record.media),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: text.labelSmall,
+                          Wrap(
+                            spacing: OrvexMetrics.gap,
+                            runSpacing: 4,
+                            children: [
+                              Text(
+                                episode.isEmpty ? '本地媒体' : episode,
+                                style: text.labelMedium?.copyWith(
+                                  color: colors.accent,
+                                ),
+                              ),
+                              Text(
+                                _mediaCaption(record.media),
+                                style: text.bodySmall,
+                              ),
+                            ],
                           ),
                           const SizedBox(height: OrvexMetrics.space),
-                          progress,
-                          if (!wide) ...[
+                          if (wide)
+                            ConstrainedBox(
+                              constraints: const BoxConstraints(maxWidth: 600),
+                              child: Row(
+                                children: [
+                                  Expanded(child: progress),
+                                  const SizedBox(width: OrvexMetrics.space),
+                                  play,
+                                ],
+                              ),
+                            )
+                          else ...[
+                            progress,
                             const SizedBox(height: OrvexMetrics.gap),
                             play,
                           ],
                         ],
                       ),
                     ),
-                    if (wide) ...[
-                      const SizedBox(width: OrvexMetrics.section),
-                      SizedBox(width: 168, child: Center(child: play)),
-                    ],
                   ],
                 ),
-              ),
-            ),
-          );
-        },
+              );
+            },
+          ),
+        ),
       ),
     );
   }
@@ -594,7 +581,15 @@ class LibraryViews extends StatelessWidget {
       children: [
         ClipRRect(
           borderRadius: BorderRadius.circular(OrvexMetrics.coverRadius),
-          child: AspectRatio(aspectRatio: 16 / 9, child: _cover(record.media)),
+          child: AspectRatio(
+            aspectRatio: 16 / 9,
+            child: _ResumeArtwork(
+              media: record.media,
+              cache: thumbnails,
+              entry: thumbnails?.library.entry(record.media),
+              fallback: _cover(record.media, fit: BoxFit.contain),
+            ),
+          ),
         ),
         const SizedBox(height: OrvexMetrics.small),
         SizedBox(
@@ -677,7 +672,11 @@ class LibraryViews extends StatelessWidget {
           ? OrvexMetrics.gap
           : OrvexMetrics.space;
       final largeText = MediaQuery.textScalerOf(context).scale(14) > 21;
-      final target = available >= 740 ? 200.0 : 140.0;
+      final target = available >= 950
+          ? 172.0
+          : available >= 740
+          ? 200.0
+          : 140.0;
       final columns = home
           ? ((available + gap) / (target + gap + (largeText ? 32 : 0)))
                 .floor()
@@ -865,9 +864,14 @@ class LibraryViews extends StatelessWidget {
     ),
   );
 
-  Widget _cover(LocalMedia media, {bool poster = false}) => MediaCover(
+  Widget _cover(
+    LocalMedia media, {
+    bool poster = false,
+    BoxFit fit = BoxFit.cover,
+  }) => MediaCover(
     media: media,
     poster: poster,
+    fit: fit,
     posterPath: metadata.posterPath(metadata.subjectFor(media)?.id ?? 0),
   );
 
@@ -1073,7 +1077,10 @@ class LibraryViews extends StatelessWidget {
         child: Text(
           title,
           style: tab == 0
-              ? Theme.of(context).textTheme.titleMedium
+              ? Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: OrvexColors.of(context).text,
+                )
               : Theme.of(context).textTheme.titleLarge,
         ),
       ),
@@ -1159,15 +1166,100 @@ String mediaTitle(String name) {
   return dot > 0 ? name.substring(0, dot) : name;
 }
 
+class _ResumeArtwork extends StatefulWidget {
+  const _ResumeArtwork({
+    required this.media,
+    required this.cache,
+    required this.entry,
+    required this.fallback,
+  });
+
+  final LocalMedia media;
+  final ThumbnailCache? cache;
+  final FolderEntry? entry;
+  final Widget fallback;
+
+  @override
+  State<_ResumeArtwork> createState() => _ResumeArtworkState();
+}
+
+class _ResumeArtworkState extends State<_ResumeArtwork> {
+  ThumbnailRequest? _request;
+  File? _preview;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  @override
+  void didUpdateWidget(_ResumeArtwork oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.cache != widget.cache ||
+        oldWidget.media.uri != widget.media.uri ||
+        oldWidget.media.resumeKey != widget.media.resumeKey ||
+        oldWidget.entry?.cacheVersion != widget.entry?.cacheVersion) {
+      _load();
+    }
+  }
+
+  void _load() {
+    _request?.cancel();
+    _request = null;
+    _preview = null;
+    final cache = widget.cache;
+    if (cache == null) return;
+    final entry = widget.entry;
+    final request = entry != null
+        ? cache.request(entry)
+        : widget.media.relativeImportPath != null
+        ? cache.requestImported(widget.media)
+        : null;
+    if (request == null) return;
+    _request = request;
+    unawaited(
+      request.result.then((preview) {
+        if (mounted && identical(_request, request) && preview != null) {
+          setState(() => _preview = preview);
+        }
+      }),
+    );
+  }
+
+  @override
+  void dispose() {
+    _request?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final preview = _preview;
+    if (preview == null) return widget.fallback;
+    return ColoredBox(
+      color: OrvexColors.of(context).elevated,
+      child: Image.file(
+        preview,
+        fit: BoxFit.contain,
+        cacheWidth: 480,
+        errorBuilder: (_, _, _) => widget.fallback,
+      ),
+    );
+  }
+}
+
 class MediaCover extends StatelessWidget {
   const MediaCover({
     super.key,
     required this.media,
     this.poster = false,
+    this.fit = BoxFit.cover,
     this.posterPath,
   });
   final LocalMedia media;
   final bool poster;
+  final BoxFit fit;
   final String? posterPath;
   @override
   Widget build(BuildContext context) {
@@ -1194,17 +1286,20 @@ class MediaCover extends StatelessWidget {
         ],
       ),
     );
-    return posterPath == null
-        ? fallback
-        : Image.file(
-            File(posterPath!),
-            fit: BoxFit.cover,
-            cacheWidth: 600,
-            gaplessPlayback: true,
-            errorBuilder: (_, _, _) => fallback,
-            frameBuilder: (context, child, frame, _) =>
-                frame == null ? fallback : child,
-          );
+    final path = posterPath;
+    if (path == null) return fallback;
+    final image = Image.file(
+      File(path),
+      fit: fit,
+      cacheWidth: 600,
+      gaplessPlayback: true,
+      errorBuilder: (_, _, _) => fallback,
+      frameBuilder: (context, child, frame, _) =>
+          frame == null ? fallback : child,
+    );
+    return fit == BoxFit.contain
+        ? ColoredBox(color: colors.elevated, child: image)
+        : image;
   }
 }
 
@@ -1234,13 +1329,14 @@ class LibraryTabBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = OrvexColors.of(context);
+    final home = selected == 0;
     return SafeArea(
       top: false,
-      minimum: const EdgeInsets.fromLTRB(
+      minimum: EdgeInsets.fromLTRB(
         OrvexMetrics.gap,
-        OrvexMetrics.small,
+        home ? 4 : OrvexMetrics.small,
         OrvexMetrics.gap,
-        OrvexMetrics.gap,
+        home ? OrvexMetrics.small : OrvexMetrics.gap,
       ),
       child: Center(
         heightFactor: 1,
@@ -1248,12 +1344,16 @@ class LibraryTabBar extends StatelessWidget {
           constraints: const BoxConstraints(maxWidth: 500),
           child: GlassSurface(
             translucent: true,
+            subtle: home,
             radius: OrvexMetrics.navigationRadius,
-            padding: const EdgeInsets.all(4),
+            padding: EdgeInsets.symmetric(
+              horizontal: 4,
+              vertical: home ? 2 : 4,
+            ),
             child: LayoutBuilder(
               builder: (context, constraints) {
                 final horizontal =
-                    constraints.maxWidth >= 460 &&
+                    constraints.maxWidth >= (home ? 396 : 460) &&
                     MediaQuery.textScalerOf(context).scale(11) <= 16;
                 return Row(
                   children: [
@@ -1263,12 +1363,19 @@ class LibraryTabBar extends StatelessWidget {
                           selected: selected == index,
                           button: true,
                           child: Material(
-                            color: Colors.transparent,
+                            color: home && selected == index
+                                ? colors.accent.withValues(alpha: 0.09)
+                                : Colors.transparent,
+                            borderRadius: home
+                                ? BorderRadius.circular(OrvexMetrics.pillRadius)
+                                : null,
                             child: InkWell(
                               key: ValueKey('tab-$index'),
                               onTap: () => onSelected(index),
                               borderRadius: BorderRadius.circular(
-                                OrvexMetrics.controlRadius,
+                                home
+                                    ? OrvexMetrics.pillRadius
+                                    : OrvexMetrics.controlRadius,
                               ),
                               child: ConstrainedBox(
                                 constraints: const BoxConstraints(
@@ -1342,21 +1449,23 @@ class LibraryTabBar extends StatelessWidget {
                                           ),
                                         ),
                                       ],
-                                      const SizedBox(height: 3),
-                                      AnimatedContainer(
-                                        duration: OrvexMetrics.duration(
-                                          context,
-                                        ),
-                                        curve: OrvexMetrics.curve,
-                                        width: selected == index ? 12 : 0,
-                                        height: 2,
-                                        decoration: BoxDecoration(
-                                          color: colors.accent,
-                                          borderRadius: BorderRadius.circular(
-                                            OrvexMetrics.pillRadius,
+                                      if (!home) ...[
+                                        const SizedBox(height: 3),
+                                        AnimatedContainer(
+                                          duration: OrvexMetrics.duration(
+                                            context,
+                                          ),
+                                          curve: OrvexMetrics.curve,
+                                          width: selected == index ? 12 : 0,
+                                          height: 2,
+                                          decoration: BoxDecoration(
+                                            color: colors.accent,
+                                            borderRadius: BorderRadius.circular(
+                                              OrvexMetrics.pillRadius,
+                                            ),
                                           ),
                                         ),
-                                      ),
+                                      ],
                                     ],
                                   ),
                                 ),

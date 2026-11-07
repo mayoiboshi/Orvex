@@ -39,7 +39,9 @@ class GlassSurface extends StatelessWidget {
               ? colors.glass.withValues(alpha: colors.glass.a * 0.8)
               : colors.glass
         : translucent
-        ? colors.glass
+        ? subtle
+              ? Color.lerp(colors.glass, colors.surface, 0.4)
+              : colors.glass
         : colors.surface;
     final panel = DecoratedBox(
       decoration: BoxDecoration(

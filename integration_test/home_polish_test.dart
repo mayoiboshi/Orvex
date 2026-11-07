@@ -240,12 +240,40 @@ void main() {
           : Size(nativeSize.height, nativeSize.width);
       observations['systemLandscape'] = systemLandscape;
       observations['landscapeViewport'] = [landscape.width, landscape.height];
+      final hero = find.byKey(const ValueKey('home-resume-card'));
+      final rail = find.byKey(const ValueKey('home-continue-rail'));
+      final covers = find.descendant(of: rail, matching: find.byType(Image));
+      bool hasLocalThumbnail() => tester.widgetList<Image>(covers).any((image) {
+        final source = image.image;
+        return source is ResizeImage &&
+            source.imageProvider is FileImage &&
+            (source.imageProvider as FileImage).file.path.contains(
+              '/thumbnails-v1/',
+            );
+      });
       for (final narrow in [false, true]) {
         final size = narrow ? Size(438, landscape.height) : landscape;
         tester.view.physicalSize = size * tester.view.devicePixelRatio;
         for (final mode in [ThemeMode.light, ThemeMode.dark]) {
           await appearance.setMode(mode);
           await scrollHome();
+          if (stage != 'before') {
+            final card = tester.getRect(hero);
+            final track = tester.getRect(rail);
+            if (narrow) {
+              expect(track.top, greaterThan(card.bottom));
+            } else {
+              expect(track.left, greaterThan(card.right));
+            }
+            expect(
+              tester.getTopLeft(find.text('最近添加')).dy,
+              lessThan(tester.getTopLeft(find.text('我的媒体库')).dy),
+            );
+            await until(
+              hasLocalThumbnail,
+              'continue-watching uses a local thumbnail',
+            );
+          }
           final name = '${narrow ? 'narrow' : 'landscape'}-${mode.name}';
           await capture('$name-top');
           await scrollHome(bottom: true);
@@ -266,6 +294,19 @@ void main() {
       );
       observations['navigationSize'] = [nav.width, nav.height];
       if (stage != 'before') {
+        final card = tester.getSize(hero);
+        expect(covers, findsWidgets);
+        expect(
+          tester
+              .widgetList<Image>(covers)
+              .every((image) => image.fit == BoxFit.contain),
+          isTrue,
+        );
+        expect(card.height, inInclusiveRange(210, 240));
+        expect(nav.height, lessThan(52));
+        expect(find.byType(BackdropFilter), findsNothing);
+        observations['resumeCardSize'] = [card.width, card.height];
+        observations['localResumeThumbnail'] = hasLocalThumbnail();
         await tester.tap(find.byTooltip('打开本地视频'));
         await tester.pump(const Duration(milliseconds: 450));
         expect(files.pickerCalls, 1);

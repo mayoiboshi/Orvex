@@ -1,0 +1,21 @@
+{
+  "stage": "after",
+  "fixtureVideos": 8,
+  "cachedPosters": 2,
+  "systemLandscape": false,
+  "landscapeViewport": [
+    1210.0,
+    834.0
+  ],
+  "navigationSize": [
+    500.0,
+    48.0
+  ],
+  "resumeCardSize": [
+    679.54,
+    224.0
+  ],
+  "localResumeThumbnail": true,
+  "actionsAndNativeResume": true,
+  "passed": true
+}

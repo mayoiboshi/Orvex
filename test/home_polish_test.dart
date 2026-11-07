@@ -133,7 +133,24 @@ void main() {
               tester.getBottomLeft(recent).dy,
               lessThan(tester.getTopLeft(find.byType(LibraryTabBar)).dy),
             );
-            expect(tester.getTopLeft(recent).dy, greaterThanOrEqualTo(0));
+            expect(
+              tester.getBottomLeft(library).dy,
+              lessThan(tester.getTopLeft(find.byType(LibraryTabBar)).dy),
+            );
+            await Scrollable.ensureVisible(
+              tester.element(recent),
+              alignment: 0.2,
+            );
+            await tester.pumpAndSettle();
+            expect(
+              tester.getTopLeft(recent).dy,
+              greaterThanOrEqualTo(0),
+              reason: '$width $brightness scale $scale after scrolling to card',
+            );
+            expect(
+              tester.getBottomLeft(recent).dy,
+              lessThan(tester.getTopLeft(find.byType(LibraryTabBar)).dy),
+            );
             await tester.tap(recent);
             expect(opened.last.resumeKey, videos.last.resumeKey);
             final info = find.descendant(
