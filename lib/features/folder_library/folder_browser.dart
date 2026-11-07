@@ -10,6 +10,7 @@ import '../anime_metadata/application/anime_metadata_controller.dart';
 import '../anime_metadata/domain/anime_filename.dart';
 import '../library/domain/playback_record.dart';
 import '../library/presentation/library_views.dart' show mediaTitle;
+import '../player/application/playback_session.dart';
 import '../player/domain/playback_engine.dart';
 import '../player/presentation/playback_surface.dart';
 import 'folder_library.dart';
@@ -41,7 +42,7 @@ class FolderBrowser extends StatefulWidget {
     required this.onMetadata,
     this.current,
     this.header,
-    this.frame,
+    this.playback,
     this.collection,
     this.collectionTitle,
   });
@@ -54,7 +55,7 @@ class FolderBrowser extends StatefulWidget {
   final VoidCallback onImport;
   final LocalMedia? current;
   final Widget? header;
-  final PlaybackFrame? frame;
+  final PlaybackSession? playback;
   final List<LocalMedia>? collection;
   final String? collectionTitle;
   @override
@@ -269,22 +270,6 @@ class _FolderBrowserState extends State<_FolderBrowserContent> {
               (!_unwatched || _record(media) == null),
         )
         .toList();
-  }
-
-  PlaybackRecord? _displayRecord(LocalMedia media) {
-    final frame = config.frame;
-    if (config.current?.resumeKey == media.resumeKey &&
-        frame != null &&
-        frame.duration > Duration.zero) {
-      return PlaybackRecord(
-        media: media,
-        position: frame.position,
-        duration: frame.duration,
-        updatedAt: DateTime.now(),
-        completed: frame.completed,
-      );
-    }
-    return _record(media);
   }
 
   @override
@@ -639,6 +624,7 @@ class _FolderBrowserState extends State<_FolderBrowserContent> {
             itemExtent: _rowHeight,
             delegate: SliverChildBuilderDelegate((context, index) {
               final media = items[index];
+              final current = media.resumeKey == config.current?.resumeKey;
               return _VideoRow(
                 key: ValueKey(media.resumeKey),
                 media: media,
@@ -646,8 +632,9 @@ class _FolderBrowserState extends State<_FolderBrowserContent> {
                 thumbnails: config.thumbnails,
                 revision: library.revision,
                 title: folderMediaTitle(media, config.metadata),
-                record: _displayRecord(media),
-                current: media.resumeKey == config.current?.resumeKey,
+                record: _record(media),
+                current: current,
+                playback: current ? config.playback : null,
                 playbackList: _watching,
                 onTap: () => config.onOpen(media),
                 onMetadata: () => config.onMetadata(media),
@@ -697,6 +684,7 @@ class _VideoRow extends StatefulWidget {
     required this.title,
     required this.record,
     required this.current,
+    this.playback,
     required this.playbackList,
     required this.onTap,
     required this.onMetadata,
@@ -707,6 +695,7 @@ class _VideoRow extends StatefulWidget {
   final String title;
   final int revision;
   final PlaybackRecord? record;
+  final PlaybackSession? playback;
   final bool current, playbackList;
   final VoidCallback onTap, onMetadata;
   @override
@@ -757,9 +746,27 @@ class _VideoRowState extends State<_VideoRow> {
 
   @override
   Widget build(BuildContext context) {
+    final playback = widget.playback;
+    if (playback == null) return _buildRow(context);
+    return ListenableBuilder(
+      listenable: playback,
+      builder: (context, _) {
+        final frame = playback.frame;
+        final matches = playback.media?.resumeKey == widget.media.resumeKey;
+        return _buildRow(
+          context,
+          matches && frame.duration > Duration.zero ? frame : null,
+        );
+      },
+    );
+  }
+
+  Widget _buildRow(BuildContext context, [PlaybackFrame? frame]) {
     final colors = OrvexColors.of(context);
     final record = widget.record;
+    final position = frame?.position ?? record?.position;
     final duration =
+        frame?.duration ??
         record?.duration ??
         Duration(
           milliseconds: widget.entry?.duration ?? _request?.duration ?? 0,
@@ -853,16 +860,16 @@ class _VideoRowState extends State<_VideoRow> {
                                         ),
                                       ),
                               ),
-                              if (record != null &&
-                                  record.duration.inMilliseconds > 0)
+                              if (position != null &&
+                                  duration.inMilliseconds > 0)
                                 Positioned(
                                   bottom: 0,
                                   left: 0,
                                   right: 0,
                                   child: LinearProgressIndicator(
                                     value:
-                                        (record.position.inMilliseconds /
-                                                record.duration.inMilliseconds)
+                                        (position.inMilliseconds /
+                                                duration.inMilliseconds)
                                             .clamp(0, 1),
                                     minHeight: 2,
                                   ),

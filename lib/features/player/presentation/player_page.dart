@@ -7,7 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../../../app/orvex_app.dart';
+import '../../../app/orvex_providers.dart';
 import '../../../design/orvex_theme.dart';
 import '../../../design/back_navigation.dart';
 import '../../anime_metadata/application/anime_metadata_controller.dart';
@@ -44,7 +44,13 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
   bool _showContinue = true;
   bool _showPlayer = false;
   bool _keepLibraryVisible = false;
-  Uri? _observedMedia;
+  ({
+    LocalMedia? media,
+    List<LocalMedia> playlist,
+    bool hasEngine,
+    String? error,
+  })?
+  _observedSession;
   int _tab = 0;
   int _loadGeneration = 0;
   int _openGeneration = 0;
@@ -159,9 +165,18 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
   }
 
   void _onSessionChanged() {
-    if (_observedMedia == _session.media?.uri) return;
-    _observedMedia = _session.media?.uri;
-    _showPlayer = _session.media != null && !_keepLibraryVisible;
+    // Position, buffering and tracks belong to the widgets that display them.
+    final next = (
+      media: _session.media,
+      playlist: _session.playlist,
+      hasEngine: _session.engine != null,
+      error: _session.error,
+    );
+    if (_observedSession == next) return;
+    if (_observedSession?.media?.uri != next.media?.uri) {
+      _showPlayer = next.media != null && !_keepLibraryVisible;
+    }
+    _observedSession = next;
     if (mounted) setState(() {});
   }
 
@@ -300,33 +315,27 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
   }
 
   @override
-  Widget build(BuildContext context) => ListenableBuilder(
-    listenable: _session,
-    builder: (context, _) {
-      final watching = _showPlayer && _session.media != null;
-      return OrvexBackStack(
-        pages: [
-          orvexNavigationPage(
-            context: context,
-            key: const ValueKey('library-page'),
-            child: _buildShell(watching: false),
-          ),
-          if (watching)
-            orvexNavigationPage(
-              context: context,
-              key: const ValueKey('watch-page'),
-              allowSnapshotting: false,
-              child: _fullscreen
-                  ? _fullscreenPlayer()
-                  : _buildShell(watching: true),
-            ),
-        ],
-        onRemoved: (page) {
-          if (page.key == const ValueKey('watch-page')) {
-            unawaited(_returnToLibrary());
-          }
-        },
-      );
+  Widget build(BuildContext context) => OrvexBackStack(
+    pages: [
+      orvexNavigationPage(
+        context: context,
+        key: const ValueKey('library-page'),
+        child: _buildShell(watching: false),
+      ),
+      if (_showPlayer && _session.media != null)
+        orvexNavigationPage(
+          context: context,
+          key: const ValueKey('watch-page'),
+          allowSnapshotting: false,
+          child: _fullscreen
+              ? _fullscreenPlayer()
+              : _buildShell(watching: true),
+        ),
+    ],
+    onRemoved: (page) {
+      if (page.key == const ValueKey('watch-page')) {
+        unawaited(_returnToLibrary());
+      }
     },
   );
 
@@ -451,9 +460,15 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
       ),
-      subtitle: Text(
-        '${_session.frame.playing ? '正在播放' : '已暂停'} · ${formatTime(_session.frame.position)}',
-        style: TextStyle(fontSize: 11, color: _colors.secondary),
+      subtitle: ListenableBuilder(
+        listenable: _session,
+        builder: (context, _) => Text(
+          '${_session.frame.playing ? '正在播放' : '已暂停'} · ${formatTime(_session.frame.position)}',
+          style: TextStyle(
+            fontSize: 11,
+            color: OrvexColors.of(context).secondary,
+          ),
+        ),
       ),
       trailing: const Icon(Icons.open_in_full_rounded, size: 20),
       onTap: () => setState(() {
@@ -485,7 +500,7 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
     history: _history,
     metadata: _metadata,
     current: _session.media,
-    frame: _session.frame,
+    playback: _session,
     collection:
         _session.media != null && _folders.identityFor(_session.media!).episodic
         ? _folders.seriesMembers(_session.media!, _videos)
@@ -655,9 +670,14 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
               episode: identity.episode == null
                   ? ''
                   : '第 ${identity.episode} 集',
-              progress: _session.loading
-                  ? '正在打开…'
-                  : '${formatTime(_session.frame.position)} / ${formatTime(_session.frame.duration)}',
+              progress: ListenableBuilder(
+                listenable: _session,
+                builder: (context, _) => Text(
+                  _session.loading
+                      ? '正在打开…'
+                      : '${formatTime(_session.frame.position)} / ${formatTime(_session.frame.duration)}',
+                ),
+              ),
               linked: subject != null,
               onMetadata: () => _showMetadata(media),
               onPrevious: _session.hasPrevious
@@ -765,20 +785,12 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
           .copyWith(systemNavigationBarColor: OrvexColors.player.background),
       child: Scaffold(
         backgroundColor: OrvexColors.player.background,
-        body: ListenableBuilder(
-          listenable: _session,
-          builder: (context, _) => Stack(
-            children: [
-              Positioned.fill(child: _surface()),
-              if (_session.error case final String message)
-                Positioned(
-                  top: 70,
-                  left: 20,
-                  right: 20,
-                  child: _error(message),
-                ),
-            ],
-          ),
+        body: Stack(
+          children: [
+            Positioned.fill(child: _surface()),
+            if (_session.error case final String message)
+              Positioned(top: 70, left: 20, right: 20, child: _error(message)),
+          ],
         ),
       ),
     ),

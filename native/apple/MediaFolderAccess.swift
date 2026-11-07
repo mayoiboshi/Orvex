@@ -12,29 +12,43 @@ import AppKit
 /// Read-only access. Every live bookmark scope has a matching release after
 /// the scan, thumbnail request or playback engine has finished using it.
 final class MediaFolderAccess: NSObject {
+  private final class Scope {
+    let url: URL
+    private let scoped: Bool
+
+    init(_ url: URL) {
+      self.url = url
+      scoped = url.startAccessingSecurityScopedResource()
+    }
+
+    deinit {
+      if scoped { url.stopAccessingSecurityScopedResource() }
+    }
+  }
+
   private let channel: FlutterMethodChannel
-  private let queue = DispatchQueue(label: "dev.orvex.folders", qos: .utility)
-  private var scopes: [String: (URL, Bool)] = [:]
+  private let accessQueue = DispatchQueue(label: "dev.orvex.folders", qos: .utility)
+  private let thumbnailQueue = DispatchQueue(label: "dev.orvex.folders.thumbnail", qos: .utility)
+  private let extractThumbnail: (URL) throws -> [String: Any]
+  private var scopes: [String: Scope] = [:]
   private var pickerResult: FlutterResult?
   #if os(iOS)
   private let presenter: () -> UIViewController?
-  init(messenger: FlutterBinaryMessenger, presenter: @escaping () -> UIViewController?) {
+  init(messenger: FlutterBinaryMessenger, presenter: @escaping () -> UIViewController?, thumbnailExtractor: ((URL) throws -> [String: Any])? = nil) {
     self.presenter = presenter
+    extractThumbnail = thumbnailExtractor ?? Self.thumbnail
     channel = FlutterMethodChannel(name: "dev.orvex/folders", binaryMessenger: messenger)
     super.init()
     install()
   }
   #else
-  init(messenger: FlutterBinaryMessenger) {
+  init(messenger: FlutterBinaryMessenger, thumbnailExtractor: ((URL) throws -> [String: Any])? = nil) {
+    extractThumbnail = thumbnailExtractor ?? Self.thumbnail
     channel = FlutterMethodChannel(name: "dev.orvex/folders", binaryMessenger: messenger)
     super.init()
     install()
   }
   #endif
-
-  deinit {
-    for scope in scopes.values where scope.1 { scope.0.stopAccessingSecurityScopedResource() }
-  }
 
   private func bookmark(_ url: URL) throws -> String {
     #if os(iOS)
@@ -64,14 +78,50 @@ final class MediaFolderAccess: NSObject {
     channel.setMethodCallHandler { [weak self] call, result in
       guard let self else { result(nil); return }
       if call.method == "pick" { self.pick(result); return }
-      let args = call.arguments as? [String: Any] ?? [:]
-      self.queue.async {
-        do {
-          let value = try self.handle(call.method, args)
-          DispatchQueue.main.async { result(value) }
-        } catch {
-          DispatchQueue.main.async { result(FlutterError(code: call.method.hasPrefix("thumbnail") && (error as NSError).domain != "OrvexFolders" ? "thumbnail_unavailable" : "folder_access", message: error.localizedDescription, details: nil)) }
+      self.enqueue(call.method, call.arguments as? [String: Any] ?? [:], result)
+    }
+  }
+
+  func enqueue(_ method: String, _ args: [String: Any], _ result: @escaping FlutterResult) {
+    let isThumbnail = method == "thumbnail" || method == "thumbnailImported"
+    accessQueue.async {
+      do {
+        if isThumbnail {
+          let scope = method == "thumbnail" ? try self.scope(args) : nil
+          // A release removes the handle immediately. Work already accepted
+          // retains its scope until the thumbnail extractor returns.
+          self.thumbnailQueue.async {
+            let outcome = Result<Any?, Error> {
+              try withExtendedLifetime(scope) {
+                // Validate on the worker so paths are checked just before use.
+                let source: URL
+                if let scope {
+                  source = try self.url(args, root: scope.url)
+                } else {
+                  source = try self.importedURL(args)
+                }
+                return try self.extractThumbnail(source)
+              }
+            }
+            self.reply(outcome, isThumbnail: true, to: result)
+          }
+        } else {
+          self.reply(.success(try self.handle(method, args)), isThumbnail: false, to: result)
         }
+      } catch {
+        self.reply(.failure(error), isThumbnail: isThumbnail, to: result)
+      }
+    }
+  }
+
+  private func reply(_ outcome: Result<Any?, Error>, isThumbnail: Bool, to result: @escaping FlutterResult) {
+    DispatchQueue.main.async {
+      switch outcome {
+      case .success(let value):
+        result(value)
+      case .failure(let error):
+        let code = isThumbnail && (error as NSError).domain != "OrvexFolders" ? "thumbnail_unavailable" : "folder_access"
+        result(FlutterError(code: code, message: error.localizedDescription, details: nil))
       }
     }
   }
@@ -102,8 +152,12 @@ final class MediaFolderAccess: NSObject {
     #endif
   }
 
-  private func url(_ args: [String: Any]) throws -> URL {
-    guard let handle = args["handle"] as? String, let root = scopes[handle]?.0 else { throw failure("目录授权已失效，请重新授权") }
+  private func scope(_ args: [String: Any]) throws -> Scope {
+    guard let handle = args["handle"] as? String, let scope = scopes[handle] else { throw failure("目录授权已失效，请重新授权") }
+    return scope
+  }
+
+  private func url(_ args: [String: Any], root: URL) throws -> URL {
     let relative = args["path"] as? String ?? ""
     let parts = relative.split(separator: "/", omittingEmptySubsequences: false)
     guard relative.isEmpty || parts.allSatisfy({ !$0.isEmpty && $0 != "." && $0 != ".." && !$0.contains("\\") }) else { throw failure("无效的相对路径") }
@@ -115,7 +169,18 @@ final class MediaFolderAccess: NSObject {
     return target
   }
 
-  func handle(_ method: String, _ args: [String: Any]) throws -> Any? {
+  private func importedURL(_ args: [String: Any]) throws -> URL {
+    guard let path = args["path"] as? String else { throw failure("导入文件位置无效") }
+    let parts = path.split(separator: "/", omittingEmptySubsequences: false)
+    guard parts.count >= 2, parts.first == "Imports", parts.allSatisfy({ !$0.isEmpty && $0 != "." && $0 != ".." && !$0.contains("\\") }) else { throw failure("导入文件位置无效") }
+    let documents = try FileManager.default.url(for: .documentDirectory, in: .userDomainMask, appropriateFor: nil, create: false)
+    let source = documents.appendingPathComponent(path)
+    let imports = documents.appendingPathComponent("Imports").resolvingSymlinksInPath().standardizedFileURL.path
+    guard source.resolvingSymlinksInPath().standardizedFileURL.path.hasPrefix(imports + "/") else { throw failure("文件超出导入目录") }
+    return source
+  }
+
+  private func handle(_ method: String, _ args: [String: Any]) throws -> Any? {
     switch method {
     case "acquire":
       guard let raw = args["grant"] as? String, let data = Data(base64Encoded: raw) else { throw failure("目录书签无效，请重新授权") }
@@ -126,22 +191,20 @@ final class MediaFolderAccess: NSObject {
       let options: URL.BookmarkResolutionOptions = [.withSecurityScope, .withoutUI]
       #endif
       let root = try URL(resolvingBookmarkData: data, options: options, relativeTo: nil, bookmarkDataIsStale: &stale)
-      let scoped = root.startAccessingSecurityScopedResource()
-      do {
-        let values = try root.resourceValues(forKeys: [.isDirectoryKey])
-        guard values.isDirectory == true else { throw failure("目录不存在，请重新授权") }
-        let handle = UUID().uuidString
-        scopes[handle] = (root, scoped)
-        var value: [String: Any] = ["handle": handle, "location": root.absoluteString]
-        if stale { value["grant"] = try bookmark(root) }
-        if let id = identity(root) { value["identity"] = id }
-        return value
-      } catch { if scoped { root.stopAccessingSecurityScopedResource() }; throw error }
+      let scope = Scope(root)
+      let values = try root.resourceValues(forKeys: [.isDirectoryKey])
+      guard values.isDirectory == true else { throw failure("目录不存在，请重新授权") }
+      let handle = UUID().uuidString
+      var value: [String: Any] = ["handle": handle, "location": root.absoluteString]
+      if stale { value["grant"] = try bookmark(root) }
+      if let id = identity(root) { value["identity"] = id }
+      scopes[handle] = scope
+      return value
     case "release":
-      if let key = args["handle"] as? String, let scope = scopes.removeValue(forKey: key), scope.1 { scope.0.stopAccessingSecurityScopedResource() }
+      if let key = args["handle"] as? String { scopes.removeValue(forKey: key) }
       return nil
     case "list":
-      let directory = try url(args)
+      let directory = try url(args, root: scope(args).url)
       var coordinationError: NSError?
       var output: [[String: Any]] = []
       var readError: Error?
@@ -163,26 +226,15 @@ final class MediaFolderAccess: NSObject {
       if let error = coordinationError ?? readError as NSError? { throw error }
       return output
     case "resolve":
-      let target = try url(args)
+      let target = try url(args, root: scope(args).url)
       guard FileManager.default.isReadableFile(atPath: target.path) else { throw failure("视频不存在或无法读取，请重新扫描或授权") }
       if let expected = args["identity"] as? String, identity(target) != expected { throw failure("文件身份已变化，请重新扫描") }
       return target.absoluteString
-    case "thumbnail":
-      return try thumbnail(url(args))
-    case "thumbnailImported":
-      guard let path = args["path"] as? String else { throw failure("导入文件位置无效") }
-      let parts = path.split(separator: "/", omittingEmptySubsequences: false)
-      guard parts.count >= 2, parts.first == "Imports", parts.allSatisfy({ !$0.isEmpty && $0 != "." && $0 != ".." && !$0.contains("\\") }) else { throw failure("导入文件位置无效") }
-      let documents = try FileManager.default.url(for: .documentDirectory, in: .userDomainMask, appropriateFor: nil, create: false)
-      let source = documents.appendingPathComponent(path)
-      let imports = documents.appendingPathComponent("Imports").resolvingSymlinksInPath().standardizedFileURL.path
-      guard source.resolvingSymlinksInPath().standardizedFileURL.path.hasPrefix(imports + "/") else { throw failure("文件超出导入目录") }
-      return try thumbnail(source)
     default: return FlutterMethodNotImplemented
     }
   }
 
-  private func thumbnail(_ source: URL) throws -> [String: Any] {
+  private static func thumbnail(_ source: URL) throws -> [String: Any] {
       let asset = AVURLAsset(url: source)
       let loaded = DispatchSemaphore(value: 0)
       asset.loadValuesAsynchronously(forKeys: ["duration"]) { loaded.signal() }
@@ -214,7 +266,7 @@ final class MediaFolderAccess: NSObject {
       return ["bytes": FlutterStandardTypedData(bytes: bytes), "duration": Int(duration * 1000)]
   }
 
-  private func previewFailure(_ message: String) -> NSError { NSError(domain: "OrvexPreview", code: 1, userInfo: [NSLocalizedDescriptionKey: message]) }
+  private static func previewFailure(_ message: String) -> NSError { NSError(domain: "OrvexPreview", code: 1, userInfo: [NSLocalizedDescriptionKey: message]) }
 
   private func failure(_ message: String) -> NSError { NSError(domain: "OrvexFolders", code: 1, userInfo: [NSLocalizedDescriptionKey: message]) }
 }

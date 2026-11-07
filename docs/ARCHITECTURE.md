@@ -27,7 +27,8 @@
 | 位置 | 实际职责 |
 | --- | --- |
 | `lib/main.dart` | 初始化 Flutter、MediaKit，捕获内核启动失败，运行 ProviderScope |
-| `lib/app/orvex_app.dart` | Provider 工厂、资源销毁回调、响应式 MaterialApp 主题和根页面 |
+| `lib/app/orvex_app.dart` | 响应式 MaterialApp 主题和根页面 |
+| `lib/app/orvex_providers.dart` | Riverpod 装配、适配器创建与资源销毁回调；不引用页面 |
 | `lib/design/` | 语义颜色/尺寸/排版、局部 Flutter 玻璃材质、外观偏好及局部返回页面栈；实现规范见 DESIGN_SYSTEM |
 | `lib/features/player/domain/` | LocalMedia、稳定导入/目录媒体身份、PlaybackFrame/Track、PlaybackEngine、ResumeStore 契约 |
 | `player/application/playback_session.dart` | 会话代次、串行命令、订阅/销毁、进度检查点、中断暂停、轻量播放列表和资源授权生命周期 |
@@ -56,7 +57,7 @@ Riverpod 当前用于创建并提供 `LocalFileSource`、历史存储、`AnimeMe
 - UI 通过 `ListenableBuilder` 和手动 listener 刷新；选中标签、文件选择中、全屏、搜索、手势等由 `StatefulWidget.setState` 管理。
 - 当前未使用 NotifierProvider、Bloc、Redux 或第三方路由包。四个底部入口仍由 PlayerPage 管理；播放详情、剧集分集和独立文件夹浏览使用 Flutter 自带的局部 Navigator 页面栈。`lib/design/back_navigation.dart` 复用 CupertinoPage / MaterialPage 与 NavigatorPopHandler；资料面板继续使用 ModalBottomSheet。
 - PlaybackSurface 的控制层独立渐变，视频组件始终保留；拖动/待跳转目标、临时倍速、反馈和菜单状态只保留在当前视图。取消、后台、暂停及引擎切换清理临时状态；恢复倍速前核对引擎身份。键盘事件仅由视频自身焦点处理，输入框、滑块和菜单保留各自行为。
-- PlayerPage 同时协调文件选择、存储加载、应用生命周期和导航；LibraryViews 同时包含四模块展示。展示层直接引用部分基础设施和 app Provider，尚未完全解耦。
+- PlayerPage 协调文件选择、存储加载、应用生命周期和导航；LibraryViews 包含多个入口的展示。应用入口和播放页共同使用独立的 Provider 装配文件。播放页外壳只响应媒体、队列、引擎可用性和错误的变化；视频控制、时间读数、迷你播放入口的状态文字及当前剧集行各自订阅原会话更新。
 - 返回使用 UI 层页面历史，不新增媒体身份或持久化历史。底层列表在播放页覆盖时保留，iOS 的交互式返回取消不暂停，确认返回才暂停并保存原会话。全屏仍在同一播放页中替换展示，关闭边缘返回以保留原播放器手势；不会同时挂载两份活动视频。播放页内的目录条保持原地浏览，独立媒体库文件夹页面才逐页保存导航状态。
 - PlaybackEngine 契约包含 `Widget buildVideo()`，domain 文件依赖 Flutter widgets；这是轻量契约，不是完全脱离 Flutter 的领域层。
 
@@ -64,8 +65,10 @@ Riverpod 当前用于创建并提供 `LocalFileSource`、历史存储、`AnimeMe
 
 ```mermaid
 flowchart TD
-  Main[main / ProviderScope] --> App[OrvexApp / Provider 工厂]
+  Main[main / ProviderScope] --> App[OrvexApp]
+  App --> Providers[orvex_providers]
   App --> UI[PlayerPage / LibraryViews]
+  UI --> Providers
   UI --> Source[LocalFileSource / ImportedFileStore]
   Source --> Media[LocalMedia / 稳定导入身份]
   Media --> Session[PlaybackSession]
@@ -104,6 +107,8 @@ AnimeMetadataController 默认采用搜索候选首项，同一规范化查询�
 
 Apple 原生预览以明确的解码错误触发 MediaKitPreview 补充：一个临时 Player/VideoController、关闭音轨及字幕、短时解码取得实际帧后释放；不使用第二套播放会话，不改主播放器状态。缓存队列仍只运行一个提取任务，列表解码使用原 cacheWidth 限制。权限错误不触发补充；固定上限的 thumbnail-results-v1.json 只记录哈希键、状态与后端，不记录文件名/路径或视频内容。Windows 提取和 Android 补充未验证。
 
+Apple 适配器将目录操作与缩略图提取分到两个串行队列。目录队列接收请求时确认句柄有效，提帧队列在读取前校验路径边界。释放句柄后，新请求立即失效。已接收的缩略图任务持有原安全作用域，任务结束后释放引用。目录操作仍串行，慢速目录读取本身仍可能延迟文件解析。
+
 ## 播放器与平台差异
 
 - 唯一已接入引擎为 MediaKitEngine。使用 `NativePlayer.setProperty` 配置字体和核对外挂字幕轨道，依赖 libmpv 的具体属性；还不能声称可直接替换任意播放器。
@@ -138,9 +143,9 @@ Bangumi 工作独立于播放等待链。按用户最新要求，默认采用返
 
 | 事实 | 对开发的影响 / 后续处理 |
 | --- | --- |
-| PlayerPage 同时协调播放和片库导航，并与应用入口双向引用；LibraryViews 集中了多个媒体浏览场景 | 播放进度更新期间复用片库快照。若后续拆分，优先把播放帧订阅限制在播放子树，并解除入口的双向依赖，按 L 提案验证导航和会话生命周期 |
+| PlayerPage 仍协调片库导航、生命周期和播放入口；LibraryViews 集中了多个媒体浏览场景 | 播放进度更新只重建订阅它的局部组件，片库内容和剧集列表保持原组件；后续按实际功能需要拆分协调职责 |
 | Imports 每次刷新仍全量遍历，但每个视频只异步读取一次文件属性，排序使用已读取的数据 | 文件夹索引和惰性列表已有千项界面测试；真实大文件夹与网络文件提供方的延迟和功耗尚未测量 |
-| Apple 目录读取、访问授权和缩略图处理共用串行队列 | 缩略图等待可能延迟文件解析。先测慢速文件提供方下选集和缩略图并发的延迟，再评估如何分离工作并保留授权的有效期 |
+| Apple 目录读取、授权和文件解析仍共用目录队列；缩略图提取独立执行 | 原生回归覆盖提帧阻塞时仍可解析文件和释放句柄。实际慢速文件提供方下的选集延迟和安全作用域体验仍待真机验证 |
 | 偏好 JSON、文件 JSON、多个迁移键共同保存状态 | 新增字段/迁移需测试旧数据、完成状态、回退进度和故障；没有数据库事务 |
 | MetadataStore 忽略单条坏数据，但整个 JSON 损坏会使加载失败；无缓存清理/容量淘汰 | 可恢复性和长期磁盘占用是明确后续项 |
 | 原生 libmpv 属性、音频通道和混合 CocoaPods/SPM 依赖 | 引擎/插件升级必须保留原生实验与设备验收，Dart 测试不够 |

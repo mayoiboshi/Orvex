@@ -10,6 +10,75 @@ import FlutterMacOS
 
 /// App-owned generated fixtures only. This does not test a File Provider grant.
 final class MediaFolderAccessTests: XCTestCase {
+  private func request(_ access: MediaFolderAccess, _ method: String, _ args: [String: Any]) throws -> Any? {
+    let finished = expectation(description: method)
+    var outcome: Any?
+    access.enqueue(method, args) {
+      outcome = $0
+      finished.fulfill()
+    }
+    wait(for: [finished], timeout: 5)
+    if let error = outcome as? FlutterError {
+      throw NSError(domain: error.code, code: 1)
+    }
+    return outcome
+  }
+
+  func testResolveAndReleaseDoNotWaitForThumbnail() throws {
+    #if os(iOS) && !targetEnvironment(simulator)
+    throw XCTSkip("Generated fixtures are restricted to an iOS simulator")
+    #else
+    let manager = FileManager.default
+    let root = manager.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    try manager.createDirectory(at: root, withIntermediateDirectories: true)
+    defer { try? manager.removeItem(at: root) }
+    let preview = Data([1])
+    let selectedVideo = root.appendingPathComponent("next.mp4")
+    try preview.write(to: root.appendingPathComponent("preview.mp4"))
+    try Data([2]).write(to: selectedVideo)
+
+    let started = expectation(description: "thumbnail worker entered")
+    let proceed = DispatchSemaphore(value: 0)
+    defer { proceed.signal() }
+    let extractor: (URL) throws -> [String: Any] = { url in
+      started.fulfill()
+      guard proceed.wait(timeout: .now() + 25) == .success else {
+        throw NSError(domain: "ThumbnailTestTimeout", code: 1)
+      }
+      return ["bytes": try Data(contentsOf: url)]
+    }
+    let messenger = FolderTestMessenger()
+    #if os(iOS)
+    let access = MediaFolderAccess(messenger: messenger, presenter: { nil }, thumbnailExtractor: extractor)
+    #else
+    let access = MediaFolderAccess(messenger: messenger, thumbnailExtractor: extractor)
+    #endif
+    let selected = try access.selection(root)
+    let granted = try XCTUnwrap(try request(access, "acquire", ["grant": selected["grant"]!]) as? [String: Any])
+    let handle = try XCTUnwrap(granted["handle"] as? String)
+    let finished = expectation(description: "accepted thumbnail completed after release")
+    let thumbnailArgs = ["handle": handle, "path": "preview.mp4"]
+    access.enqueue("thumbnail", thumbnailArgs) { result in
+      XCTAssertEqual((result as? [String: Any])?["bytes"] as? Data, preview)
+      finished.fulfill()
+    }
+    wait(for: [started], timeout: 5)
+
+    let args = ["handle": handle, "path": "next.mp4"]
+    let resolved = try XCTUnwrap(try request(access, "resolve", args) as? String)
+    XCTAssertEqual(URL(string: resolved)?.resolvingSymlinksInPath(), selectedVideo.resolvingSymlinksInPath())
+    _ = try request(access, "release", ["handle": handle])
+    XCTAssertThrowsError(try request(access, "resolve", args)) {
+      XCTAssertEqual(($0 as NSError).domain, "folder_access")
+    }
+    XCTAssertThrowsError(try request(access, "thumbnail", thumbnailArgs)) {
+      XCTAssertEqual(($0 as NSError).domain, "folder_access")
+    }
+    proceed.signal()
+    wait(for: [finished], timeout: 5)
+    #endif
+  }
+
   func testBookmarkTraversalThumbnailAndRelease() throws {
     #if os(iOS) && !targetEnvironment(simulator)
     throw XCTSkip("Generated fixtures are restricted to an iOS simulator")
@@ -40,16 +109,22 @@ final class MediaFolderAccessTests: XCTestCase {
     }
     try manager.createSymbolicLink(at: root.appendingPathComponent("TV/loop"), withDestinationURL: root)
     let selected = try access.selection(root)
-    let granted = try XCTUnwrap(try access.handle("acquire", ["grant": selected["grant"]!]) as? [String: Any])
+    let granted = try XCTUnwrap(try request(access, "acquire", ["grant": selected["grant"]!]) as? [String: Any])
     let handle = try XCTUnwrap(granted["handle"] as? String)
-    let children = try XCTUnwrap(try access.handle("list", ["handle": handle, "path": "TV"]) as? [[String: Any]])
+    let children = try XCTUnwrap(try request(access, "list", ["handle": handle, "path": "TV"]) as? [[String: Any]])
     XCTAssertEqual(Set(children.compactMap { $0["name"] as? String }), Set(["0001-0123", "0124-0173"]))
-    XCTAssertThrowsError(try access.handle("resolve", ["handle": handle, "path": "../outside.mp4"]))
-    let thumbnail = try XCTUnwrap(try access.handle("thumbnail", ["handle": handle, "path": "TV/0001-0123/第1集.mp4"]) as? [String: Any])
+    XCTAssertThrowsError(try request(access, "resolve", ["handle": handle, "path": "../outside.mp4"]))
+    XCTAssertThrowsError(try request(access, "thumbnail", ["handle": handle, "path": "../outside.mp4"])) {
+      XCTAssertEqual(($0 as NSError).domain, "folder_access")
+    }
+    XCTAssertThrowsError(try request(access, "thumbnailImported", ["path": "Imports/../outside.mp4"])) {
+      XCTAssertEqual(($0 as NSError).domain, "folder_access")
+    }
+    let thumbnail = try XCTUnwrap(try request(access, "thumbnail", ["handle": handle, "path": "TV/0001-0123/第1集.mp4"]) as? [String: Any])
     XCTAssertGreaterThan(try XCTUnwrap(thumbnail["duration"] as? Int), 10000)
     XCTAssertGreaterThan(try XCTUnwrap(thumbnail["bytes"] as? FlutterStandardTypedData).data.count, 1000)
-    _ = try access.handle("release", ["handle": handle])
-    XCTAssertThrowsError(try access.handle("list", ["handle": handle, "path": ""]))
+    _ = try request(access, "release", ["handle": handle])
+    XCTAssertThrowsError(try request(access, "list", ["handle": handle, "path": ""]))
     // New adapter instance models process-scope loss; the persisted bookmark
     // must independently resolve without the previous live scope.
     #if os(iOS)
@@ -57,8 +132,8 @@ final class MediaFolderAccessTests: XCTestCase {
     #else
     let restored = MediaFolderAccess(messenger: messenger)
     #endif
-    let reopened = try XCTUnwrap(try restored.handle("acquire", ["grant": selected["grant"]!]) as? [String: Any])
-    _ = try restored.handle("release", ["handle": reopened["handle"]!])
+    let reopened = try XCTUnwrap(try request(restored, "acquire", ["grant": selected["grant"]!]) as? [String: Any])
+    _ = try request(restored, "release", ["handle": reopened["handle"]!])
     let exported: [String: Any] = ["id": "native-fixture-root", "name": selected["name"]!, "grant": selected["grant"]!, "location": selected["location"]!, "identity": selected["identity"] ?? NSNull()]
     try JSONSerialization.data(withJSONObject: exported).write(to: documents.appendingPathComponent("orvex-folder-native-test.json"), options: .atomic)
     #endif

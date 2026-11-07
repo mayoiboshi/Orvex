@@ -17,7 +17,8 @@ class WatchInformation extends StatelessWidget {
     required this.onAutoNext,
   });
 
-  final String title, episode, progress;
+  final String title, episode;
+  final Widget progress;
   final bool linked, autoNext;
   final VoidCallback onMetadata;
   final VoidCallback? onPrevious, onNext;
@@ -50,9 +51,9 @@ class WatchInformation extends StatelessWidget {
                   fontWeight: FontWeight.w600,
                 ),
               ),
-            Text(
-              progress,
+            DefaultTextStyle.merge(
               style: text.bodySmall?.copyWith(color: colors.secondary),
+              child: progress,
             ),
           ],
         ),

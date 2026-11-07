@@ -29,7 +29,7 @@ void main() {
                       child: WatchInformation(
                         title: '名侦探柯南 Detective Conan · 很长的作品标题与季度信息',
                         episode: '第 626 集',
-                        progress: '11:18 / 24:12',
+                        progress: const Text('11:18 / 24:12'),
                         linked: false,
                         onMetadata: () => metadata++,
                         onPrevious: () => previous++,

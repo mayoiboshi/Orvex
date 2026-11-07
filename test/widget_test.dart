@@ -8,7 +8,9 @@ import 'package:orvex/design/orvex_theme.dart';
 import 'package:orvex/features/anime_metadata/application/anime_metadata_controller.dart';
 import 'package:orvex/features/anime_metadata/domain/anime_subject.dart';
 import 'package:orvex/features/anime_metadata/presentation/anime_metadata_sheet.dart';
+import 'package:orvex/features/folder_library/folder_browser.dart';
 import 'package:orvex/features/library/infrastructure/playback_history_store.dart';
+import 'package:orvex/features/library/presentation/library_views.dart';
 import 'package:orvex/features/media_sources/imported_file_store.dart';
 import 'package:orvex/features/media_sources/local_file_source.dart';
 import 'package:orvex/features/player/application/playback_session.dart';
@@ -333,6 +335,63 @@ void main() {
       await tester.pumpWidget(const SizedBox.shrink());
     },
   );
+
+  testWidgets('playback progress updates without rebuilding media browsers', (
+    tester,
+  ) async {
+    final video = LocalMedia(
+      uri: Uri.file('/local/Show - 01.mp4'),
+      name: 'Show - 01.mp4',
+    );
+    imports.videos = [video];
+    await mount(tester, const Size(1210, 834));
+    await session.open(video);
+    await tester.pumpAndSettle();
+
+    final home = find.byType(LibraryViews, skipOffstage: false);
+    final episodes = find.byType(FolderBrowser);
+    final homeWidget = tester.widget(home);
+    final episodesWidget = tester.widget(episodes);
+    final row = find.byKey(ValueKey(video.resumeKey));
+    final rowProgress = find.descendant(
+      of: row,
+      matching: find.byType(LinearProgressIndicator),
+    );
+
+    engine.frameController.add(
+      const PlaybackFrame(
+        playing: true,
+        position: Duration(minutes: 3),
+        duration: Duration(minutes: 12),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(tester.widget(home), same(homeWidget));
+    expect(tester.widget(episodes), same(episodesWidget));
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('watch-information')),
+        matching: find.text('03:00 / 12:00'),
+      ),
+      findsOneWidget,
+    );
+    expect(tester.widget<LinearProgressIndicator>(rowProgress).value, 0.25);
+    await tester.tap(find.byTooltip('返回首页'));
+    await tester.pumpAndSettle();
+    expect(engine.pauses, 1);
+    await tester.tap(find.byKey(const ValueKey('tab-2')));
+    await tester.pumpAndSettle();
+    engine.frameController.add(
+      const PlaybackFrame(
+        position: Duration(minutes: 3),
+        duration: Duration(minutes: 12),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('已暂停 · 03:00'), findsOneWidget);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
 
   testWidgets('leaving playback discards a pending episode selection', (
     tester,

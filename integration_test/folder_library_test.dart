@@ -161,6 +161,8 @@ void main() {
         await tester.pumpAndSettle();
         await tester.tap(find.byKey(const ValueKey('tab-1')));
         await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const ValueKey('folders-view')));
+        await tester.pumpAndSettle();
         await tester.tap(find.text('名侦探柯南'));
         await tester.pumpAndSettle();
         await appearance.setMode(ThemeMode.light);
@@ -169,9 +171,12 @@ void main() {
         await tester.pumpAndSettle();
         await tester.tap(find.widgetWithText(ChoiceChip, '0124-0173'));
         await tester.pumpAndSettle();
-        final selected = library
-            .children(root.id, 'TV/0124-0173', directories: false)
-            .first;
+        final group = library.children(
+          root.id,
+          'TV/0124-0173',
+          directories: false,
+        );
+        final selected = group.first;
         expect(selected.name, '第124集.mkv');
         final mp4 = library
             .children(root.id, 'TV/0001-0123', directories: false)
@@ -193,7 +198,9 @@ void main() {
           'Real Apple AVAssetImageGenerator preview and duration persisted to bounded disk cache',
         );
         await capture('group-light');
-        await tester.tap(find.text('第124集'));
+        final selectedRow = find.byKey(ValueKey(selected.media.resumeKey));
+        await tester.ensureVisible(selectedRow);
+        await tester.tap(selectedRow);
         await until(
           () => session.ready && session.frame.duration.inSeconds > 10,
           'directory item starts actual media_kit playback',
@@ -217,6 +224,10 @@ void main() {
         await capture('portrait-dark');
         expect(session.engine, same(engine));
         expect(created, 1);
+        final browseFolders = find.byTooltip('浏览文件夹');
+        await tester.ensureVisible(browseFolders);
+        await tester.tap(browseFolders);
+        await tester.pumpAndSettle();
         await tester.tap(find.widgetWithText(ChoiceChip, '0001-0123'));
         await tester.pumpAndSettle();
         expect(session.engine, same(engine));
@@ -224,8 +235,11 @@ void main() {
         await capture('browse-other-group-dark');
         await tester.tap(find.byTooltip('定位当前视频'));
         await tester.pumpAndSettle();
-        expect(find.text('第125集'), findsOneWidget);
-        final scroll = find.byType(CustomScrollView).last;
+        expect(
+          find.byKey(ValueKey(group.last.media.resumeKey)),
+          findsOneWidget,
+        );
+        final scroll = find.byKey(const PageStorageKey('folder-player'));
         await tester.drag(scroll, const Offset(0, -500));
         await tester.pumpAndSettle();
         expect(session.engine, same(engine));
