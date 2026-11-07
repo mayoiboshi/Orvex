@@ -12,6 +12,7 @@ import '../../../design/orvex_theme.dart';
 import '../../../design/back_navigation.dart';
 import '../../anime_metadata/application/anime_metadata_controller.dart';
 import '../../anime_metadata/presentation/anime_metadata_sheet.dart';
+import '../../anime_metadata/presentation/episode_details.dart';
 import '../../media_sources/local_file_source.dart';
 import '../../folder_library/folder_browser.dart';
 import '../../folder_library/folder_library.dart';
@@ -519,6 +520,7 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
     final root = _folders.root(media.folderRoot ?? '');
     final subject = _metadata.subjectFor(media);
     final identity = _folders.identityFor(media);
+    final episodeNumber = identity.episode;
     final title =
         subject?.title ??
         (identity.title.isNotEmpty ? identity.title : mediaTitle(media.name));
@@ -667,9 +669,22 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
             ),
             WatchInformation(
               title: title,
-              episode: identity.episode == null
-                  ? ''
-                  : '第 ${identity.episode} 集',
+              episode: episodeNumber == null ? '' : '第 $episodeNumber 集',
+              episodeDetails: subject == null || episodeNumber == null
+                  ? null
+                  : EpisodeDetails(
+                      key: ValueKey((
+                        media.resumeKey,
+                        subject.id,
+                        episodeNumber,
+                        _metadata.automatic,
+                      )),
+                      metadata: _metadata,
+                      media: media,
+                      subjectId: subject.id,
+                      number: episodeNumber,
+                      automatic: _metadata.automatic,
+                    ),
               progress: ListenableBuilder(
                 listenable: _session,
                 builder: (context, _) => Text(

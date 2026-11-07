@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import '../domain/anime_episode.dart';
 import '../domain/anime_subject.dart';
 import '../domain/anime_filename.dart';
 
@@ -27,6 +28,31 @@ class BangumiClient {
   DateTime _lastRequest = DateTime.fromMillisecondsSinceEpoch(0);
   DateTime? _cooldown;
   bool _closed = false;
+
+  Future<List<AnimeEpisode>> episodes(int subjectId) async {
+    const pageSize = 200;
+    final episodes = <int, AnimeEpisode>{};
+    try {
+      for (var offset = 0; offset < 10000;) {
+        final page = await _request(
+          '/v0/episodes?subject_id=$subjectId&type=0&limit=$pageSize&offset=$offset',
+        );
+        final items = page['data'] as List;
+        final total = page['total'] as int;
+        for (final item in items.cast<Map<String, dynamic>>()) {
+          if (item['subject_id'] != subjectId || item['type'] != 0) continue;
+          final episode = AnimeEpisode.fromJson(item);
+          episodes[episode.id] = episode;
+        }
+        offset += items.length;
+        if (offset >= total) return List.unmodifiable(episodes.values);
+        if (items.isEmpty) break;
+      }
+    } on TypeError {
+      throw const BangumiException('Bangumi 单集资料格式异常');
+    }
+    throw const BangumiException('Bangumi 单集列表未能完整读取');
+  }
 
   Future<List<AnimeSubject>> search(String keyword) async {
     if (keyword.trim().length < 2) return [];

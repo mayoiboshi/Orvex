@@ -5,6 +5,59 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:orvex/features/anime_metadata/infrastructure/bangumi_client.dart';
 
 void main() {
+  test(
+    'episode catalog follows pagination and validates subject and type',
+    () async {
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      final client = BangumiClient(
+        baseUrl: 'http://127.0.0.1:${server.port}',
+        minimumInterval: Duration.zero,
+      );
+      final offsets = <String?>[];
+      final subscription = server.listen((request) async {
+        final query = request.uri.queryParameters;
+        offsets.add(query['offset']);
+        expect(request.uri.path, '/v0/episodes');
+        expect(query['subject_id'], '899');
+        expect(query['type'], '0');
+        request.response.write(
+          jsonEncode({
+            'total': 3,
+            'data': query['offset'] == '0'
+                ? [
+                    {'id': 1, 'subject_id': 899, 'type': 0, 'sort': 652},
+                    {'id': 2, 'subject_id': 899, 'type': 1, 'sort': 653},
+                  ]
+                : [
+                    {
+                      'id': 150925,
+                      'subject_id': 899,
+                      'type': 0,
+                      'sort': 653,
+                      'ep': 653,
+                      'name_cn': '毒与幻的设计（S）',
+                      'desc': '',
+                    },
+                  ],
+          }),
+        );
+        await request.response.close();
+      });
+      try {
+        final episodes = await client.episodes(899);
+        expect(offsets, ['0', '2']);
+        expect(episodes.map((episode) => episode.id), [1, 150925]);
+        expect(episodes.last.matches(653), isTrue);
+        expect(episodes.last.title, '毒与幻的设计（S）');
+        expect(episodes.last.description, isEmpty);
+      } finally {
+        client.close();
+        await subscription.cancel();
+        await server.close(force: true);
+      }
+    },
+  );
+
   for (final ambiguous in [false, true]) {
     test(
       'franchise fallback requires two independent main-story links (ambiguous=$ambiguous)',

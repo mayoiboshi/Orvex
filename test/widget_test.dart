@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:orvex/app/orvex_app.dart';
 import 'package:orvex/design/orvex_theme.dart';
 import 'package:orvex/features/anime_metadata/application/anime_metadata_controller.dart';
+import 'package:orvex/features/anime_metadata/domain/anime_episode.dart';
 import 'package:orvex/features/anime_metadata/domain/anime_subject.dart';
 import 'package:orvex/features/anime_metadata/presentation/anime_metadata_sheet.dart';
 import 'package:orvex/features/folder_library/folder_browser.dart';
@@ -43,6 +44,7 @@ void main() {
   late FakeEngine engine;
   late PlaybackSession session;
   late AnimeMetadataController metadata;
+  late FakeBangumiClient bangumi;
   bool hasSession = false;
   int createdEngines = 0;
 
@@ -62,8 +64,9 @@ void main() {
 
   Future<void> mount(WidgetTester tester, Size size) async {
     history = PlaybackHistoryStore();
+    bangumi = FakeBangumiClient();
     metadata = AnimeMetadataController(
-      client: FakeBangumiClient(),
+      client: bangumi,
       store: MemoryMetadataStore(),
     );
     engine = FakeEngine();
@@ -335,6 +338,53 @@ void main() {
       await tester.pumpWidget(const SizedBox.shrink());
     },
   );
+
+  testWidgets('watch details match and remember a corrected Bangumi episode', (
+    tester,
+  ) async {
+    final video = LocalMedia(
+      uri: Uri.file('/local/Detective Conan - 653.mp4'),
+      name: 'Detective Conan - 653.mp4',
+    );
+    imports.videos = [video];
+    await mount(tester, const Size(1210, 834));
+    bangumi.episodeResults[899] = const [
+      AnimeEpisode(id: 150925, sort: 653, chineseName: '毒与幻的设计（S）'),
+      AnimeEpisode(
+        id: 150926,
+        sort: 654,
+        name: 'Poison',
+        airdate: '2012-05-05',
+        description: '单集简介示例',
+      ),
+    ];
+    await metadata.select(
+      video,
+      AnimeSubject.fromJson({'id': 899, 'type': 2, 'name_cn': '名侦探柯南'}),
+    );
+    await session.open(video);
+    await tester.pumpAndSettle();
+
+    expect(find.text('毒与幻的设计（S）'), findsOneWidget);
+    await tester.tap(find.text('更正 Bangumi 单集'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField).last, '654');
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Poison'));
+    await tester.pumpAndSettle();
+    expect(find.text('单集简介示例'), findsOneWidget);
+    expect(find.textContaining('2012-05-05'), findsOneWidget);
+    expect((await metadata.savedEpisode(video, 899))?.id, 150926);
+    expect(await metadata.savedEpisode(video, 123), isNull);
+    expect(bangumi.episodeRequests, [899]);
+
+    await tester.tap(find.text('清除手动选择'));
+    await tester.pumpAndSettle();
+    expect(await metadata.savedEpisode(video, 899), isNull);
+    expect(find.text('毒与幻的设计（S）'), findsOneWidget);
+    expect(bangumi.episodeRequests, [899]);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
 
   testWidgets('dismissing watch dialogs keeps the current video playing', (
     tester,

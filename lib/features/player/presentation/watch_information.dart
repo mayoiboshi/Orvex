@@ -8,6 +8,7 @@ class WatchInformation extends StatelessWidget {
     super.key,
     required this.title,
     required this.episode,
+    this.episodeDetails,
     required this.progress,
     required this.linked,
     required this.onMetadata,
@@ -18,6 +19,7 @@ class WatchInformation extends StatelessWidget {
   });
 
   final String title, episode;
+  final Widget? episodeDetails;
   final Widget progress;
   final bool linked, autoNext;
   final VoidCallback onMetadata;
@@ -57,6 +59,10 @@ class WatchInformation extends StatelessWidget {
             ),
           ],
         ),
+        if (episodeDetails case final Widget details) ...[
+          const SizedBox(height: OrvexMetrics.gap),
+          details,
+        ],
         const SizedBox(height: OrvexMetrics.gap),
         TextButton(
           key: const ValueKey('watch-metadata'),

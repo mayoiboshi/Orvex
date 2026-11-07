@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:orvex/features/anime_metadata/domain/anime_episode.dart';
 import 'package:orvex/features/anime_metadata/domain/anime_subject.dart';
 import 'package:orvex/features/anime_metadata/infrastructure/bangumi_client.dart';
 import 'package:orvex/features/anime_metadata/infrastructure/metadata_store.dart';
@@ -33,6 +34,15 @@ class FakeBangumiClient extends BangumiClient {
   bool fail = false;
   List<int> posterBytes = [1, 2, 3];
   int posterRequests = 0;
+  final episodeResults = <int, List<AnimeEpisode>>{};
+  final episodeRequests = <int>[];
+
+  @override
+  Future<List<AnimeEpisode>> episodes(int subjectId) async {
+    episodeRequests.add(subjectId);
+    if (fail) throw const BangumiException('单集资料暂时无法连接');
+    return episodeResults[subjectId] ?? [];
+  }
 
   @override
   Future<List<int>> fetchPoster(String url) async {

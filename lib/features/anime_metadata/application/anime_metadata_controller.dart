@@ -1,8 +1,11 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../player/domain/playback_engine.dart';
+import '../domain/anime_episode.dart';
 import '../domain/anime_filename.dart';
 import '../domain/anime_subject.dart';
 import '../infrastructure/bangumi_client.dart';
@@ -28,6 +31,9 @@ class AnimeMetadataController extends ChangeNotifier {
   final Map<String, LocalMedia> _queue = {};
   final Map<int, String> _posters = {};
   final Map<int, Future<void>> _posterJobs = {};
+  final _episodes = <int, List<AnimeEpisode>>{};
+  final _episodeRequests = <int, Future<List<AnimeEpisode>>>{};
+  late final _episodePreferences = SharedPreferencesAsync();
   List<LocalMedia> _media = [];
   Future<void>? _initialization;
   bool _loaded = false;
@@ -40,6 +46,52 @@ class AnimeMetadataController extends ChangeNotifier {
   String? posterPath(int subjectId) => _posters[subjectId];
   AnimeMatch? matchFor(LocalMedia media) => _entries[animeMediaKey(media)];
   AnimeSubject? subjectFor(LocalMedia media) => matchFor(media)?.subject;
+
+  Future<List<AnimeEpisode>> episodesFor(int subjectId) async {
+    final cached = _episodes[subjectId];
+    if (cached != null) return cached;
+    final pending = _episodeRequests[subjectId];
+    if (pending != null) return pending;
+    final request = _episodeRequests[subjectId] = client.episodes(subjectId);
+    try {
+      final episodes = await request;
+      if (!_disposed) {
+        if (_episodes.length >= 8) _episodes.remove(_episodes.keys.first);
+        _episodes[subjectId] = episodes;
+      }
+      return episodes;
+    } finally {
+      _episodeRequests.remove(subjectId);
+    }
+  }
+
+  String _episodeKey(LocalMedia media, int subjectId) =>
+      'orvex.bangumi.episode.v1:$subjectId:${media.resumeKey}';
+
+  Future<AnimeEpisode?> savedEpisode(LocalMedia media, int subjectId) async {
+    final saved = await _episodePreferences.getString(
+      _episodeKey(media, subjectId),
+    );
+    if (saved == null) return null;
+    try {
+      return AnimeEpisode.fromJson(jsonDecode(saved) as Map<String, dynamic>);
+    } on FormatException {
+      return null;
+    } on TypeError {
+      return null;
+    }
+  }
+
+  Future<void> saveEpisode(
+    LocalMedia media,
+    int subjectId,
+    AnimeEpisode? episode,
+  ) {
+    final key = _episodeKey(media, subjectId);
+    return episode == null
+        ? _episodePreferences.remove(key)
+        : _episodePreferences.setString(key, jsonEncode(episode.toJson()));
+  }
 
   void _notify() {
     if (!_disposed) notifyListeners();
