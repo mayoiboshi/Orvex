@@ -10,10 +10,12 @@ class SeriesIdentity {
     required this.query,
     required this.episodic,
     this.episode,
+    this.season,
   });
   final String key, title, query;
   final bool episodic;
   final int? episode;
+  final int? season;
 }
 
 SeriesIdentity identifySeries(
@@ -51,6 +53,7 @@ SeriesIdentity identifySeries(
     query: query,
     episodic: episodic,
     episode: episode,
+    season: season,
   );
 }
 

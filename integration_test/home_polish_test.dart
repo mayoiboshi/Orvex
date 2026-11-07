@@ -215,12 +215,22 @@ void main() {
     }
 
     final recentMedia = (await store.listVideos())
-        .where((media) => media.resumeKey != videos[2].resumeKey)
-        .take(8)
+        .where(
+          (media) =>
+              stage != 'before' || media.resumeKey != videos[2].resumeKey,
+        )
         .toList();
+    String recentKey(LocalMedia media) {
+      final subject = entries[animeMediaKey(media)]?.subject;
+      return stage != 'before' && [400602, 899].contains(subject?.id)
+          ? 'bangumi:${subject!.id}'
+          : media.resumeKey;
+    }
+
     Finder recentCard(LocalMedia media) =>
-        find.byKey(ValueKey('home-recent-${media.resumeKey}'));
-    final lastCard = recentCard(recentMedia.last);
+        find.byKey(ValueKey('home-recent-${recentKey(media)}'));
+    final lastKey = recentMedia.map(recentKey).toSet().last;
+    final lastCard = find.byKey(ValueKey('home-recent-$lastKey'));
     void expectLastRowVisible() {
       final last = tester.getRect(lastCard);
       final navTop = tester.getTopLeft(find.byType(LibraryTabBar)).dy;
@@ -336,21 +346,20 @@ void main() {
       if (stage != 'before') {
         await until(
           () => [
-            1,
             3,
-            4,
-            5,
             7,
           ].every((i) => recentImage(videos[i], '/thumbnails-v1/') != null),
-          'recent episode, local file and broken movie cover use video frames',
+          'local file and broken movie cover use video frames',
         );
         expect(recentImage(videos[6], 'bangumi-cover-101.img'), isNotNull);
         expect(recentImage(videos[6], '/thumbnails-v1/'), isNull);
-        expect(recentImage(videos[4], 'bangumi-cover-899.img'), isNull);
-        expect(
-          recentImage(videos[4], '/thumbnails-v1/'),
-          isNot(recentImage(videos[5], '/thumbnails-v1/')),
-        );
+        expect(recentImage(videos[4], 'bangumi-cover-899.img'), isNotNull);
+        expect(recentImage(videos[4], '/thumbnails-v1/'), isNull);
+        expect(recentCard(videos[4]), findsOneWidget);
+        expect(recentCard(videos[5]), findsOneWidget);
+        expect(recentKey(videos[4]), recentKey(videos[5]));
+        expect(find.textContaining('已收录 3 个视频'), findsOneWidget);
+        expect(find.textContaining('已收录 2 个视频'), findsOneWidget);
         final artwork = find.descendant(
           of: recentCard(videos[6]),
           matching: find.byType(AspectRatio),
@@ -360,13 +369,6 @@ void main() {
               .widgetList<AspectRatio>(artwork)
               .map((view) => view.aspectRatio),
           containsAll([4 / 3, 2 / 3]),
-        );
-        expect(
-          find.descendant(
-            of: recentCard(videos[4]),
-            matching: find.text('00:18'),
-          ),
-          findsOneWidget,
         );
         observations['recentMixedArtwork'] = true;
         final card = tester.getSize(hero);
@@ -423,6 +425,37 @@ void main() {
         await tester.tap(find.byKey(const ValueKey('tab-0')));
         await tester.pump(const Duration(milliseconds: 450));
         await scrollHome();
+        final workCard = recentCard(videos[4]);
+        await Scrollable.ensureVisible(
+          tester.element(workCard),
+          alignment: 0.25,
+        );
+        await tester.pump(const Duration(milliseconds: 450));
+        await tester.tap(workCard);
+        await tester.pump(const Duration(milliseconds: 450));
+        final episode = find.byKey(ValueKey(videos[4].resumeKey));
+        final secondEpisode = find.byKey(ValueKey(videos[5].resumeKey));
+        expect(episode, findsOneWidget);
+        expect(secondEpisode, findsOneWidget);
+        await until(
+          () => [episode, secondEpisode].every(
+            (row) => tester
+                .widgetList<Image>(
+                  find.descendant(of: row, matching: find.byType(Image)),
+                )
+                .any(
+                  (image) =>
+                      imageFilePath(image)?.contains('/thumbnails-v1/') ??
+                      false,
+                ),
+          ),
+          'work detail shows local frames for both episodes',
+        );
+        await capture('work-detail');
+        await tester.tap(find.byType(BackButton));
+        await tester.pump(const Duration(milliseconds: 450));
+        await scrollHome();
+        observations['recentWorkDetail'] = true;
         await tester.tap(find.text('继续播放'));
         await until(
           () =>

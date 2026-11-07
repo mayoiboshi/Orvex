@@ -7,11 +7,13 @@ class LocalMedia {
     this.importPath,
     this.folderRoot,
     this.folderFile,
+    this.modifiedAt,
   });
   final Uri uri;
   final String name;
   final String? importPath;
   final String? folderRoot, folderFile;
+  final DateTime? modifiedAt;
   String? get relativeImportPath => importPath ?? legacyImportedPath(uri);
   String get resumeKey => folderRoot != null && folderFile != null
       ? 'orvex.folder.v1:$folderRoot:$folderFile'

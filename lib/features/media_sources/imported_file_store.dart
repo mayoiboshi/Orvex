@@ -203,7 +203,10 @@ class ImportedFileStore {
       }
     }
     found.sort((a, b) => b.modified.compareTo(a.modified));
-    return [for (final entry in found) _media(entry.file, root)];
+    return [
+      for (final entry in found)
+        _media(entry.file, root, modifiedAt: entry.modified),
+    ];
   }
 
   Future<List<LocalMedia>> listSubtitles() async {
@@ -222,9 +225,15 @@ class ImportedFileStore {
     return found;
   }
 
-  LocalMedia _media(File file, Directory root, {String? name}) => LocalMedia(
+  LocalMedia _media(
+    File file,
+    Directory root, {
+    String? name,
+    DateTime? modifiedAt,
+  }) => LocalMedia(
     uri: file.uri,
     name: name ?? file.uri.pathSegments.last,
+    modifiedAt: modifiedAt,
     importPath: file.uri.pathSegments
         .skip(root.uri.pathSegments.where((part) => part.isNotEmpty).length)
         .join('/'),

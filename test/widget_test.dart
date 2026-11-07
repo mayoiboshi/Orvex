@@ -729,6 +729,43 @@ void main() {
     },
   );
 
+  testWidgets('home work detail opens a file and keeps the detail on return', (
+    tester,
+  ) async {
+    final videos = [
+      for (final name in ['示例番剧 S01E02', '示例番剧 S02E01'])
+        LocalMedia(uri: Uri.file('/test/$name.mp4'), name: '$name.mp4'),
+    ];
+    imports.videos = videos;
+    await mount(tester, const Size(1194, 834));
+    await metadata.selectMany(
+      videos,
+      const AnimeSubject(id: 55, name: '示例番剧', nameCn: '示例番剧', platform: 'TV'),
+    );
+    await tester.pumpAndSettle();
+    final card = find.byKey(const ValueKey('home-recent-bangumi:55'));
+    expect(card, findsOneWidget);
+    expect(find.textContaining('已收录 2 个视频'), findsOneWidget);
+    await tester.ensureVisible(card);
+    await tester.tap(card);
+    await tester.pumpAndSettle();
+    for (final video in videos) {
+      expect(find.byKey(ValueKey(video.resumeKey)), findsOneWidget);
+    }
+    final row = find.byKey(ValueKey(videos.last.resumeKey));
+    await tester.ensureVisible(row);
+    await tester.tap(row);
+    await tester.pumpAndSettle();
+    expect(session.media?.resumeKey, videos.last.resumeKey);
+    await tester.tap(find.byTooltip('返回首页'));
+    await tester.pumpAndSettle();
+    expect(row, findsOneWidget);
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(card, findsOneWidget);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
   test('time label distinguishes long videos', () {
     expect(
       formatTime(const Duration(hours: 2, minutes: 3, seconds: 4)),

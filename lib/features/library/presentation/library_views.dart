@@ -14,6 +14,7 @@ import '../../folder_library/folder_models.dart';
 import '../../folder_library/thumbnail_cache.dart';
 import '../../player/presentation/playback_surface.dart';
 import '../domain/playback_record.dart';
+import '../domain/recent_work.dart';
 
 class LibraryViews extends StatelessWidget {
   const LibraryViews({
@@ -35,6 +36,8 @@ class LibraryViews extends StatelessWidget {
     required this.onMetadata,
     required this.appearance,
     this.thumbnails,
+    this.recentWorks,
+    this.onOpenWork,
   });
 
   final int tab;
@@ -52,6 +55,8 @@ class LibraryViews extends StatelessWidget {
   final ValueChanged<LocalMedia> onMetadata;
   final AppearanceController appearance;
   final ThumbnailCache? thumbnails;
+  final List<RecentWork>? recentWorks;
+  final ValueChanged<RecentWork>? onOpenWork;
 
   List<PlaybackRecord> get continuing =>
       history.where((record) => record.canContinue).toList();
@@ -229,10 +234,13 @@ class LibraryViews extends StatelessWidget {
     final others = showContinue
         ? continuing.skip(1).toList()
         : <PlaybackRecord>[];
-    final recent = videos
-        .where((video) => video.resumeKey != resume?.media.resumeKey)
-        .take(8)
-        .toList();
+    final works = recentWorks?.take(8).toList();
+    final recent = works == null
+        ? videos
+              .where((video) => video.resumeKey != resume?.media.resumeKey)
+              .take(8)
+              .toList()
+        : works.map((work) => work.representative).toList();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -245,7 +253,15 @@ class LibraryViews extends StatelessWidget {
           const SizedBox(height: OrvexMetrics.section),
           _section(context, '最近添加', action: '全部', onTap: () => onTab(1)),
           const SizedBox(height: OrvexMetrics.small),
-          _posterGrid(context, recent, home: true),
+          _posterGrid(
+            context,
+            recent,
+            home: true,
+            grouped: {
+              for (final work in works ?? const <RecentWork>[])
+                if (work.subject != null) work.representative.resumeKey: work,
+            },
+          ),
         ],
         const SizedBox(height: OrvexMetrics.section),
         _section(context, '我的媒体库', action: '查看全部', onTap: () => onTab(1)),
@@ -665,6 +681,7 @@ class LibraryViews extends StatelessWidget {
     BuildContext context,
     List<LocalMedia> items, {
     bool home = false,
+    Map<String, RecentWork> grouped = const {},
   }) => LayoutBuilder(
     builder: (context, constraints) {
       final available = constraints.maxWidth;
@@ -697,9 +714,20 @@ class LibraryViews extends StatelessWidget {
             SizedBox(
               width: width,
               child: InkWell(
-                key: home ? ValueKey('home-recent-${media.resumeKey}') : null,
+                key: home
+                    ? ValueKey(
+                        'home-recent-${grouped[media.resumeKey]?.key ?? media.resumeKey}',
+                      )
+                    : null,
                 borderRadius: BorderRadius.circular(OrvexMetrics.coverRadius),
-                onTap: () => onOpen(media),
+                onTap: () {
+                  final work = grouped[media.resumeKey];
+                  if (work != null && onOpenWork != null) {
+                    onOpenWork!(work);
+                  } else {
+                    onOpen(media);
+                  }
+                },
                 onLongPress: () => onMetadata(media),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -717,6 +745,7 @@ class LibraryViews extends StatelessWidget {
                                 ? _recentArtwork(
                                     media,
                                     durations[media.resumeKey],
+                                    grouped[media.resumeKey]?.subject,
                                   )
                                 : _cover(media, poster: true),
                             Positioned(
@@ -768,7 +797,8 @@ class LibraryViews extends StatelessWidget {
                             1.3 *
                             2,
                         child: Text(
-                          _recentTitle(media),
+                          grouped[media.resumeKey]?.subject?.title ??
+                              _recentTitle(media),
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                           style: Theme.of(context).textTheme.titleSmall
@@ -784,7 +814,11 @@ class LibraryViews extends StatelessWidget {
                       ),
                     const SizedBox(height: 4),
                     Text(
-                      _mediaCaption(media),
+                      switch (grouped[media.resumeKey]) {
+                        final RecentWork work =>
+                          '已收录 ${work.files.length} 个视频 · ${_mediaCaption(media)}',
+                        null => _mediaCaption(media),
+                      },
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: Theme.of(context).textTheme.labelSmall,
@@ -893,7 +927,20 @@ class LibraryViews extends StatelessWidget {
     return subject?.platform.trim() == '剧场版' ? subject : null;
   }
 
-  Widget _recentArtwork(LocalMedia media, Duration? duration) {
+  Widget _recentArtwork(
+    LocalMedia media,
+    Duration? duration,
+    AnimeSubject? series,
+  ) {
+    if (series != null) {
+      return MediaCover(
+        media: media,
+        poster: true,
+        posterPath: metadata.posterPath(series.id),
+        fit: BoxFit.contain,
+        artworkRatio: 2 / 3,
+      );
+    }
     final entry = thumbnails?.library.entry(media);
     final preview = _HomeVideoArtwork(
       media: media,

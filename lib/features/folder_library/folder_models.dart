@@ -107,6 +107,9 @@ class FolderEntry {
     name: name,
     folderRoot: rootId,
     folderFile: id,
+    modifiedAt: modified > 0
+        ? DateTime.fromMillisecondsSinceEpoch(modified, isUtc: true)
+        : null,
   );
   Map<String, dynamic> toJson() => {
     'id': id,

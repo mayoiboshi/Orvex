@@ -17,6 +17,8 @@ import '../../media_sources/local_file_source.dart';
 import '../../folder_library/folder_browser.dart';
 import '../../folder_library/folder_library.dart';
 import '../../library/domain/playback_record.dart';
+import '../../library/domain/recent_work.dart';
+import '../../library/infrastructure/recent_arrival_index.dart';
 import '../../library/presentation/library_views.dart';
 import '../../library/presentation/series_library.dart';
 import '../application/playback_session.dart';
@@ -39,6 +41,9 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
   late FolderLibrary _folders;
   bool _autoNext = false;
   final _preferences = SharedPreferencesAsync();
+  late final _arrivalIndex = RecentArrivalIndex(_preferences);
+  Map<String, DateTime> _arrivals = const {};
+  String? _homeWorkKey;
   List<LocalMedia> _videos = [];
   List<PlaybackRecord> _history = [];
   bool _loadingLibrary = true;
@@ -68,6 +73,8 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
   bool _foreground = true;
   ({int revision, List<LocalMedia> imports, List<LocalMedia> videos})?
   _catalogSnapshot;
+  ({List<LocalMedia> catalog, String? resumedFile, List<RecentWork> works})?
+  _recentWorkSnapshot;
   late PlaybackSession _session;
   late AnimeMetadataController _metadata;
 
@@ -82,6 +89,55 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
     final videos = _folders.catalog(_videos);
     _catalogSnapshot = (revision: revision, imports: _videos, videos: videos);
     return videos;
+  }
+
+  List<RecentWork> get _recentWorks {
+    final catalog = _catalog;
+    final resumedFile = _showContinue
+        ? _history
+              .where((record) => record.canContinue)
+              .firstOrNull
+              ?.media
+              .resumeKey
+        : null;
+    final cached = _recentWorkSnapshot;
+    if (cached != null &&
+        identical(cached.catalog, catalog) &&
+        cached.resumedFile == resumedFile) {
+      return cached.works;
+    }
+    final works = buildRecentWorks(
+      catalog,
+      added: _arrivals,
+      matchFor: _metadata.matchFor,
+      identify: _folders.identityFor,
+      resumedFile: resumedFile,
+    );
+    _recentWorkSnapshot = (
+      catalog: catalog,
+      resumedFile: resumedFile,
+      works: works,
+    );
+    return works;
+  }
+
+  Future<void> _observeArrivals() async {
+    if (_loadingLibrary || _folders.loading || _folders.scanning) return;
+    try {
+      final next = await _arrivalIndex.observe([
+        ..._videos,
+        for (final entry in _folders.entries)
+          if (!entry.directory) entry.media,
+      ]);
+      if (mounted && !identical(next, _arrivals)) {
+        setState(() {
+          _arrivals = next;
+          _recentWorkSnapshot = null;
+        });
+      }
+    } catch (_) {
+      // Keep browsing available and use modification time if this index fails.
+    }
   }
 
   @override
@@ -186,15 +242,16 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
     _catalogTimer = Timer(const Duration(milliseconds: 300), () {
       if (!mounted) return;
       unawaited(_metadata.scan(_catalog));
+      unawaited(_observeArrivals());
       setState(() {});
     });
   }
 
   void _onMetadataChanged() {
-    if (mounted) setState(() {});
+    if (mounted) setState(() => _recentWorkSnapshot = null);
   }
 
-  void _showMetadata(LocalMedia media) {
+  void _showMetadata(LocalMedia media, {List<LocalMedia>? group}) {
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -204,7 +261,7 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
       builder: (_) => AnimeMetadataSheet(
         media: media,
         metadata: _metadata,
-        group: _folders.seriesMembers(media, _videos),
+        group: group ?? _folders.seriesMembers(media, _videos),
       ),
     );
   }
@@ -245,6 +302,7 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
         _libraryError = null;
       });
       unawaited(_metadata.scan(_catalog));
+      unawaited(_observeArrivals());
     } catch (_) {
       if (!mounted || generation != _loadGeneration) return;
       setState(() {
@@ -311,7 +369,10 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
 
   void _selectTab(int value) {
     FocusManager.instance.primaryFocus?.unfocus();
-    setState(() => _tab = value);
+    setState(() {
+      _tab = value;
+      _homeWorkKey = null;
+    });
     unawaited(_reload());
   }
 
@@ -323,6 +384,12 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
         key: const ValueKey('library-page'),
         child: _buildShell(watching: false),
       ),
+      if (_homeWorkKey case final String key)
+        orvexNavigationPage(
+          context: context,
+          key: ValueKey(key),
+          child: _homeWorkPage(key),
+        ),
       if (_showPlayer && _session.media != null)
         orvexNavigationPage(
           context: context,
@@ -336,6 +403,9 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
     onRemoved: (page) {
       if (page.key == const ValueKey('watch-page')) {
         unawaited(_returnToLibrary());
+      } else if (_homeWorkKey case final String key
+          when page.key == ValueKey(key)) {
+        setState(() => _homeWorkKey = null);
       }
     },
   );
@@ -436,6 +506,9 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
                                 thumbnails: _tab == 0
                                     ? ref.read(thumbnailCacheProvider)
                                     : null,
+                                recentWorks: _tab == 0 ? _recentWorks : null,
+                                onOpenWork: (work) =>
+                                    setState(() => _homeWorkKey = work.key),
                               ),
                       ),
                       if (!watching && _session.media != null && !homeHasResume)
@@ -495,6 +568,46 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
     selection: _seriesSelection,
     onSelection: (key) => _seriesSelection = key,
   );
+
+  Widget _homeWorkPage(String key) {
+    final work = _recentWorks.where((item) => item.key == key).firstOrNull;
+    final subject = work?.subject;
+    return Scaffold(
+      backgroundColor: _colors.background,
+      appBar: AppBar(
+        leading: BackButton(
+          onPressed: () => setState(() => _homeWorkKey = null),
+        ),
+        title: Text(subject?.title ?? '作品详情'),
+        actions: [
+          if (work != null)
+            IconButton(
+              tooltip: '番剧资料',
+              onPressed: () =>
+                  _showMetadata(work.representative, group: work.files),
+              icon: const Icon(Icons.info_outline_rounded),
+            ),
+        ],
+      ),
+      body: SafeArea(
+        top: false,
+        child: work == null
+            ? const Center(child: Text('暂无可用的单集'))
+            : FolderBrowser(
+                library: _folders,
+                thumbnails: ref.read(thumbnailCacheProvider),
+                imported: _videos,
+                history: _history,
+                metadata: _metadata,
+                collection: work.files,
+                collectionTitle: subject?.title,
+                onOpen: (media) => unawaited(_open(media)),
+                onImport: () => _pick(),
+                onMetadata: _showMetadata,
+              ),
+      ),
+    );
+  }
 
   Widget _folderBrowser({Widget? header}) => FolderBrowser(
     key: _watchBrowserKey,
