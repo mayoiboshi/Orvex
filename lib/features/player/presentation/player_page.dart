@@ -74,6 +74,7 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
   ({int revision, List<LocalMedia> imports, List<LocalMedia> videos})?
   _catalogSnapshot;
   ({List<LocalMedia> catalog, List<RecentWork> works})? _recentWorkSnapshot;
+  RecentWork? _playbackWork;
   late PlaybackSession _session;
   late AnimeMetadataController _metadata;
 
@@ -297,7 +298,7 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
     }
   }
 
-  Future<void> _open(LocalMedia media) async {
+  Future<void> _open(LocalMedia media, {RecentWork? work}) async {
     final generation = ++_openGeneration;
     LocalMedia resolved;
     try {
@@ -311,21 +312,25 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
       return;
     }
     if (!mounted || generation != _openGeneration || !_foreground) return;
+    final reuse =
+        _session.media?.resumeKey == resolved.resumeKey &&
+        _session.engine != null;
     _session.allowAutoNext = _foreground;
     setState(() {
       _keepLibraryVisible = false;
       _showPlayer = true;
+      if (!reuse || work != null) _playbackWork = work;
     });
-    if (_session.media?.resumeKey != resolved.resumeKey ||
-        _session.engine == null) {
-      final group = _folders.seriesMembers(resolved, _videos);
-      final queue = _folders.identityFor(resolved).episodic
-          ? group
-          : resolved.folderRoot == null
-          ? (_videos.any((v) => v.resumeKey == resolved.resumeKey)
-                ? _videos
-                : [resolved])
-          : _folders.playlist(resolved);
+    if (!reuse) {
+      final queue =
+          work?.files ??
+          (_folders.identityFor(resolved).episodic
+              ? _folders.seriesMembers(resolved, _videos)
+              : resolved.folderRoot == null
+              ? (_videos.any((v) => v.resumeKey == resolved.resumeKey)
+                    ? _videos
+                    : [resolved])
+              : _folders.playlist(resolved));
       final catalog = _catalog;
       unawaited(
         _metadata.scan([
@@ -335,6 +340,7 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
       );
       await _session.open(resolved, queue: queue);
     } else {
+      if (work != null) _session.replacePlaylist(work.files);
       if (_session.frame.completed) await _session.seek(Duration.zero);
       if (!_session.frame.playing) await _session.togglePause();
     }
@@ -586,12 +592,20 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
                 metadata: _metadata,
                 collection: work.files,
                 collectionTitle: subject?.title,
-                onOpen: (media) => unawaited(_open(media)),
+                onOpen: (media) => unawaited(_open(media, work: work)),
                 onImport: () => _pick(),
                 onMetadata: _showMetadata,
               ),
       ),
     );
+  }
+
+  RecentWork? _playbackWorkFor(LocalMedia media) {
+    final work = _playbackWork;
+    return work != null &&
+            work.files.any((item) => item.resumeKey == media.resumeKey)
+        ? work
+        : null;
   }
 
   Widget _folderBrowser({Widget? header}) => FolderBrowser(
@@ -603,15 +617,19 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
     metadata: _metadata,
     current: _session.media,
     playback: _session,
-    collection:
-        _session.media != null && _folders.identityFor(_session.media!).episodic
+    collection: _playbackWork != null
+        ? _session.playlist
+        : _session.media != null &&
+              _folders.identityFor(_session.media!).episodic
         ? _folders.seriesMembers(_session.media!, _videos)
         : null,
-    collectionTitle: _session.media == null
-        ? null
-        : _folders.identityFor(_session.media!).title,
+    collectionTitle:
+        _playbackWork?.subject?.title ??
+        (_session.media == null
+            ? null
+            : _folders.identityFor(_session.media!).title),
     header: header,
-    onOpen: (media) => unawaited(_open(media)),
+    onOpen: (media) => unawaited(_open(media, work: _playbackWorkFor(media))),
     onImport: () => _pick(),
     onMetadata: _showMetadata,
   );

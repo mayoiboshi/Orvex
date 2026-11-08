@@ -858,10 +858,50 @@ void main() {
     for (final video in videos) {
       expect(find.byKey(ValueKey(video.resumeKey)), findsOneWidget);
     }
-    final row = find.byKey(ValueKey(videos.last.resumeKey));
+    // Reuse a session started outside the work without reopening the video.
+    await session.open(videos.first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('返回首页'));
+    await tester.pumpAndSettle();
+    final row = find.byKey(ValueKey(videos.first.resumeKey));
     await tester.ensureVisible(row);
     await tester.tap(row);
     await tester.pumpAndSettle();
+    expect(createdEngines, 1);
+    expect(session.playlist, videos);
+    await tester.tap(find.byTooltip('下一集'));
+    await tester.pump();
+    await tester.runAsync(() => Future<void>.delayed(Duration.zero));
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(
+      session.ready,
+      isTrue,
+      reason:
+          '${session.media?.name} loading=${session.loading} created=$createdEngines ${session.error}',
+    );
+    expect(session.media?.resumeKey, videos.last.resumeKey);
+    await tester.tap(find.byTooltip('上一集'));
+    await tester.pump();
+    await tester.runAsync(() => Future<void>.delayed(Duration.zero));
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(
+      session.ready,
+      isTrue,
+      reason:
+          '${session.media?.name} loading=${session.loading} created=$createdEngines ${session.error}',
+    );
+    expect(session.media?.resumeKey, videos.first.resumeKey);
+    session.autoNext = true;
+    engine.frameController.add(const PlaybackFrame(completed: true));
+    await tester.pump();
+    await tester.runAsync(() => Future<void>.delayed(Duration.zero));
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(
+      session.ready,
+      isTrue,
+      reason:
+          '${session.media?.name} loading=${session.loading} created=$createdEngines ${session.error}',
+    );
     expect(session.media?.resumeKey, videos.last.resumeKey);
     await tester.tap(find.byTooltip('返回首页'));
     await tester.pumpAndSettle();

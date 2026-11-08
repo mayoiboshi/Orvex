@@ -45,6 +45,15 @@ class PlaybackSession extends ChangeNotifier {
   Future<void> next() => hasNext
       ? open(playlist[playlistIndex + 1], queue: playlist)
       : Future.value();
+
+  void replacePlaylist(List<LocalMedia> queue) {
+    if (_disposed || !queue.any((item) => item.resumeKey == media?.resumeKey)) {
+      return;
+    }
+    playlist = List.unmodifiable(queue);
+    _notify();
+  }
+
   _ActiveSession? _active;
   LocalMedia? media;
   PlaybackFrame frame = const PlaybackFrame();
