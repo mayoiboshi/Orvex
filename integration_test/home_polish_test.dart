@@ -159,7 +159,8 @@ void main() {
     await metadata.initialize();
     final history = PlaybackHistoryStore();
     final resume = PreferencesResumeStore();
-    for (final i in [4, 0, 5, 2]) {
+    final resumeIndex = stage == 'before' ? 2 : 6;
+    for (final i in [4, 0, 5, resumeIndex]) {
       final position = Duration(seconds: 5 + i);
       await history.record(
         videos[i],
@@ -493,7 +494,7 @@ void main() {
               session.frame.position.inSeconds >= 6,
           'native Home resume',
         );
-        expect(session.media?.resumeKey, videos[2].resumeKey);
+        expect(session.media?.resumeKey, videos[resumeIndex].resumeKey);
         expect(created, 1);
         await session.pauseForInterruption();
         await tester.tap(find.byTooltip('返回首页'));

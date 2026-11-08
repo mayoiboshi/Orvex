@@ -83,7 +83,6 @@ void main() {
         added: added,
         matchFor: (file) => matches[file],
         identify: identifySeries,
-        resumedFile: first.resumeKey,
       );
       final old = groups({});
       expect(old.first.representative, same(uncertain));
@@ -104,6 +103,30 @@ void main() {
       expect(recent.first.files, [first, nextSeason]);
     },
   );
+
+  test('equal and missing arrival dates retain distinct files and stable input order', () {
+    final first = file('Unmatched 01', 3);
+    final second = file('Incomplete 02', 3);
+    final undated = LocalMedia(
+      uri: Uri.file('/fixtures/undated.mp4'),
+      name: 'undated.mp4',
+    );
+    final groups = buildRecentWorks(
+      [undated, first, second, first],
+      added: {first.resumeKey: DateTime.utc(2026, 11, 3)},
+      matchFor: (media) => media == second
+          ? AnimeMatch(
+              query: '',
+              status: AnimeMatchStatus.matched,
+              updatedAt: DateTime.utc(2026, 11, 3),
+              subject: const AnimeSubject(id: 8, name: '', nameCn: ''),
+            )
+          : null,
+      identify: identifySeries,
+    );
+    expect(groups.map((work) => work.representative), [first, second, undated]);
+    expect(groups.every((work) => work.files.length == 1), isTrue);
+  });
 
   test('an exact automatic match may group, an ambiguous candidate remains independent', () {
     const subject = AnimeSubject(

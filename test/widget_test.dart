@@ -98,6 +98,23 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  Iterable<Key?> recentCardKeys(WidgetTester tester) => tester
+      .widgetList<InkWell>(
+        find.byWidgetPredicate((widget) {
+          final key = widget.key;
+          return widget is InkWell &&
+              key is ValueKey<String> &&
+              key.value.startsWith('home-recent-');
+        }),
+      )
+      .map((card) => card.key);
+
+  LocalMedia datedVideo(String name, int day) => LocalMedia(
+    uri: Uri.file('/test/$name.mp4'),
+    name: '$name.mp4',
+    modifiedAt: DateTime.utc(2026, 11, day),
+  );
+
   for (final size in [
     const Size(360, 800),
     const Size(430, 932),
@@ -728,6 +745,80 @@ void main() {
       await tester.pumpWidget(const SizedBox.shrink());
     },
   );
+
+  testWidgets(
+    'recent additions show both series and the single-file resume movie',
+    (tester) async {
+      final conan = [for (var i = 1; i <= 28; i++) datedVideo('名侦探柯南 - $i', 2)];
+      final tooMany = [
+        for (var i = 1; i <= 12; i++) datedVideo('败犬女主太多了！ - $i', 3),
+      ];
+      final movie = datedVideo('超辉夜姬！', 1);
+      imports.videos = [...conan, ...tooMany, movie];
+      await PlaybackHistoryStore().record(
+        movie,
+        const PlaybackFrame(
+          position: Duration(minutes: 90),
+          duration: Duration(minutes: 142),
+        ),
+      );
+      await mount(tester, const Size(1194, 834));
+      await metadata.selectMany(
+        conan,
+        const AnimeSubject(id: 1, name: '名侦探柯南', nameCn: '', platform: 'TV'),
+      );
+      await metadata.selectMany(
+        tooMany,
+        const AnimeSubject(id: 2, name: '败犬女主太多了！', nameCn: '', platform: 'TV'),
+      );
+      await metadata.select(
+        movie,
+        const AnimeSubject(id: 3, name: '超辉夜姬！', nameCn: '', platform: '剧场版'),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('41 部视频 · 1 部可继续观看'), findsOneWidget);
+      expect(find.byKey(const ValueKey('home-resume')), findsOneWidget);
+      expect(find.text('继续播放'), findsOneWidget);
+      expect(recentCardKeys(tester), [
+        const ValueKey('home-recent-bangumi:2'),
+        const ValueKey('home-recent-bangumi:1'),
+        ValueKey('home-recent-${movie.resumeKey}'),
+      ]);
+      expect(find.text('已收录 28 个视频'), findsOneWidget);
+      expect(find.text('已收录 12 个视频'), findsOneWidget);
+      final movieCard = find.byKey(ValueKey('home-recent-${movie.resumeKey}'));
+      await Scrollable.ensureVisible(tester.element(movieCard), alignment: 0.2);
+      await tester.pumpAndSettle();
+      await tester.tap(movieCard);
+      await tester.pumpAndSettle();
+      expect(session.media?.resumeKey, movie.resumeKey);
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
+
+  testWidgets('recent additions limit cards after grouping and sorting', (
+    tester,
+  ) async {
+    final episodes = [
+      for (var i = 1; i <= 9; i++) datedVideo('Series - $i', 10),
+    ];
+    final independent = [for (var i = 1; i <= 9; i++) datedVideo('Clip $i', i)];
+    imports.videos = [...episodes, ...independent];
+    await mount(tester, const Size(1194, 834));
+    await metadata.selectMany(
+      episodes,
+      const AnimeSubject(id: 1, name: 'Series', nameCn: '', platform: 'TV'),
+    );
+    await tester.pumpAndSettle();
+    expect(recentCardKeys(tester), [
+      const ValueKey('home-recent-bangumi:1'),
+      for (final media in independent.reversed.take(7))
+        ValueKey('home-recent-${media.resumeKey}'),
+    ]);
+    expect(find.text('已收录 9 个视频'), findsOneWidget);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
 
   testWidgets('home work detail opens a file and keeps the detail on return', (
     tester,

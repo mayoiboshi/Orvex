@@ -73,8 +73,7 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
   bool _foreground = true;
   ({int revision, List<LocalMedia> imports, List<LocalMedia> videos})?
   _catalogSnapshot;
-  ({List<LocalMedia> catalog, String? resumedFile, List<RecentWork> works})?
-  _recentWorkSnapshot;
+  ({List<LocalMedia> catalog, List<RecentWork> works})? _recentWorkSnapshot;
   late PlaybackSession _session;
   late AnimeMetadataController _metadata;
 
@@ -93,17 +92,8 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
 
   List<RecentWork> get _recentWorks {
     final catalog = _catalog;
-    final resumedFile = _showContinue
-        ? _history
-              .where((record) => record.canContinue)
-              .firstOrNull
-              ?.media
-              .resumeKey
-        : null;
     final cached = _recentWorkSnapshot;
-    if (cached != null &&
-        identical(cached.catalog, catalog) &&
-        cached.resumedFile == resumedFile) {
+    if (cached != null && identical(cached.catalog, catalog)) {
       return cached.works;
     }
     final works = buildRecentWorks(
@@ -111,13 +101,8 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
       added: _arrivals,
       matchFor: _metadata.matchFor,
       identify: _folders.identityFor,
-      resumedFile: resumedFile,
     );
-    _recentWorkSnapshot = (
-      catalog: catalog,
-      resumedFile: resumedFile,
-      works: works,
-    );
+    _recentWorkSnapshot = (catalog: catalog, works: works);
     return works;
   }
 

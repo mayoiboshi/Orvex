@@ -236,10 +236,7 @@ class LibraryViews extends StatelessWidget {
         : <PlaybackRecord>[];
     final works = recentWorks?.take(8).toList();
     final recent = works == null
-        ? videos
-              .where((video) => video.resumeKey != resume?.media.resumeKey)
-              .take(8)
-              .toList()
+        ? videos.take(8).toList()
         : works.map((work) => work.representative).toList();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,

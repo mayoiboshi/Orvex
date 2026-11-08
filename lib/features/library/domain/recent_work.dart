@@ -22,7 +22,6 @@ List<RecentWork> buildRecentWorks(
   required Map<String, DateTime> added,
   required AnimeMatch? Function(LocalMedia) matchFor,
   required SeriesIdentity Function(LocalMedia) identify,
-  String? resumedFile,
 }) {
   final groups = <String, List<LocalMedia>>{};
   final subjects = <String, AnimeSubject>{};
@@ -39,7 +38,6 @@ List<RecentWork> buildRecentWorks(
     final identity = identify(file);
     identities[file.resumeKey] = identity;
     final subject = _confirmedSeries(file, match, identity);
-    if (subject == null && file.resumeKey == resumedFile) continue;
     final key = subject == null
         ? 'file:${file.resumeKey}'
         : 'bangumi:${subject.id}';
