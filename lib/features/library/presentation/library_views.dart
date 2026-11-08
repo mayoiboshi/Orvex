@@ -91,16 +91,11 @@ class LibraryViews extends StatelessWidget {
             bottom,
           ),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               _header(context),
               const SizedBox(height: OrvexMetrics.section),
-              Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 760),
-                  child: _settings(context),
-                ),
-              ),
+              _settings(context),
             ],
           ),
         );

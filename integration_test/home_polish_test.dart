@@ -759,7 +759,12 @@ void main() {
         await tester.pump(const Duration(milliseconds: 450));
         expect(find.byType(TextFormField), findsWidgets);
         expect(find.byKey(const ValueKey('home-library')), findsNothing);
-        final libraryHeaderLeft = tester.getTopLeft(find.byType(OrvexBrand)).dx;
+        final librarySearchBounds = tester.getRect(
+          find.descendant(
+            of: find.byKey(const PageStorageKey('series-overview')),
+            matching: find.byType(TextFormField),
+          ),
+        );
         await tester.tap(find.byKey(const ValueKey('tab-0')));
         await tester.pump(const Duration(milliseconds: 450));
         await scrollHome(bottom: true);
@@ -783,15 +788,13 @@ void main() {
         );
         expect(
           tester.getTopLeft(settingsBrand).dx,
-          closeTo(libraryHeaderLeft, .01),
+          closeTo(librarySearchBounds.left, .01),
         );
+        final settingsFormBounds = tester.getRect(themePicker);
+        expect(settingsFormBounds.left, closeTo(librarySearchBounds.left, .01));
         expect(
-          tester.getCenter(themePicker).dx,
-          closeTo(tester.getCenter(settingsPage).dx, .01),
-        );
-        expect(
-          tester.getSize(themePicker).width,
-          lessThan(landscape.width - 200),
+          settingsFormBounds.right,
+          closeTo(librarySearchBounds.right, .01),
         );
         expect(find.text('导入本地视频'), findsNothing);
         final version = (await PackageInfo.fromPlatform()).version;
