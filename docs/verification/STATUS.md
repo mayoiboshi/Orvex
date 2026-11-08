@@ -6,6 +6,12 @@
 
 - 新增界面回归在旧代码上复现 41 个文件仅出现两个作品入口，修复后出现三个，且继续观看主卡仍可用。格式、静态分析和 147 项测试通过，另覆盖日期并列、缺失资料、同文件去重与聚合后最多展示八项。
 - iPad 模拟器通过首页集成测试，验证同一部单文件电影在最近添加和主续播均可访问，续播使用原生无声测试模式。
+- 正式版已覆盖安装并启动于 iPad Pro 2022。实际片库中的电影卡片待用户确认。
+
+## 首批十次交付独立审查（2026-11-08）
+
+- 范围为 `76b5494..cebd4c6`。作品详情展示 Bangumi 聚合后的全部单集，点播仍使用原文件来源与季数分组，跨季和跨来源可能无法连续播放。参见 [详情点播](../../lib/features/player/presentation/player_page.dart#L589) 和 [播放队列](../../lib/features/player/presentation/player_page.dart#L321)。
+- 首页作品卡的资料入口按原文件名分组执行批量修改，可能影响同名但 Bangumi ID 不同的作品，或漏掉同一作品的其他季。参见 [卡片资料入口](../../lib/features/library/presentation/library_views.dart#L774) 和 [更正范围](../../lib/features/player/presentation/player_page.dart#L239)。两项均为待处理问题。
 
 ## 最近添加作品海报与信息层次（2026-11-08）
 
