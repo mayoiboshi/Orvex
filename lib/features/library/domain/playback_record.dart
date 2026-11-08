@@ -12,7 +12,7 @@ class PlaybackRecord {
   final LocalMedia media;
   final Duration position;
   final Duration duration;
-  final DateTime updatedAt;
+  final DateTime? updatedAt;
   final bool completed;
 
   bool get canContinue => !completed && position > Duration.zero;

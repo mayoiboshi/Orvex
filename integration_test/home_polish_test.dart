@@ -98,6 +98,9 @@ void main() {
     );
     final files = _Files(store);
     final source = await rootBundle.load('test/fixtures/generated.mp4');
+    final alternate = File(
+      '${Directory.systemTemp.path}/orvex-visual-library/history-episode.mp4',
+    );
     final videos = <LocalMedia>[];
     for (var i = 0; i < 8; i++) {
       final title = i < 4 ? '葬送的芙莉莲' : '名侦探柯南';
@@ -113,7 +116,11 @@ void main() {
       final relative = 'Imports/home-$i/$filename';
       final file = File('${root.path}/documents/$relative');
       await file.parent.create(recursive: true);
-      await file.writeAsBytes(source.buffer.asUint8List());
+      await file.writeAsBytes(
+        i == 5 && await alternate.exists()
+            ? await alternate.readAsBytes()
+            : source.buffer.asUint8List(),
+      );
       videos.add(
         LocalMedia(uri: file.uri, name: filename, importPath: relative),
       );
@@ -926,6 +933,144 @@ void main() {
           'last folder row starts native playback above the mini player',
         );
         observations['miniPlaybackUsesNativeSession'] = true;
+        await session.pauseForInterruption();
+        await tester.tap(find.byTooltip('返回首页'));
+        await tester.pump(const Duration(milliseconds: 500));
+        for (final (i, frame) in [
+          (
+            6,
+            const PlaybackFrame(
+              position: Duration(hours: 1, minutes: 14),
+              duration: Duration(hours: 2, minutes: 22),
+            ),
+          ),
+          (
+            1,
+            const PlaybackFrame(
+              position: Duration(seconds: 18),
+              duration: Duration(seconds: 18),
+              completed: true,
+            ),
+          ),
+          (
+            4,
+            const PlaybackFrame(
+              position: Duration(seconds: 6),
+              duration: Duration(seconds: 18),
+            ),
+          ),
+          (
+            5,
+            const PlaybackFrame(
+              position: Duration(seconds: 8),
+              duration: Duration(seconds: 18),
+            ),
+          ),
+        ]) {
+          await history.record(videos[i], frame);
+        }
+        await resume.write(videos[5].resumeKey, const Duration(seconds: 8));
+        tester.view.physicalSize = landscape * tester.view.devicePixelRatio;
+        await tester.tap(find.byKey(const ValueKey('tab-2')));
+        await tester.pump(const Duration(milliseconds: 500));
+        final historyScroll = find
+            .descendant(
+              of: find.byKey(const PageStorageKey('library-tab-2')),
+              matching: find.byType(Scrollable),
+            )
+            .first;
+        ScrollPosition historyPosition() =>
+            tester.state<ScrollableState>(historyScroll).position;
+        historyPosition().jumpTo(0);
+        await tester.pump(const Duration(milliseconds: 450));
+        final firstRow = find.byKey(ValueKey(videos[5].resumeKey));
+        final secondRow = find.byKey(ValueKey(videos[4].resumeKey));
+        String? thumbnail(Finder row) => tester
+            .widgetList<Image>(
+              find.descendant(of: row, matching: find.byType(Image)),
+            )
+            .map(imageFilePath)
+            .whereType<String>()
+            .where((path) => path.contains('/thumbnails-v1/'))
+            .firstOrNull;
+        await until(
+          () => [firstRow, secondRow].every((row) {
+            final path = thumbnail(row);
+            return path != null && path.isNotEmpty;
+          }),
+          'history rows show independent cached video frames',
+        );
+        expect(thumbnail(firstRow), isNot(thumbnail(secondRow)));
+        expect(
+          tester.getTopLeft(firstRow).dy,
+          lessThan(tester.getTopLeft(secondRow).dy),
+        );
+        expect(find.text('已看完 · 00:18 / 00:18'), findsOneWidget);
+        expect(find.text('未看完 · 1:14:00 / 2:22:00'), findsOneWidget);
+        expect(find.byTooltip('打开本地视频'), findsNothing);
+        final progress = find.descendant(
+          of: firstRow,
+          matching: find.byType(LinearProgressIndicator),
+        );
+        final art = find.descendant(
+          of: firstRow,
+          matching: find.byType(LocalVideoArtwork),
+        );
+        expect(tester.getSize(progress).width, tester.getSize(art).width);
+        expect(
+          tester.widget<LinearProgressIndicator>(progress).value,
+          closeTo(8 / 18, .001),
+        );
+        final historyBefore = await history.list();
+        await capture('library-history-dark');
+        await appearance.setMode(ThemeMode.light);
+        await capture('library-history-light');
+        expect(
+          (await history.list()).first.updatedAt,
+          historyBefore.first.updatedAt,
+        );
+        tester.view.physicalSize =
+            Size(438, landscape.height) * tester.view.devicePixelRatio;
+        await tester.pump(const Duration(milliseconds: 450));
+        final narrowPosition = historyPosition();
+        narrowPosition.jumpTo(narrowPosition.maxScrollExtent);
+        await tester.pump(const Duration(milliseconds: 450));
+        final bottomRecord = find.byKey(
+          ValueKey(historyBefore.last.media.resumeKey),
+        );
+        expect(
+          tester.getBottomLeft(bottomRecord).dy,
+          lessThan(tester.getTopLeft(mini).dy),
+        );
+        expect(
+          find
+              .descendant(of: bottomRecord, matching: find.byType(IconButton))
+              .hitTestable(),
+          findsOneWidget,
+        );
+        await capture('library-history-narrow-bottom');
+        historyPosition().jumpTo(0);
+        await tester.pump(const Duration(milliseconds: 450));
+        final createdBefore = created;
+        await tester.tap(
+          find.descendant(of: firstRow, matching: find.byTooltip('继续播放')),
+        );
+        await until(
+          () =>
+              session.ready &&
+              session.media?.resumeKey == videos[5].resumeKey &&
+              session.frame.duration.inSeconds > 10 &&
+              session.frame.position.inSeconds >= 8,
+          'history resumes the exact file at its stored position',
+        );
+        expect(created, createdBefore + 1);
+        await tester.tap(find.byTooltip('返回首页'));
+        await tester.pump(const Duration(milliseconds: 550));
+        expect(
+          find.descendant(of: mini, matching: find.text('名侦探柯南 · 第 616 集')),
+          findsOneWidget,
+        );
+        observations['historyNativeResume'] = true;
       }
       passed = true;
     } finally {

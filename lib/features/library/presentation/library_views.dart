@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
@@ -77,35 +78,49 @@ class LibraryViews extends StatelessWidget {
       final bottom = MediaQuery.paddingOf(context).bottom + OrvexMetrics.page;
       return RefreshIndicator(
         onRefresh: onRefresh,
-        child: SingleChildScrollView(
-          key: PageStorageKey('library-tab-$tab'),
-          physics: const AlwaysScrollableScrollPhysics(),
-          padding: EdgeInsets.fromLTRB(inset, OrvexMetrics.page, inset, bottom),
-          child: Center(
-            child: ConstrainedBox(
-              constraints: BoxConstraints(maxWidth: tab == 3 ? 760 : 1160),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _header(context),
-                  SizedBox(
-                    height: tab == 0 ? OrvexMetrics.page : OrvexMetrics.section,
+        child: tab == 2
+            ? _history(
+                context,
+                math.max(inset, (constraints.maxWidth - 1160) / 2),
+                bottom,
+              )
+            : SingleChildScrollView(
+                key: PageStorageKey('library-tab-$tab'),
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: EdgeInsets.fromLTRB(
+                  inset,
+                  OrvexMetrics.page,
+                  inset,
+                  bottom,
+                ),
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(
+                      maxWidth: tab == 3 ? 760 : 1160,
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _header(context),
+                        SizedBox(
+                          height: tab == 0
+                              ? OrvexMetrics.page
+                              : OrvexMetrics.section,
+                        ),
+                        if (loading) ...[
+                          const LinearProgressIndicator(minHeight: 2),
+                          const SizedBox(height: 20),
+                        ],
+                        switch (tab) {
+                          1 => _library(context),
+                          3 => _settings(context),
+                          _ => _home(context),
+                        },
+                      ],
+                    ),
                   ),
-                  if (loading) ...[
-                    const LinearProgressIndicator(minHeight: 2),
-                    const SizedBox(height: 20),
-                  ],
-                  switch (tab) {
-                    1 => _library(context),
-                    2 => _history(context),
-                    3 => _settings(context),
-                    _ => _home(context),
-                  },
-                ],
+                ),
               ),
-            ),
-          ),
-        ),
       );
     },
   );
@@ -133,7 +148,7 @@ class LibraryViews extends StatelessWidget {
                   ),
                   const SizedBox(width: 8),
                 ],
-                if (tab != 3)
+                if (tab == 1)
                   GlassIconButton(
                     icon: Icons.add_rounded,
                     tooltip: '打开本地视频',
@@ -145,7 +160,7 @@ class LibraryViews extends StatelessWidget {
             const SizedBox(height: 6),
             Text(switch (tab) {
               1 => '${videos.length} 部本地视频',
-              2 => '从上次停下的地方，继续。',
+              2 => '查看观看进度，继续上次播放。',
               3 => '按你的方式，享受每一次播放。',
               _ => '喜欢的内容，触手可及。',
             }, style: Theme.of(context).textTheme.bodySmall),
@@ -830,82 +845,173 @@ class LibraryViews extends StatelessWidget {
     );
   }
 
-  Widget _history(BuildContext context) => Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      if (history.isEmpty)
-        _emptyState(
-          context,
-          Icons.history_rounded,
-          '下一段故事，等你开始',
-          '播放记录会自动保存在此设备。',
-          import: true,
-        )
-      else ...[
-        _section(context, '最近播放', detail: '${history.length} 部'),
-        const SizedBox(height: 14),
-        for (final record in history) ...[
-          _recordTile(context, record),
-          const SizedBox(height: 10),
-        ],
-      ],
-    ],
-  );
-
-  Widget _recordTile(
-    BuildContext context,
-    PlaybackRecord record,
-  ) => GlassSurface(
-    child: InkWell(
-      onTap: () => onOpen(record.media),
-      onLongPress: () => onMetadata(record.media),
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Row(
-          children: [
-            SizedBox(
-              width: 96,
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(OrvexMetrics.smallRadius),
-                child: AspectRatio(
-                  aspectRatio: 16 / 9,
-                  child: _cover(record.media),
-                ),
-              ),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    _mediaTitle(record.media),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.titleSmall,
+  Widget _history(BuildContext context, double inset, double bottom) {
+    final indices = {
+      for (var i = 0; i < history.length; i++) history[i].media.resumeKey: i,
+    };
+    return CustomScrollView(
+      key: const PageStorageKey('library-tab-2'),
+      physics: const AlwaysScrollableScrollPhysics(),
+      slivers: [
+        SliverPadding(
+          padding: EdgeInsets.fromLTRB(inset, OrvexMetrics.page, inset, 0),
+          sliver: SliverToBoxAdapter(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _header(context),
+                const SizedBox(height: OrvexMetrics.section),
+                if (loading)
+                  const LinearProgressIndicator(minHeight: 2)
+                else if (history.isEmpty)
+                  _emptyState(
+                    context,
+                    Icons.history_rounded,
+                    '还没有播放记录',
+                    '从媒体库播放视频后，可在这里查看进度并继续观看。',
+                    action: FilledButton.icon(
+                      onPressed: () => onTab(1),
+                      icon: const Icon(Icons.video_library_outlined),
+                      label: const Text('前往媒体库'),
+                    ),
                   ),
-                  const SizedBox(height: 6),
-                  Text(
-                    record.completed
-                        ? '已看完'
-                        : '看到 ${formatTime(record.position)}',
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                  const SizedBox(height: 8),
-                  LinearProgressIndicator(value: record.progress, minHeight: 2),
+                if (history.isNotEmpty) ...[
+                  _section(context, '最近播放', detail: '${history.length} 条记录'),
+                  const SizedBox(height: OrvexMetrics.gap),
                 ],
-              ),
+              ],
             ),
-            const SizedBox(width: 10),
-            Icon(
-              Icons.play_arrow_rounded,
-              color: OrvexColors.of(context).accent,
+          ),
+        ),
+        SliverPadding(
+          padding: EdgeInsets.fromLTRB(inset, 0, inset, bottom),
+          sliver: SliverList.builder(
+            itemCount: history.length,
+            findChildIndexCallback: (key) =>
+                indices[(key as ValueKey<String>).value],
+            itemBuilder: (context, index) {
+              final record = history[index];
+              return Padding(
+                key: ValueKey(record.media.resumeKey),
+                padding: const EdgeInsets.only(bottom: OrvexMetrics.small),
+                child: _recordTile(context, record),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _recordTile(BuildContext context, PlaybackRecord record) {
+    final media = record.media;
+    final theme = Theme.of(context).textTheme;
+    final colors = OrvexColors.of(context);
+    final library = thumbnails?.library;
+    final episode =
+        library?.identityFor(media).episode ??
+        AnimeFilename.parse(media.name).episode;
+    final status = record.completed ? '已看完' : '未看完';
+    final position = formatTime(record.position);
+    final hasDuration = record.duration > Duration.zero;
+    final time = hasDuration
+        ? '$position / ${formatTime(record.duration)}'
+        : position;
+    final recent = _historyDate(context, record.updatedAt);
+    void open() => onOpen(media);
+    return GlassSurface(
+      child: InkWell(
+        onTap: open,
+        onLongPress: () => onMetadata(media),
+        child: LayoutBuilder(
+          builder: (context, constraints) => Padding(
+            padding: const EdgeInsets.all(OrvexMetrics.gap),
+            child: Row(
+              children: [
+                SizedBox(
+                  width: constraints.maxWidth < 320 ? 80 : 112,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(
+                      OrvexMetrics.smallRadius,
+                    ),
+                    child: AspectRatio(
+                      aspectRatio: 16 / 9,
+                      child: Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          LocalVideoArtwork(
+                            media: media,
+                            cache: thumbnails,
+                            entry: library?.entry(media),
+                            fallback: _cover(media, fit: BoxFit.contain),
+                          ),
+                          if (hasDuration)
+                            Positioned(
+                              left: 0,
+                              right: 0,
+                              bottom: 0,
+                              child: LinearProgressIndicator(
+                                value: record.progress,
+                                minHeight: 2,
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: OrvexMetrics.gap),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        playbackMediaTitle(media, metadata, episode),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.titleSmall,
+                      ),
+                      const SizedBox(height: 4),
+                      Text('$status · $time', style: theme.bodySmall),
+                      Text(recent, style: theme.labelSmall),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: OrvexMetrics.small),
+                IconButton(
+                  tooltip: record.completed
+                      ? '重新播放'
+                      : record.canContinue
+                      ? '继续播放'
+                      : '播放视频',
+                  color: colors.accent,
+                  onPressed: open,
+                  icon: const Icon(Icons.play_arrow_rounded),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
-    ),
-  );
+    );
+  }
+
+  String _historyDate(BuildContext context, DateTime? timestamp) {
+    if (timestamp == null) return '最近播放时间未知';
+    final local = timestamp.toLocal();
+    final now = DateTime.now();
+    final localizations = MaterialLocalizations.of(context);
+    final day = DateUtils.isSameDay(local, now)
+        ? '今天'
+        : DateUtils.isSameDay(local, DateTime(now.year, now.month, now.day - 1))
+        ? '昨天'
+        : localizations.formatCompactDate(local);
+    final time = localizations.formatTimeOfDay(
+      TimeOfDay.fromDateTime(local),
+      alwaysUse24HourFormat: MediaQuery.alwaysUse24HourFormatOf(context),
+    );
+    return '$day $time';
+  }
 
   Widget _cover(
     LocalMedia media, {
@@ -1229,6 +1335,7 @@ class LibraryViews extends StatelessWidget {
     String title,
     String subtitle, {
     bool import = false,
+    Widget? action,
   }) => GlassSurface(
     radius: OrvexMetrics.panelRadius,
     padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
@@ -1249,6 +1356,10 @@ class LibraryViews extends StatelessWidget {
             textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.bodySmall,
           ),
+          if (action != null) ...[
+            const SizedBox(height: OrvexMetrics.page),
+            action,
+          ],
           if (import) ...[
             const SizedBox(height: 20),
             FilledButton.icon(
@@ -1266,6 +1377,23 @@ class LibraryViews extends StatelessWidget {
 String mediaTitle(String name) {
   final dot = name.lastIndexOf('.');
   return dot > 0 ? name.substring(0, dot) : name;
+}
+
+String playbackMediaTitle(
+  LocalMedia media,
+  AnimeMetadataController metadata,
+  int? episode,
+) {
+  final match = metadata.matchFor(media);
+  final subject = match?.status == AnimeMatchStatus.matched
+      ? match?.subject
+      : null;
+  final title = subject?.title.trim();
+  if (title == null || title.isEmpty) return media.name;
+  final standalone =
+      subject!.platform == '剧场版' ||
+      (subject.platform != 'TV' && subject.episodes == 1);
+  return episode == null || standalone ? title : '$title · 第 $episode 集';
 }
 
 class LocalVideoArtwork extends StatefulWidget {

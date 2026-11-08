@@ -126,7 +126,7 @@ Apple 适配器将目录操作与缩略图提取分到两个串行队列。目�
 | --- | --- |
 | 视频/字幕 | Documents/Imports；视频按内容查重，字幕按内容哈希和文件名复用 |
 | 续播进度 | SharedPreferences；已导入文件使用稳定的 v2 键，兼容旧绝对路径检查点 |
-| 播放记录 | `orvex.history.v2` JSON 字符串列表，最多 100 项；旧 v1 保留作恢复数据 |
+| 播放记录 | `orvex.history.v2` JSON 字符串列表，按稳定视频标识保留最近检查点，最多 100 项；有效时间倒序，旧记录缺时间排末尾，缺时长保留实际位置；旧 v1 保留作恢复数据 |
 | 文件夹授权和索引 | Application Support/folder-library-v1.json，串行临时写入/替换及备份；不包含视频副本 |
 | 视频预览 | Application Support/thumbnails-v1，按稳定文件身份与大小/修改时间分版本，磁盘限额清理 |
 | 导入查重缓存 | Documents/Imports/.video-hashes-v1.json，相对路径对应大小/修改/变更时间及 SHA-256；可重建，不替代媒体或进度 |

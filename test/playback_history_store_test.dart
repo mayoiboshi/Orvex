@@ -166,4 +166,39 @@ void main() {
     expect(records.single.canContinue, isFalse);
     expect(records.single.progress, 1);
   });
+
+  test(
+    'legacy records without time or duration keep progress after valid dates',
+    () async {
+      final preferences = SharedPreferencesAsync();
+      final legacy = {
+        'uri': 'file:///legacy.mp4',
+        'name': 'legacy.mp4',
+        'position': 52000,
+        'completed': false,
+      };
+      await preferences.setStringList(PlaybackHistoryStore.legacyKey, [
+        jsonEncode(legacy),
+        jsonEncode({...legacy, 'updatedAt': 'invalid'}),
+        jsonEncode({
+          ...legacy,
+          'uri': 'file:///known.mp4',
+          'name': 'known.mp4',
+          'updatedAt': '2026-11-08T12:30:00Z',
+          'duration': 1440000,
+        }),
+      ]);
+      final store = PlaybackHistoryStore();
+      final records = await store.list(importedVideos: []);
+      expect(records.map((record) => record.media.name), [
+        'known.mp4',
+        'legacy.mp4',
+      ]);
+      expect(records.last.updatedAt, isNull);
+      expect(records.last.duration, Duration.zero);
+      expect(records.last.position, const Duration(seconds: 52));
+      expect(records.last.canContinue, isTrue);
+      expect((await store.list()).last.updatedAt, isNull);
+    },
+  );
 }

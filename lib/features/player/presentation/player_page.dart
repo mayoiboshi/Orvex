@@ -11,7 +11,6 @@ import '../../../app/orvex_providers.dart';
 import '../../../design/orvex_theme.dart';
 import '../../../design/back_navigation.dart';
 import '../../anime_metadata/application/anime_metadata_controller.dart';
-import '../../anime_metadata/domain/anime_subject.dart';
 import '../../anime_metadata/presentation/anime_metadata_sheet.dart';
 import '../../anime_metadata/presentation/episode_details.dart';
 import '../../media_sources/local_file_source.dart';
@@ -617,7 +616,7 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
                                 metadata: _metadata,
                                 onMetadata: _showMetadata,
                                 appearance: ref.read(appearanceProvider),
-                                thumbnails: _tab == 0
+                                thumbnails: _tab == 0 || _tab == 2
                                     ? ref.read(thumbnailCacheProvider)
                                     : null,
                                 recentWorks: _tab == 0 ? _recentWorks : null,
@@ -637,17 +636,6 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
   }
 
   Widget _miniPlayer(LocalMedia media, {required bool sidebar}) {
-    final match = _metadata.matchFor(media);
-    final subject = match?.status == AnimeMatchStatus.matched
-        ? match?.subject
-        : null;
-    final episode =
-        subject != null &&
-            subject.platform != '剧场版' &&
-            (subject.platform == 'TV' || subject.episodes != 1)
-        ? _folders.identityFor(media).episode
-        : null;
-    final title = subject?.title.trim();
     return SafeArea(
       top: false,
       bottom: sidebar,
@@ -664,11 +652,11 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
           child: MiniPlaybackCard(
             key: const ValueKey('mini-playback-card'),
             session: _session,
-            title: title == null || title.isEmpty
-                ? media.name
-                : episode == null
-                ? title
-                : '$title · 第 $episode 集',
+            title: playbackMediaTitle(
+              media,
+              _metadata,
+              _folders.identityFor(media).episode,
+            ),
             artwork: LocalVideoArtwork(
               media: media,
               cache: ref.read(thumbnailCacheProvider),

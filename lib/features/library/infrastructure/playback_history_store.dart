@@ -28,6 +28,7 @@ class PlaybackHistoryStore {
         final data = jsonDecode(value) as Map<String, dynamic>;
         final relative = data['importPath'] as String?;
         if (relative != null && !validImportPath(relative)) continue;
+        final timestamp = data['updatedAt'];
         records.add(
           PlaybackRecord(
             media: LocalMedia(
@@ -38,8 +39,10 @@ class PlaybackHistoryStore {
               folderFile: data['folderFile'] as String?,
             ),
             position: Duration(milliseconds: data['position'] as int),
-            duration: Duration(milliseconds: data['duration'] as int),
-            updatedAt: DateTime.parse(data['updatedAt'] as String),
+            duration: Duration(milliseconds: (data['duration'] as int?) ?? 0),
+            updatedAt: timestamp is String
+                ? DateTime.tryParse(timestamp)
+                : null,
             completed: data['completed'] as bool,
           ),
         );
@@ -53,7 +56,12 @@ class PlaybackHistoryStore {
   }
 
   List<PlaybackRecord> _deduplicate(List<PlaybackRecord> records) {
-    records.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+    records.sort((a, b) {
+      final first = a.updatedAt;
+      final second = b.updatedAt;
+      if (first == null) return second == null ? 0 : 1;
+      return second == null ? -1 : second.compareTo(first);
+    });
     final seen = <String>{};
     return records
         .where((record) => seen.add(record.media.resumeKey))
@@ -74,7 +82,8 @@ class PlaybackHistoryStore {
           'folderFile': record.media.folderFile,
         'position': record.position.inMilliseconds,
         'duration': record.duration.inMilliseconds,
-        'updatedAt': record.updatedAt.toUtc().toIso8601String(),
+        if (record.updatedAt case final time?)
+          'updatedAt': time.toUtc().toIso8601String(),
         'completed': record.completed,
       }),
   ];

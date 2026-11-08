@@ -336,7 +336,7 @@ void main() {
         await tester.tap(find.byKey(const ValueKey('tab-2')));
         await tester.pumpAndSettle();
         expect(find.text('最近播放'), findsOneWidget);
-        expect(find.textContaining('看到 '), findsWidgets);
+        expect(find.textContaining('未看完 · '), findsWidgets);
         checks.add('library shell shows persisted native playback history');
         for (final index in [0, 1, 2, 3]) {
           await tester.tap(find.byKey(ValueKey('tab-$index')));

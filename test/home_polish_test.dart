@@ -14,6 +14,93 @@ import 'support/fake_metadata.dart';
 
 void main() {
   testWidgets(
+    'history offers library navigation and one playback action per row',
+    (tester) async {
+      SharedPreferencesAsyncPlatform.instance =
+          InMemorySharedPreferencesAsync.empty();
+      final metadata = AnimeMetadataController(
+        client: FakeBangumiClient(),
+        store: MemoryMetadataStore(),
+      );
+      final appearance = AppearanceController();
+      addTearDown(metadata.dispose);
+      addTearDown(appearance.dispose);
+      tester.view.physicalSize = const Size(360, 700);
+      tester.view.devicePixelRatio = 1;
+      tester.platformDispatcher.textScaleFactorTestValue = 2;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      final media = LocalMedia(
+        uri: Uri.file('/history.mp4'),
+        name: '${List.filled(12, '无关联资料的长文件名').join()}.mp4',
+      );
+      var imports = 0, details = 0;
+      final opened = <LocalMedia>[];
+      final tabs = <int>[];
+      Future<void> show(List<PlaybackRecord> history) async {
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: OrvexTheme.create(Brightness.light),
+            home: Scaffold(
+              body: LibraryViews(
+                tab: 2,
+                videos: const [],
+                history: history,
+                loading: false,
+                picking: false,
+                showContinue: true,
+                query: '',
+                onQuery: (_) {},
+                onImport: () => imports++,
+                onOpen: opened.add,
+                onTab: tabs.add,
+                onRefresh: () async {},
+                onShowContinue: (_) {},
+                metadata: metadata,
+                onMetadata: (_, {group}) => details++,
+                appearance: appearance,
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+      }
+
+      await show([]);
+      expect(find.byTooltip('打开本地视频'), findsNothing);
+      await tester.tap(find.text('前往媒体库'));
+      expect(tabs, [1]);
+      expect(imports, 0);
+      await show([
+        PlaybackRecord(
+          media: media,
+          position: const Duration(seconds: 50),
+          duration: Duration.zero,
+          updatedAt: null,
+        ),
+      ]);
+      expect(find.text('1 条记录'), findsOneWidget);
+      expect(find.text('最近播放时间未知'), findsOneWidget);
+      expect(find.text('未看完 · 00:50'), findsOneWidget);
+      expect(find.byType(LinearProgressIndicator), findsNothing);
+      expect(
+        tester.widget<MediaCover>(find.byType(MediaCover)).fit,
+        BoxFit.contain,
+      );
+      await tester.longPress(find.text(media.name));
+      expect(details, 1);
+      expect(opened, isEmpty);
+      await tester.tap(find.byTooltip('继续播放'));
+      expect(opened, [media]);
+      await tester.tap(find.text(media.name));
+      expect(opened, [media, media]);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
+
+  testWidgets(
     'populated Home preserves actions and touch areas across sizes, themes and large text',
     (tester) async {
       SharedPreferencesAsyncPlatform.instance =

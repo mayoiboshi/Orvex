@@ -198,7 +198,7 @@ void main() {
       expect(engine.pauses, 1);
       await tester.tap(find.byKey(const ValueKey('tab-2')));
       await tester.pumpAndSettle();
-      expect(find.text('看到 03:00'), findsOneWidget);
+      expect(find.text('未看完 · 03:00 / 10:00'), findsOneWidget);
       final saved = (await tester.runAsync(PlaybackHistoryStore().list))!;
       expect(saved.single.media.uri, video.uri);
       expect(saved.single.position, const Duration(minutes: 3));
