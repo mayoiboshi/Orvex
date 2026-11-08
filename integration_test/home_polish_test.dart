@@ -824,8 +824,10 @@ void main() {
         );
         final settingsFormBounds = tester.getRect(themePicker);
         expect(settingsFormBounds.left, closeTo(librarySearchBounds.left, .01));
-        expect(settingsFormBounds.width, closeTo(800, .01));
-        expect(settingsFormBounds.right, lessThan(librarySearchBounds.right));
+        expect(
+          settingsFormBounds.right,
+          closeTo(librarySearchBounds.right, .01),
+        );
         final settingsCards = find.descendant(
           of: settingsPage,
           matching: find.byType(GlassSurface),
