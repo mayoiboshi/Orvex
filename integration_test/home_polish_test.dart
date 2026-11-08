@@ -11,6 +11,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:media_kit/media_kit.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:orvex/app/orvex_app.dart';
 import 'package:orvex/design/appearance_controller.dart';
 import 'package:orvex/design/glass.dart';
@@ -773,6 +774,43 @@ void main() {
         await tester.pump(const Duration(milliseconds: 450));
         expect(find.text('显示继续观看'), findsOneWidget);
         expect(tester.getRect(navSurface), homeNavRect);
+        final settingsPage = find.byKey(const PageStorageKey('library-tab-3'));
+        final themePicker = find.byKey(const ValueKey('theme-picker'));
+        final settingsBrand = find.descendant(
+          of: settingsPage,
+          matching: find.byType(OrvexBrand),
+        );
+        expect(
+          tester.getTopLeft(themePicker).dx,
+          tester.getTopLeft(settingsBrand).dx,
+        );
+        expect(
+          tester.getSize(themePicker).width,
+          lessThan(landscape.width - 200),
+        );
+        expect(find.text('导入本地视频'), findsNothing);
+        final version = (await PackageInfo.fromPlatform()).version;
+        await until(
+          () => find.text('版本 $version').evaluate().isNotEmpty,
+          'installed version',
+        );
+        await capture('library-settings-light');
+        await tester.tap(themePicker);
+        await tester.pump(const Duration(milliseconds: 450));
+        expect(
+          tester
+              .widget<CheckedPopupMenuItem<ThemeMode>>(
+                find.byKey(const ValueKey('theme-light')),
+              )
+              .checked,
+          isTrue,
+        );
+        await capture('library-settings-theme');
+        await tester.tap(find.byKey(const ValueKey('theme-dark')));
+        await capture('library-settings-dark');
+        expect(appearance.mode, ThemeMode.dark);
+        await appearance.setMode(ThemeMode.light);
+        await tester.pump(const Duration(milliseconds: 450));
         observations['navigationStableAcrossTabs'] = true;
         await tester.tap(find.byKey(const ValueKey('tab-0')));
         await tester.pump(const Duration(milliseconds: 450));
@@ -883,11 +921,12 @@ void main() {
         expect(mini, findsOneWidget);
         await tester.tap(find.byTooltip('暂停视频'));
         await until(() => !session.frame.playing, 'mini player pauses');
-        final resumedAt = session.frame.position;
         await appearance.setMode(ThemeMode.dark);
         tester.view.physicalSize =
             Size(438, landscape.height) * tester.view.devicePixelRatio;
         await capture('library-mini-folders-narrow-dark');
+        // Sample after pause-related native frame events have settled.
+        final resumedAt = session.frame.position;
         await tester.tap(find.byTooltip('展开播放器'));
         await tester.pump(const Duration(milliseconds: 500));
         expect(session.engine, same(miniEngine));
@@ -1144,6 +1183,62 @@ void main() {
           findsOneWidget,
         );
         observations['historyNativeResume'] = true;
+        final settingsEngine = session.engine;
+        final settingsPosition = session.frame.position;
+        final checkpoint = (await history.list()).firstWhere(
+          (record) => record.media.resumeKey == videos[5].resumeKey,
+        );
+        await tester.tap(find.byKey(const ValueKey('tab-3')));
+        await tester.pump(const Duration(milliseconds: 450));
+        final miniBounds = tester.getRect(mini);
+        await tester.tap(find.widgetWithText(SwitchListTile, '显示继续观看'));
+        await tester.pump(const Duration(milliseconds: 450));
+        expect(
+          await SharedPreferencesAsync().getBool('orvex.home.continue.v1'),
+          isFalse,
+        );
+        await tester.tap(find.byKey(const ValueKey('tab-0')));
+        await tester.pump(const Duration(milliseconds: 450));
+        expect(find.text('继续观看'), findsNothing);
+        expect(
+          (await history.list())
+              .firstWhere(
+                (record) => record.media.resumeKey == videos[5].resumeKey,
+              )
+              .position,
+          checkpoint.position,
+        );
+        expect(session.engine, same(settingsEngine));
+        expect(session.frame.position, settingsPosition);
+        await tester.tap(find.byKey(const ValueKey('tab-3')));
+        await tester.pump(const Duration(milliseconds: 450));
+        await tester.tap(find.widgetWithText(SwitchListTile, '显示继续观看'));
+        await tester.pump(const Duration(milliseconds: 450));
+        await appearance.setMode(ThemeMode.dark);
+        await tester.pump(const Duration(milliseconds: 450));
+        expect(tester.getRect(mini), miniBounds);
+        final settingsScroll = tester
+            .state<ScrollableState>(
+              find
+                  .descendant(
+                    of: settingsPage,
+                    matching: find.byType(Scrollable),
+                  )
+                  .first,
+            )
+            .position;
+        settingsScroll.jumpTo(settingsScroll.maxScrollExtent);
+        await tester.pump(const Duration(milliseconds: 450));
+        final licenses = find.text('开源许可');
+        expect(
+          tester.getBottomLeft(licenses).dy,
+          lessThan(tester.getTopLeft(mini).dy),
+        );
+        await capture('library-settings-narrow-bottom');
+        await tester.tap(licenses.hitTestable());
+        await tester.pump(const Duration(milliseconds: 450));
+        expect(find.byType(LicensePage), findsOneWidget);
+        observations['settingsPreservePlaybackAndLicenses'] = true;
       }
       passed = true;
     } finally {

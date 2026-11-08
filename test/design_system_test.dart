@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:orvex/app/orvex_app.dart';
 import 'package:orvex/design/appearance_controller.dart';
 import 'package:orvex/design/glass.dart';
@@ -45,14 +46,18 @@ void main() {
     final controller = AppearanceController();
     await controller.initialize();
     expect(controller.mode, ThemeMode.system);
-    await controller.setMode(ThemeMode.dark);
     await controller.setReduceTransparency(true);
     controller.dispose();
-    final reopened = AppearanceController();
-    await reopened.initialize();
-    expect(reopened.mode, ThemeMode.dark);
-    expect(reopened.reduceTransparency, isTrue);
-    reopened.dispose();
+    for (final mode in [ThemeMode.dark, ThemeMode.light, ThemeMode.system]) {
+      final saved = AppearanceController();
+      await saved.setMode(mode);
+      saved.dispose();
+      final reopened = AppearanceController();
+      await reopened.initialize();
+      expect(reopened.mode, mode);
+      expect(reopened.reduceTransparency, isTrue);
+      reopened.dispose();
+    }
   });
 
   test(
@@ -117,6 +122,28 @@ void main() {
     return controller;
   }
 
+  Future<void> chooseTheme(
+    WidgetTester tester,
+    ThemeMode mode, {
+    ThemeMode? current,
+  }) async {
+    final picker = find.byKey(const ValueKey('theme-picker'));
+    await tester.ensureVisible(picker);
+    await tester.tap(picker);
+    await tester.pumpAndSettle();
+    if (current != null) {
+      for (final option in ThemeMode.values) {
+        final item = find.byKey(ValueKey('theme-${option.name}'));
+        expect(
+          tester.widget<CheckedPopupMenuItem<ThemeMode>>(item).checked,
+          option == current,
+        );
+      }
+    }
+    await tester.tap(find.byKey(ValueKey('theme-${mode.name}')));
+    await tester.pumpAndSettle();
+  }
+
   testWidgets(
     'settings change theme immediately, persist, and follow system changes',
     (tester) async {
@@ -146,8 +173,7 @@ void main() {
       expectOrbitMark();
       await tester.tap(find.byKey(const ValueKey('tab-3')));
       await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const ValueKey('theme-dark')));
-      await tester.pumpAndSettle();
+      await chooseTheme(tester, ThemeMode.dark, current: ThemeMode.system);
       expect(brightness(), Brightness.dark);
       expect(find.widgetWithText(ListTile, 'Orvex'), findsOneWidget);
       expectOrbitMark();
@@ -157,12 +183,11 @@ void main() {
       );
       tester.platformDispatcher.platformBrightnessTestValue = Brightness.dark;
       await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const ValueKey('theme-light')));
-      await tester.pumpAndSettle();
+      await chooseTheme(tester, ThemeMode.light, current: ThemeMode.dark);
       expect(brightness(), Brightness.light);
-      await tester.tap(find.byKey(const ValueKey('theme-system')));
-      await tester.pumpAndSettle();
+      await chooseTheme(tester, ThemeMode.system, current: ThemeMode.light);
       expect(brightness(), Brightness.dark);
+      expect(find.text('跟随系统'), findsOneWidget);
       tester.platformDispatcher.platformBrightnessTestValue = Brightness.light;
       await tester.pumpAndSettle();
       expect(brightness(), Brightness.light);
@@ -279,6 +304,12 @@ void main() {
       ),
     );
     expect(find.byType(BackdropFilter), findsNothing);
+    await controller.setReduceTransparency(true);
+    await controller.setReduceTransparency(false);
+    await tester.pumpAndSettle();
+    expect(controller.reduceTransparency, isFalse);
+    expect(controller.systemReduceTransparency, isTrue);
+    expect(find.byType(BackdropFilter), findsNothing);
     expect(
       OrvexMetrics.duration(tester.element(find.byType(GlassSurface))),
       Duration.zero,
@@ -305,14 +336,74 @@ void main() {
   }, variant: TargetPlatformVariant.only(TargetPlatform.macOS));
 
   testWidgets(
+    'Bangumi settings controls automatic requests and saves the preference',
+    (tester) async {
+      await mount(tester);
+      await tester.tap(find.byKey(const ValueKey('tab-3')));
+      await tester.pumpAndSettle();
+      final metadata = ProviderScope.containerOf(
+        tester.element(find.byType(OrvexApp)),
+      ).read(animeMetadataProvider);
+      final client = metadata.client as FakeBangumiClient;
+      final toggle = find.byKey(const ValueKey('automatic-bangumi'));
+      await tester.ensureVisible(toggle);
+      await tester.tap(toggle);
+      await tester.pumpAndSettle();
+      expect((await metadata.store.read()).automatic, isFalse);
+      await metadata.scan([
+        LocalMedia(uri: Uri.file('/Match - 01.mp4'), name: 'Match - 01.mp4'),
+      ]);
+      expect(client.queries, isEmpty);
+      await tester.tap(toggle);
+      await tester.pumpAndSettle();
+      expect((await metadata.store.read()).automatic, isTrue);
+      expect(client.queries, ['Match']);
+    },
+  );
+
+  testWidgets(
+    'settings shows the installed version and opens licenses in a narrow window',
+    (tester) async {
+      PackageInfo.setMockInitialValues(
+        appName: 'Orvex',
+        packageName: 'dev.orvex.orvex',
+        version: '2.7.3',
+        buildNumber: '81',
+        buildSignature: '',
+      );
+      await mount(tester, size: const Size(360, 640), scale: 2);
+      await tester.tap(find.byKey(const ValueKey('tab-3')));
+      await tester.pumpAndSettle();
+      expect(find.text('导入本地视频'), findsNothing);
+      expect(find.text('外挂字幕'), findsNothing);
+      expect(find.text('自动保存播放进度'), findsNothing);
+      final settings = find.byKey(const PageStorageKey('library-tab-3'));
+      final license = find.text('开源许可');
+      final position = tester
+          .state<ScrollableState>(
+            find
+                .descendant(of: settings, matching: find.byType(Scrollable))
+                .first,
+          )
+          .position;
+      position.jumpTo(position.maxScrollExtent);
+      await tester.pumpAndSettle();
+      expect(find.text('版本 2.7.3'), findsOneWidget);
+      expect(license.hitTestable(), findsOneWidget);
+      await tester.tap(license);
+      await tester.pumpAndSettle();
+      expect(find.byType(LicensePage), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
     'small landscape and larger text keep navigation and settings usable',
     (tester) async {
       await mount(tester, size: const Size(640, 360), scale: 1.3);
       await tester.tap(find.byKey(const ValueKey('tab-3')));
       await tester.pumpAndSettle();
-      await tester.ensureVisible(find.byKey(const ValueKey('theme-dark')));
-      await tester.tap(find.byKey(const ValueKey('theme-dark')));
-      await tester.pumpAndSettle();
+      await chooseTheme(tester, ThemeMode.dark, current: ThemeMode.system);
       expect(tester.takeException(), isNull);
       expect(find.byKey(const ValueKey('tab-0')).hitTestable(), findsOneWidget);
     },

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 import '../../../design/appearance_controller.dart';
 import '../../../design/glass.dart';
@@ -79,6 +80,29 @@ class LibraryViews extends StatelessWidget {
           : 36.0;
       // With extendBody, Scaffold includes the measured bottom bar in padding.
       final bottom = MediaQuery.paddingOf(context).bottom + OrvexMetrics.page;
+      if (tab == 3) {
+        final pageInset = libraryBrowseInset(constraints.maxWidth);
+        return SingleChildScrollView(
+          key: const PageStorageKey('library-tab-3'),
+          padding: EdgeInsets.fromLTRB(
+            pageInset,
+            OrvexMetrics.page,
+            pageInset,
+            bottom,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _header(context),
+              const SizedBox(height: OrvexMetrics.section),
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 760),
+                child: _settings(context),
+              ),
+            ],
+          ),
+        );
+      }
       return RefreshIndicator(
         onRefresh: onRefresh,
         child: tab == 2
@@ -98,9 +122,7 @@ class LibraryViews extends StatelessWidget {
                 ),
                 child: Center(
                   child: ConstrainedBox(
-                    constraints: BoxConstraints(
-                      maxWidth: tab == 3 ? 760 : 1160,
-                    ),
+                    constraints: BoxConstraints(maxWidth: 1160),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -116,7 +138,6 @@ class LibraryViews extends StatelessWidget {
                         ],
                         switch (tab) {
                           1 => _library(context),
-                          3 => _settings(context),
                           _ => _home(context),
                         },
                       ],
@@ -1210,126 +1231,113 @@ class LibraryViews extends StatelessWidget {
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
       _section(context, '外观'),
-      const SizedBox(height: 12),
+      const SizedBox(height: OrvexMetrics.gap),
       _group([
-        RadioGroup<ThemeMode>(
-          groupValue: appearance.mode,
-          onChanged: (value) {
-            if (value != null) appearance.setMode(value);
-          },
-          child: Column(
-            children: [
-              for (final mode in ThemeMode.values)
-                RadioListTile<ThemeMode>(
-                  key: ValueKey('theme-${mode.name}'),
-                  value: mode,
-                  title: Text(switch (mode) {
-                    ThemeMode.system => '跟随系统',
-                    ThemeMode.light => '浅色',
-                    ThemeMode.dark => '深色',
-                  }),
-                  secondary: Icon(switch (mode) {
-                    ThemeMode.system => Icons.brightness_auto_outlined,
-                    ThemeMode.light => Icons.light_mode_outlined,
-                    ThemeMode.dark => Icons.dark_mode_outlined,
-                  }),
+        PopupMenuButton<ThemeMode>(
+          key: const ValueKey('theme-picker'),
+          tooltip: '选择主题',
+          position: PopupMenuPosition.under,
+          onSelected: appearance.setMode,
+          itemBuilder: (context) => [
+            for (final mode in ThemeMode.values)
+              CheckedPopupMenuItem(
+                key: ValueKey('theme-${mode.name}'),
+                value: mode,
+                checked: appearance.mode == mode,
+                child: Text(_themeLabel(mode)),
+              ),
+          ],
+          child: ListTile(
+            contentPadding: _settingsRowPadding,
+            title: Row(
+              children: [
+                const Expanded(child: Text('主题')),
+                const SizedBox(width: OrvexMetrics.small),
+                Expanded(
+                  child: Text(
+                    _themeLabel(appearance.mode),
+                    textAlign: TextAlign.end,
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
                 ),
-            ],
+                const SizedBox(width: OrvexMetrics.small),
+                const Icon(
+                  Icons.expand_more_rounded,
+                  size: OrvexMetrics.iconSize,
+                ),
+              ],
+            ),
           ),
         ),
-        const Divider(indent: 18, endIndent: 18),
+        _settingsDivider,
         SwitchListTile.adaptive(
+          contentPadding: _settingsRowPadding,
           key: const ValueKey('reduce-transparency'),
           value: appearance.reduceTransparency,
           onChanged: appearance.setReduceTransparency,
           title: const Text('减少透明效果'),
           subtitle: Text(
-            appearance.systemReduceTransparency ? '系统已启用减少透明度' : '使用更清晰的不透明表面',
+            appearance.systemReduceTransparency
+                ? '系统已启用减少透明度，关闭此项仍遵循系统设置。'
+                : '让应用内的玻璃表面使用不透明背景。',
           ),
         ),
         if (appearance.error != null)
           Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(OrvexMetrics.space),
             child: Text(
               appearance.error!,
               style: TextStyle(color: OrvexColors.of(context).error),
             ),
           ),
       ]),
-      const SizedBox(height: 24),
+      const SizedBox(height: OrvexMetrics.section),
       _section(context, '首页'),
-      const SizedBox(height: 12),
+      const SizedBox(height: OrvexMetrics.gap),
       _group([
         SwitchListTile.adaptive(
+          contentPadding: _settingsRowPadding,
           title: const Text('显示继续观看'),
-          subtitle: const Text('在首页接着上次的进度'),
+          subtitle: const Text('在首页显示可续播的视频。'),
           value: showContinue,
           onChanged: onShowContinue,
         ),
       ]),
-      const SizedBox(height: 24),
-      _section(context, '番剧资料'),
-      const SizedBox(height: 12),
+      const SizedBox(height: OrvexMetrics.section),
+      _section(context, '资料匹配'),
+      const SizedBox(height: OrvexMetrics.gap),
       _group([
         SwitchListTile.adaptive(
+          contentPadding: _settingsRowPadding,
           key: const ValueKey('automatic-bangumi'),
           title: const Text('自动匹配番剧'),
-          subtitle: const Text('向 Bangumi 查询整理后的片名，不上传媒体文件'),
           value: metadata.automatic,
           onChanged: metadata.setAutomatic,
         ),
-        const Divider(indent: 18, endIndent: 18),
-        const ListTile(
-          title: Text('数据来源：Bangumi'),
-          subtitle: Text('资料缓存在本机；封面上的 ⓘ 可更正匹配'),
-        ),
-      ]),
-      const SizedBox(height: 24),
-      _section(context, '文件与播放'),
-      const SizedBox(height: 12),
-      _group([
-        ListTile(
-          leading: const Icon(Icons.create_new_folder_outlined),
-          title: const Text('导入本地视频'),
-          trailing: const Icon(Icons.chevron_right_rounded),
-          onTap: picking ? null : onImport,
-        ),
-        const Divider(indent: 18, endIndent: 18),
-        const ListTile(
-          leading: Icon(Icons.subtitles_outlined),
-          title: Text('外挂字幕'),
-          subtitle: Text('在播放设置添加 SRT、ASS、SSA 或 VTT'),
-        ),
-        const Divider(indent: 18, endIndent: 18),
-        const ListTile(
-          leading: Icon(Icons.bookmark_border_rounded),
-          title: Text('自动保存播放进度'),
-          subtitle: Text('重新打开同一视频时，从上次继续'),
-        ),
-      ]),
-      const SizedBox(height: 24),
-      _section(context, '关于'),
-      const SizedBox(height: 12),
-      _group([
-        const ListTile(
-          leading: OrvexBrand(compact: true),
-          title: Text('Orvex'),
-          trailing: Text('0.1.0'),
-        ),
-        const Divider(indent: 18, endIndent: 18),
-        ListTile(
-          leading: const Icon(Icons.description_outlined),
-          title: const Text('开源许可'),
-          trailing: const Icon(Icons.chevron_right_rounded),
-          onTap: () => showLicensePage(
-            context: context,
-            applicationName: 'Orvex',
-            applicationVersion: '0.1.0',
+        _settingsDivider,
+        Padding(
+          padding: const EdgeInsets.all(OrvexMetrics.space),
+          child: Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: Text(
+              '来源为 Bangumi。查询使用整理后的片名，匹配资料缓存在此设备。可通过封面上的资料按钮更正匹配。',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
           ),
         ),
       ]),
+      const SizedBox(height: OrvexMetrics.section),
+      _section(context, '关于'),
+      const SizedBox(height: OrvexMetrics.gap),
+      const _SettingsAbout(),
     ],
   );
+
+  String _themeLabel(ThemeMode mode) => switch (mode) {
+    ThemeMode.system => '跟随系统',
+    ThemeMode.light => '浅色',
+    ThemeMode.dark => '深色',
+  };
 
   Widget _group(List<Widget> children) =>
       GlassSurface(child: Column(children: children));
@@ -1431,6 +1439,71 @@ class LibraryViews extends StatelessWidget {
         ],
       ),
     ),
+  );
+}
+
+const _settingsRowPadding = EdgeInsets.symmetric(
+  horizontal: OrvexMetrics.space,
+);
+
+const _settingsDivider = Divider(
+  indent: OrvexMetrics.space,
+  endIndent: OrvexMetrics.space,
+);
+
+class _SettingsAbout extends StatefulWidget {
+  const _SettingsAbout();
+
+  @override
+  State<_SettingsAbout> createState() => _SettingsAboutState();
+}
+
+class _SettingsAboutState extends State<_SettingsAbout> {
+  late final _version = _readVersion();
+
+  Future<String?> _readVersion() async {
+    try {
+      final version = (await PackageInfo.fromPlatform()).version.trim();
+      return version.isEmpty ? null : version;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => FutureBuilder<String?>(
+    future: _version,
+    builder: (context, snapshot) {
+      final version = snapshot.data;
+      return GlassSurface(
+        child: Column(
+          children: [
+            ListTile(
+              contentPadding: _settingsRowPadding,
+              title: const Text('Orvex'),
+              subtitle: Text(
+                version != null
+                    ? '版本 $version'
+                    : snapshot.connectionState == ConnectionState.done
+                    ? '版本暂不可用'
+                    : '正在读取版本…',
+              ),
+            ),
+            _settingsDivider,
+            ListTile(
+              contentPadding: _settingsRowPadding,
+              title: const Text('开源许可'),
+              trailing: const Icon(Icons.chevron_right_rounded),
+              onTap: () => showLicensePage(
+                context: context,
+                applicationName: 'Orvex',
+                applicationVersion: version,
+              ),
+            ),
+          ],
+        ),
+      );
+    },
   );
 }
 
