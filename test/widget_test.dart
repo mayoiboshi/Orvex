@@ -817,7 +817,7 @@ void main() {
           find.byKey(const ValueKey('home-recent-bangumi:2')),
           ['败犬女主太多了！', '★ 8.1', '已收录 12 个视频'],
         ),
-        (movieCard, ['超辉夜姬！', '2026 · ★ 8.0']),
+        (movieCard, ['超辉夜姬！', '2026 · ★ 8.0', '已收录 1 个视频']),
       ]) {
         final labels = tester.widgetList<Text>(
           find.descendant(of: card, matching: find.byType(Text)),
@@ -867,6 +867,7 @@ void main() {
         ValueKey('home-recent-${media.resumeKey}'),
     ]);
     expect(find.text('已收录 9 个视频'), findsOneWidget);
+    expect(find.text('已收录 1 个视频'), findsNothing);
     await tester.pumpWidget(const SizedBox.shrink());
   });
 

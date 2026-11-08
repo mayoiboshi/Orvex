@@ -841,10 +841,10 @@ class LibraryViews extends StatelessWidget {
                 style: Theme.of(context).textTheme.labelSmall,
               ),
             ],
-            if (work != null && work.files.length > 1) ...[
+            if (subject != null) ...[
               SizedBox(height: caption.isEmpty ? 4 : 2),
               Text(
-                '已收录 ${work.files.length} 个视频',
+                '已收录 ${work?.files.length ?? 1} 个视频',
                 style: Theme.of(context).textTheme.labelSmall,
               ),
             ],
