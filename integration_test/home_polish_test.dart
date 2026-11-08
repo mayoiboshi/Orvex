@@ -843,6 +843,89 @@ void main() {
         await capture('reduced-transparency');
         expect(find.byType(BackdropFilter), findsNothing);
         observations['actionsAndNativeResume'] = true;
+        await tester.tap(find.byKey(const ValueKey('tab-1')));
+        await tester.pump(const Duration(milliseconds: 500));
+        final mini = find.byKey(const ValueKey('mini-playback-card'));
+        expect(mini, findsOneWidget);
+        expect(tester.getRect(navSurface), homeNavRect);
+        expect(
+          find.descendant(of: mini, matching: find.text('名侦探柯南 · 第 616 集')),
+          findsOneWidget,
+        );
+        await until(
+          () => tester
+              .widgetList<Image>(
+                find.descendant(of: mini, matching: find.byType(Image)),
+              )
+              .any(
+                (image) =>
+                    imageFilePath(image)?.contains('/thumbnails-v1/') ?? false,
+              ),
+          'mini player reuses the cached local thumbnail',
+        );
+        await tester.tap(find.byKey(const ValueKey('folders-view')));
+        await tester.pump(const Duration(milliseconds: 500));
+        await capture('library-mini-folders-light');
+        final miniEngine = session.engine;
+        final pausedAt = session.frame.position;
+        await tester.tap(find.byTooltip('播放视频'));
+        await until(
+          () => session.frame.playing && session.frame.position > pausedAt,
+          'mini player resumes the same native session',
+        );
+        expect(mini, findsOneWidget);
+        await tester.tap(find.byTooltip('暂停视频'));
+        await until(() => !session.frame.playing, 'mini player pauses');
+        final resumedAt = session.frame.position;
+        await appearance.setMode(ThemeMode.dark);
+        tester.view.physicalSize =
+            Size(438, landscape.height) * tester.view.devicePixelRatio;
+        await capture('library-mini-folders-narrow-dark');
+        await tester.tap(find.byTooltip('展开播放器'));
+        await tester.pump(const Duration(milliseconds: 500));
+        expect(session.engine, same(miniEngine));
+        expect(session.media?.resumeKey, videos[5].resumeKey);
+        expect(session.frame.position, resumedAt);
+        expect(session.frame.playing, isFalse);
+        expect(find.byTooltip('返回首页'), findsOneWidget);
+        expect(mini, findsNothing);
+        await tester.tap(find.byTooltip('返回首页'));
+        await tester.pump(const Duration(milliseconds: 500));
+        final folderScroll = find
+            .descendant(
+              of: find.byKey(const PageStorageKey('folder-library')),
+              matching: find.byType(Scrollable),
+            )
+            .first;
+        final position = tester.state<ScrollableState>(folderScroll).position;
+        position.jumpTo(position.maxScrollExtent);
+        await tester.pump(const Duration(milliseconds: 450));
+        final lastMedia = (await store.listVideos()).last;
+        final lastRow = find.byKey(ValueKey(lastMedia.resumeKey)).hitTestable();
+        expect(lastRow, findsOneWidget);
+        expect(
+          tester.getBottomLeft(lastRow).dy,
+          lessThan(tester.getTopLeft(mini).dy),
+        );
+        await tester.tap(
+          find
+              .descendant(of: lastRow, matching: find.byTooltip('番剧资料'))
+              .hitTestable(),
+        );
+        await tester.pump(const Duration(milliseconds: 450));
+        expect(find.byTooltip('关闭番剧资料'), findsOneWidget);
+        await tester.tap(find.byTooltip('关闭番剧资料'));
+        await tester.pump(const Duration(milliseconds: 450));
+        await capture('library-mini-last-row');
+        await tester.tap(lastRow);
+        await until(
+          () =>
+              session.ready &&
+              session.media?.resumeKey == lastMedia.resumeKey &&
+              session.frame.duration.inSeconds > 10,
+          'last folder row starts native playback above the mini player',
+        );
+        observations['miniPlaybackUsesNativeSession'] = true;
       }
       passed = true;
     } finally {

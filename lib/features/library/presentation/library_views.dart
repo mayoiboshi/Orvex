@@ -74,9 +74,7 @@ class LibraryViews extends StatelessWidget {
           ? OrvexMetrics.page
           : 36.0;
       // With extendBody, Scaffold includes the measured bottom bar in padding.
-      final bottom = home
-          ? MediaQuery.paddingOf(context).bottom + OrvexMetrics.page
-          : 120.0;
+      final bottom = MediaQuery.paddingOf(context).bottom + OrvexMetrics.page;
       return RefreshIndicator(
         onRefresh: onRefresh,
         child: SingleChildScrollView(
@@ -596,7 +594,7 @@ class LibraryViews extends StatelessWidget {
           borderRadius: BorderRadius.circular(OrvexMetrics.coverRadius),
           child: AspectRatio(
             aspectRatio: 16 / 9,
-            child: _HomeVideoArtwork(
+            child: LocalVideoArtwork(
               media: record.media,
               cache: thumbnails,
               entry: thumbnails?.library.entry(record.media),
@@ -947,7 +945,7 @@ class LibraryViews extends StatelessWidget {
       );
     }
     final entry = thumbnails?.library.entry(media);
-    final preview = _HomeVideoArtwork(
+    final preview = LocalVideoArtwork(
       media: media,
       cache: thumbnails,
       entry: entry,
@@ -1270,8 +1268,9 @@ String mediaTitle(String name) {
   return dot > 0 ? name.substring(0, dot) : name;
 }
 
-class _HomeVideoArtwork extends StatefulWidget {
-  const _HomeVideoArtwork({
+class LocalVideoArtwork extends StatefulWidget {
+  const LocalVideoArtwork({
+    super.key,
     required this.media,
     required this.cache,
     required this.entry,
@@ -1288,10 +1287,10 @@ class _HomeVideoArtwork extends StatefulWidget {
   final Duration knownDuration;
 
   @override
-  State<_HomeVideoArtwork> createState() => _HomeVideoArtworkState();
+  State<LocalVideoArtwork> createState() => _LocalVideoArtworkState();
 }
 
-class _HomeVideoArtworkState extends State<_HomeVideoArtwork> {
+class _LocalVideoArtworkState extends State<LocalVideoArtwork> {
   ThumbnailRequest? _request;
   File? _preview;
 
@@ -1302,7 +1301,7 @@ class _HomeVideoArtworkState extends State<_HomeVideoArtwork> {
   }
 
   @override
-  void didUpdateWidget(_HomeVideoArtwork oldWidget) {
+  void didUpdateWidget(LocalVideoArtwork oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.cache != widget.cache ||
         oldWidget.media.uri != widget.media.uri ||
@@ -1503,6 +1502,7 @@ class LibraryTabBar extends StatelessWidget {
   });
   final int selected;
   final ValueChanged<int> onSelected;
+  static const maxWidth = 500.0;
 
   @override
   Widget build(BuildContext context) {
@@ -1518,7 +1518,7 @@ class LibraryTabBar extends StatelessWidget {
       child: Center(
         heightFactor: 1,
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 500),
+          constraints: const BoxConstraints(maxWidth: maxWidth),
           child: GlassSurface(
             subtle: true,
             radius: OrvexMetrics.navigationRadius,

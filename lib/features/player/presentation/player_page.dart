@@ -11,6 +11,7 @@ import '../../../app/orvex_providers.dart';
 import '../../../design/orvex_theme.dart';
 import '../../../design/back_navigation.dart';
 import '../../anime_metadata/application/anime_metadata_controller.dart';
+import '../../anime_metadata/domain/anime_subject.dart';
 import '../../anime_metadata/presentation/anime_metadata_sheet.dart';
 import '../../anime_metadata/presentation/episode_details.dart';
 import '../../media_sources/local_file_source.dart';
@@ -25,6 +26,7 @@ import '../../library/presentation/library_views.dart';
 import '../../library/presentation/series_library.dart';
 import '../application/playback_session.dart';
 import '../domain/playback_engine.dart';
+import 'mini_playback_card.dart';
 import 'playback_surface.dart';
 import 'watch_information.dart';
 
@@ -534,6 +536,11 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
         !watching &&
         (Platform.isMacOS || Platform.isWindows || Platform.isLinux) &&
         MediaQuery.sizeOf(context).width >= 1000;
+    final media = _session.media;
+    final miniPlayer =
+        !watching && !_showPlayer && media != null && !homeHasResume
+        ? _miniPlayer(media, sidebar: sidebar)
+        : null;
     return CallbackShortcuts(
       bindings: {
         const SingleActivator(LogicalKeyboardKey.keyO, meta: true): () =>
@@ -547,8 +554,14 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
           backgroundColor: _colors.background,
           extendBody: !watching && !sidebar,
           bottomNavigationBar: watching || sidebar
-              ? null
-              : LibraryTabBar(selected: _tab, onSelected: _selectTab),
+              ? miniPlayer
+              : Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    ?miniPlayer,
+                    LibraryTabBar(selected: _tab, onSelected: _selectTab),
+                  ],
+                ),
           body: SafeArea(
             bottom: watching,
             child: Row(
@@ -612,11 +625,6 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
                                     setState(() => _homeWorkKey = work.key),
                               ),
                       ),
-                      if (!watching && _session.media != null && !homeHasResume)
-                        Padding(
-                          padding: EdgeInsets.only(bottom: sidebar ? 0 : 100),
-                          child: _returnToPlayer(),
-                        ),
                     ],
                   ),
                 ),
@@ -628,34 +636,58 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
     );
   }
 
-  Widget _returnToPlayer() => Material(
-    color: _colors.elevated,
-    child: ListTile(
-      dense: true,
-      leading: Icon(Icons.movie_outlined, color: _colors.accent),
-      title: Text(
-        mediaTitle(_session.media!.name),
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
+  Widget _miniPlayer(LocalMedia media, {required bool sidebar}) {
+    final match = _metadata.matchFor(media);
+    final subject = match?.status == AnimeMatchStatus.matched
+        ? match?.subject
+        : null;
+    final episode =
+        subject != null &&
+            subject.platform != '剧场版' &&
+            (subject.platform == 'TV' || subject.episodes != 1)
+        ? _folders.identityFor(media).episode
+        : null;
+    final title = subject?.title.trim();
+    return SafeArea(
+      top: false,
+      bottom: sidebar,
+      minimum: const EdgeInsets.fromLTRB(
+        OrvexMetrics.gap,
+        OrvexMetrics.small,
+        OrvexMetrics.gap,
+        4,
       ),
-      subtitle: ListenableBuilder(
-        listenable: _session,
-        builder: (context, _) => Text(
-          '${_session.frame.playing ? '正在播放' : '已暂停'} · ${formatTime(_session.frame.position)}',
-          style: TextStyle(
-            fontSize: 11,
-            color: OrvexColors.of(context).secondary,
+      child: Center(
+        heightFactor: 1,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: LibraryTabBar.maxWidth),
+          child: MiniPlaybackCard(
+            key: const ValueKey('mini-playback-card'),
+            session: _session,
+            title: title == null || title.isEmpty
+                ? media.name
+                : episode == null
+                ? title
+                : '$title · 第 $episode 集',
+            artwork: LocalVideoArtwork(
+              media: media,
+              cache: ref.read(thumbnailCacheProvider),
+              entry: _folders.entry(media),
+              fallback: ColoredBox(
+                color: _colors.elevated,
+                child: Icon(Icons.movie_outlined, color: _colors.secondary),
+              ),
+            ),
+            onExpand: () => setState(() {
+              _keepLibraryVisible = false;
+              _showPlayer = true;
+              _session.allowAutoNext = _foreground;
+            }),
           ),
         ),
       ),
-      trailing: const Icon(Icons.open_in_full_rounded, size: 20),
-      onTap: () => setState(() {
-        _keepLibraryVisible = false;
-        _showPlayer = true;
-        _session.allowAutoNext = _foreground;
-      }),
-    ),
-  );
+    );
+  }
 
   Widget _seriesLibrary() => SeriesLibrary(
     library: _folders,

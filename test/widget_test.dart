@@ -5,11 +5,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:orvex/app/orvex_app.dart';
 import 'package:orvex/design/orvex_theme.dart';
+import 'package:orvex/design/glass.dart';
 import 'package:orvex/features/anime_metadata/application/anime_metadata_controller.dart';
 import 'package:orvex/features/anime_metadata/domain/anime_episode.dart';
 import 'package:orvex/features/anime_metadata/domain/anime_subject.dart';
 import 'package:orvex/features/anime_metadata/presentation/anime_metadata_sheet.dart';
 import 'package:orvex/features/folder_library/folder_browser.dart';
+import 'package:orvex/features/folder_library/folder_library.dart';
+import 'package:orvex/features/folder_library/folder_models.dart';
+import 'package:orvex/features/folder_library/thumbnail_cache.dart';
 import 'package:orvex/features/library/infrastructure/playback_history_store.dart';
 import 'package:orvex/features/library/presentation/library_views.dart';
 import 'package:orvex/features/media_sources/imported_file_store.dart';
@@ -37,6 +41,14 @@ class TestImports extends ImportedFileStore {
       pendingResolutions[media.resumeKey] ?? super.resolve(media);
 }
 
+class _EmptyThumbnailCache extends ThumbnailCache {
+  _EmptyThumbnailCache(super.library);
+
+  @override
+  ThumbnailRequest request(FolderEntry entry) =>
+      ThumbnailRequest(entry)..completer.complete(null);
+}
+
 void main() {
   late TestImports imports;
   late LocalFileSource files;
@@ -62,7 +74,11 @@ void main() {
     metadata.dispose();
   });
 
-  Future<void> mount(WidgetTester tester, Size size) async {
+  Future<void> mount(
+    WidgetTester tester,
+    Size size, {
+    FolderLibrary? folders,
+  }) async {
     history = PlaybackHistoryStore();
     bangumi = FakeBangumiClient();
     metadata = AnimeMetadataController(
@@ -84,9 +100,14 @@ void main() {
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
+    final thumbnails = folders == null ? null : _EmptyThumbnailCache(folders);
+    if (thumbnails != null) addTearDown(thumbnails.dispose);
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          if (folders != null) folderLibraryProvider.overrideWithValue(folders),
+          if (thumbnails != null)
+            thumbnailCacheProvider.overrideWithValue(thumbnails),
           sessionProvider.overrideWithValue(session),
           localFilesProvider.overrideWithValue(files),
           historyStoreProvider.overrideWithValue(history),
@@ -453,10 +474,8 @@ void main() {
   testWidgets('playback progress updates without rebuilding media browsers', (
     tester,
   ) async {
-    final video = LocalMedia(
-      uri: Uri.file('/local/Show - 01.mp4'),
-      name: 'Show - 01.mp4',
-    );
+    final longName = '${List.filled(8, '没有关联资料的超长文件名').join()} - 99.mp4';
+    final video = LocalMedia(uri: Uri.file('/local/$longName'), name: longName);
     imports.videos = [video];
     await mount(tester, const Size(1210, 834));
     await session.open(video);
@@ -503,7 +522,167 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    expect(find.text('已暂停 · 03:00'), findsOneWidget);
+    expect(find.text('已暂停 · 03:00 / 12:00'), findsOneWidget);
+    tester.view.physicalSize = const Size(360, 760);
+    await tester.pumpAndSettle();
+    final card = find.byKey(const ValueKey('mini-playback-card'));
+    expect(
+      find.descendant(of: card, matching: find.text(longName)),
+      findsOneWidget,
+    );
+    expect(find.byTooltip('播放视频').hitTestable(), findsOneWidget);
+    expect(find.byTooltip('展开播放器').hitTestable(), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('mini player keeps folder rows reachable and reuses playback', (
+    tester,
+  ) async {
+    final folders = FolderLibrary()..loading = false;
+    final root = FolderRoot(
+      id: 'mini-player',
+      name: '本地视频',
+      grant: 'test',
+      location: 'file:///test/',
+    );
+    final longName = '${List.filled(8, '没有关联资料的超长文件名').join()} - 99.mp4';
+    final entries = [
+      for (var i = 1; i <= 12; i++)
+        FolderEntry(
+          id: 'mini-$i',
+          rootId: root.id,
+          path: '子目录/${i == 12 ? longName : '剧集 - $i.mp4'}',
+          directory: false,
+        ),
+    ];
+    folders.roots.add(root);
+    folders.entries.addAll([
+      FolderEntry(id: 'child', rootId: root.id, path: '子目录', directory: true),
+      ...entries,
+    ]);
+    addTearDown(folders.dispose);
+    await mount(tester, const Size(960, 834), folders: folders);
+    Future<void> tap(Finder target) async {
+      await tester.tap(target);
+      await tester.pumpAndSettle();
+    }
+
+    final card = find.byKey(const ValueKey('mini-playback-card'));
+    final nav = find.descendant(
+      of: find.byType(LibraryTabBar),
+      matching: find.byType(GlassSurface),
+    );
+    final navBefore = tester.getRect(nav);
+    await tap(find.byKey(const ValueKey('tab-1')));
+    await tap(find.byKey(const ValueKey('folders-view')));
+    await tap(find.text('本地视频'));
+    await tap(find.widgetWithText(ChoiceChip, '子目录'));
+    final last = find.byKey(ValueKey(entries.last.media.resumeKey));
+    final lastInfo = find.descendant(
+      of: last,
+      matching: find.byTooltip('番剧资料'),
+    );
+    Future<void> scrollToLast() async {
+      final folderScroll = find
+          .descendant(
+            of: find.byKey(const PageStorageKey('folder-library')),
+            matching: find.byType(Scrollable),
+          )
+          .first;
+      final position = tester.state<ScrollableState>(folderScroll).position;
+      position.jumpTo(position.maxScrollExtent);
+      await tester.pumpAndSettle();
+    }
+
+    await scrollToLast();
+    expect(card, findsNothing);
+    expect(lastInfo.hitTestable(), findsOneWidget);
+    expect(tester.getBottomLeft(last).dy, lessThan(tester.getTopLeft(nav).dy));
+
+    final episode = entries.first.media;
+    await metadata.select(
+      episode,
+      const AnimeSubject(id: 1, name: 'Series', nameCn: '测试作品', platform: 'TV'),
+    );
+    await session.open(episode);
+    await tester.pumpAndSettle();
+    engine.frameController.add(
+      const PlaybackFrame(
+        position: Duration(seconds: 130),
+        duration: Duration(minutes: 24, seconds: 12),
+      ),
+    );
+    await tap(find.byTooltip('返回首页'));
+    expect(
+      find.descendant(of: card, matching: find.text('测试作品 · 第 1 集')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: card, matching: find.text('已暂停 · 02:10 / 24:12')),
+      findsOneWidget,
+    );
+    expect(tester.getRect(nav), navBefore);
+    expect(tester.getRect(card).center.dx, navBefore.center.dx);
+    expect(tester.getRect(card).width, lessThanOrEqualTo(520));
+
+    final library = tester.widget(find.byType(FolderBrowser));
+    engine.frameController.add(
+      const PlaybackFrame(
+        position: Duration(seconds: 131),
+        duration: Duration(minutes: 24, seconds: 12),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(tester.widget(find.byType(FolderBrowser)), same(library));
+
+    await tap(find.byTooltip('播放视频'));
+    expect(engine.toggles, 1);
+    expect(find.byType(PlaybackSurface), findsNothing);
+    engine.frameController.add(
+      const PlaybackFrame(
+        playing: true,
+        position: Duration(seconds: 132),
+        duration: Duration(minutes: 24, seconds: 12),
+      ),
+    );
+    await tester.pump();
+    await tap(find.byTooltip('暂停视频'));
+    expect(engine.toggles, 2);
+    expect(find.byType(PlaybackSurface), findsNothing);
+    engine.frameController.add(
+      const PlaybackFrame(
+        position: Duration(seconds: 132),
+        duration: Duration(minutes: 24, seconds: 12),
+      ),
+    );
+    await tester.pump();
+
+    tester.view.physicalSize = const Size(360, 760);
+    tester.platformDispatcher.textScaleFactorTestValue = 2;
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+    final appearance = ProviderScope.containerOf(
+      tester.element(find.byType(OrvexApp)),
+    ).read(appearanceProvider);
+    await appearance.setMode(ThemeMode.dark);
+    await tester.pumpAndSettle();
+    await scrollToLast();
+    expect(tester.getBottomLeft(last).dy, lessThan(tester.getTopLeft(card).dy));
+    await tap(lastInfo.hitTestable());
+    expect(find.byTooltip('关闭番剧资料'), findsOneWidget);
+    await tap(find.byTooltip('关闭番剧资料'));
+
+    await tap(find.byTooltip('展开播放器'));
+    expect(session.engine, same(engine));
+    expect(session.media?.resumeKey, episode.resumeKey);
+    expect(session.frame.position, const Duration(seconds: 132));
+    expect(createdEngines, 1);
+    await tap(find.byTooltip('返回首页'));
+    await scrollToLast();
+    expect(last.hitTestable(), findsOneWidget);
+    expect(find.byTooltip('播放视频'), findsOneWidget);
+    expect(find.byTooltip('展开播放器'), findsOneWidget);
+    expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox.shrink());
   });
 

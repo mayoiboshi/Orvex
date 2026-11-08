@@ -743,7 +743,13 @@ class _FolderBrowserState extends State<_FolderBrowserContent> {
               );
             }, childCount: items.length),
           ),
-          SliverToBoxAdapter(child: SizedBox(height: _watching ? 28 : 120)),
+          SliverToBoxAdapter(
+            child: SizedBox(
+              height: _watching
+                  ? 28
+                  : MediaQuery.paddingOf(context).bottom + OrvexMetrics.page,
+            ),
+          ),
         ],
       );
       return sideList
