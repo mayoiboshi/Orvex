@@ -70,7 +70,7 @@ class _SeriesLibraryState extends State<SeriesLibrary> {
   bool _folders = false;
   String _query = '';
   LibraryKind _filter = LibraryKind.all;
-  String? _dismissedScan;
+  String? _dismissedScan, _observedScanRoot;
   String? _selected;
   int _revision = -1;
   List<LocalMedia>? _imports;
@@ -79,6 +79,57 @@ class _SeriesLibraryState extends State<SeriesLibrary> {
   void initState() {
     super.initState();
     _selected = widget.selection;
+    _listenForScanResults();
+  }
+
+  @override
+  void didUpdateWidget(SeriesLibrary oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.library != widget.library) {
+      oldWidget.library.removeListener(_onScanResult);
+      _listenForScanResults();
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.library.removeListener(_onScanResult);
+    super.dispose();
+  }
+
+  void _listenForScanResults() {
+    _observedScanRoot = widget.library.lastScanRoot;
+    widget.library.addListener(_onScanResult);
+  }
+
+  String _scanCounts(FolderLibrary library) =>
+      '已读取 ${library.foldersScanned} 个目录 · 发现 ${library.discovered} 个视频';
+
+  void _onScanResult() {
+    final library = widget.library;
+    final rootId = library.lastScanRoot;
+    if (_observedScanRoot == rootId) return;
+    _observedScanRoot = rootId;
+    if (rootId == null || library.error != null) return;
+    final root = library.root(rootId);
+    if (root == null || root.issue != null) return;
+
+    final message = '扫描完成 · ${_scanCounts(library)}';
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted ||
+          widget.library != library ||
+          library.lastScanRoot != rootId ||
+          ModalRoute.of(context)?.isCurrent == false) {
+        return;
+      }
+      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+        SnackBar(
+          width: math.min(440, MediaQuery.sizeOf(context).width - 32),
+          duration: const Duration(seconds: 3),
+          content: Text(message),
+        ),
+      );
+    });
   }
 
   List<MediaSeries> _groups() {
@@ -318,8 +369,7 @@ class _SeriesLibraryState extends State<SeriesLibrary> {
                 context,
                 (
                   title: '正在扫描',
-                  detail:
-                      '已读取 ${library.foldersScanned} 个目录 · 发现 ${library.discovered} 个视频',
+                  detail: _scanCounts(library),
                   fraction: null,
                   failed: false,
                   active: true,
@@ -327,14 +377,12 @@ class _SeriesLibraryState extends State<SeriesLibrary> {
                 onAction: library.cancelScan,
                 action: '取消',
               )
-            else if (lastRoot != null && scanRoot != _dismissedScan)
+            else if (lastRoot != null &&
+                scanRoot != _dismissedScan &&
+                (library.error != null || lastRoot.issue != null))
               _task(context, (
-                title: library.error != null
-                    ? '扫描失败'
-                    : lastRoot.issue ?? '扫描完成',
-                detail:
-                    library.error ??
-                    '已读取 ${library.foldersScanned} 个目录 · 发现 ${library.discovered} 个视频',
+                title: library.error != null ? '扫描失败' : lastRoot.issue!,
+                detail: library.error ?? _scanCounts(library),
                 fraction: null,
                 failed: library.error != null,
                 active: false,

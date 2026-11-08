@@ -362,10 +362,10 @@ class FolderLibrary extends ChangeNotifier {
       } catch (_) {
         root.issue = '目录授权释放失败，请重启应用';
       }
+      await save();
       scanning = false;
       scanningRoot = null;
       lastScanRoot = root.id;
-      await save();
       changed();
     }
   }

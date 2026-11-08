@@ -10,6 +10,8 @@ import 'package:orvex/features/folder_library/folder_browser.dart';
 import 'package:orvex/features/folder_library/folder_library.dart';
 import 'package:orvex/features/folder_library/folder_models.dart';
 import 'package:orvex/features/folder_library/thumbnail_cache.dart';
+import 'package:orvex/features/library/domain/library_overview.dart';
+import 'package:orvex/features/library/presentation/series_library.dart';
 import 'package:orvex/features/player/domain/playback_engine.dart';
 
 import 'support/fake_metadata.dart';
@@ -36,6 +38,102 @@ class _NoPreviewCache extends ThumbnailCache {
 }
 
 void main() {
+  testWidgets(
+    'successful folder scans show a one-time toast above navigation',
+    (tester) async {
+      final (directory, library) = (await tester.runAsync(() async {
+        final directory = await Directory.systemTemp.createTemp(
+          'orvex-scan-toast-',
+        );
+        await File('${directory.path}/sample.mp4').create();
+        return (
+          directory,
+          FolderLibrary(
+            access: _NoPreviewAccess(),
+            directory: () async => directory,
+          ),
+        );
+      }))!;
+      final cache = _NoPreviewCache(library);
+      final metadata = AnimeMetadataController(
+        client: FakeBangumiClient(),
+        store: MemoryMetadataStore(),
+      );
+      final root = FolderRoot(
+        id: 'toast',
+        name: '本地文件',
+        grant: directory.path,
+        location: directory.uri.toString(),
+      );
+      library.roots.add(root);
+      addTearDown(() async {
+        cache.dispose();
+        library.dispose();
+        metadata.dispose();
+        await directory.delete(recursive: true);
+      });
+
+      Widget app() => MaterialApp(
+        theme: OrvexTheme.create(Brightness.dark),
+        home: Scaffold(
+          extendBody: true,
+          bottomNavigationBar: const SizedBox(key: ValueKey('nav'), height: 60),
+          body: SeriesLibrary(
+            library: library,
+            thumbnails: cache,
+            imported: const [],
+            history: const [],
+            metadata: metadata,
+            onOpen: (_) {},
+            onImport: null,
+            onMetadata: (_) {},
+            arrivals: const {},
+            sort: defaultLibrarySort,
+            onSort: (_) {},
+            compact: false,
+            onCompact: (_) {},
+            importStatus: null,
+            onDismissImport: () {},
+            onSelection: (_) {},
+          ),
+        ),
+      );
+      await tester.pumpWidget(app());
+      await tester.tap(find.byKey(const ValueKey('folders-view')));
+      await tester.pumpAndSettle();
+
+      final toast = find.byType(SnackBar);
+      for (var scan = 0; scan < 2; scan++) {
+        await tester.runAsync(() => library.scan(root));
+        await tester.pump();
+        await tester.pumpAndSettle();
+        expect(toast, findsOneWidget);
+        expect(find.text('扫描完成 · 已读取 1 个目录 · 发现 1 个视频'), findsOneWidget);
+        expect(find.text('关闭'), findsNothing);
+        expect(
+          tester.getBottomLeft(toast).dy,
+          lessThanOrEqualTo(
+            tester.getTopLeft(find.byKey(const ValueKey('nav'))).dy,
+          ),
+        );
+        await tester.pump(const Duration(seconds: 4));
+        await tester.pumpAndSettle();
+        expect(toast, findsNothing);
+      }
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpWidget(app());
+      await tester.pumpAndSettle();
+      expect(toast, findsNothing);
+
+      root.grant = '${directory.path}/missing';
+      await tester.runAsync(() => library.scan(root));
+      await tester.pumpAndSettle();
+      expect(find.text('扫描失败'), findsOneWidget);
+      expect(toast, findsNothing);
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
+
   testWidgets(
     'standalone folders keep navigation history and parent search on iOS edge back',
     (tester) async {
