@@ -49,6 +49,7 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
   List<LocalMedia> _videos = [];
   List<PlaybackRecord> _history = [];
   bool _loadingLibrary = true;
+  bool _catalogReadFailed = false;
   bool _showContinue = true;
   bool _showPlayer = false;
   bool _keepLibraryVisible = false;
@@ -402,6 +403,7 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
         _videos = videos;
         _history = history;
         _loadingLibrary = false;
+        _catalogReadFailed = false;
         _libraryError = null;
       });
       unawaited(_metadata.scan(_catalog));
@@ -410,6 +412,7 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
       if (!mounted || generation != _loadGeneration) return;
       setState(() {
         _loadingLibrary = false;
+        _catalogReadFailed = true;
         _libraryError = '媒体库未能读取，请下拉重试';
       });
     }
@@ -656,6 +659,8 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
 
   Widget _seriesLibrary() => SeriesLibrary(
     library: _folders,
+    importedLoading: _loadingLibrary,
+    importedUnavailable: _catalogReadFailed,
     thumbnails: ref.read(thumbnailCacheProvider),
     imported: _videos,
     history: _history,

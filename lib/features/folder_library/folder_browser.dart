@@ -9,6 +9,7 @@ import '../../design/orvex_theme.dart';
 import '../anime_metadata/application/anime_metadata_controller.dart';
 import '../anime_metadata/domain/anime_filename.dart';
 import '../library/domain/playback_record.dart';
+import '../library/presentation/library_browse_style.dart';
 import '../library/presentation/library_views.dart' show mediaTitle;
 import '../player/application/playback_session.dart';
 import '../player/domain/playback_engine.dart';
@@ -43,6 +44,9 @@ class FolderBrowser extends StatefulWidget {
     this.current,
     this.header,
     this.libraryHeader,
+    this.libraryInset = 20,
+    this.importedLoading = false,
+    this.importedUnavailable = false,
     this.playback,
     this.collection,
     this.collectionTitle,
@@ -57,6 +61,8 @@ class FolderBrowser extends StatefulWidget {
   final LocalMedia? current;
   final Widget? header;
   final Widget? libraryHeader;
+  final double libraryInset;
+  final bool importedLoading, importedUnavailable;
   final PlaybackSession? playback;
   final List<LocalMedia>? collection;
   final String? collectionTitle;
@@ -65,12 +71,12 @@ class FolderBrowser extends StatefulWidget {
 }
 
 class _FolderBrowserNavigationState extends State<FolderBrowser> {
-  final _locations = <({int id, String? root, String path})>[
-    (id: 0, root: null, path: ''),
+  final _locations = <({int id, String? root, String path, bool unwatched})>[
+    (id: 0, root: null, path: '', unwatched: false),
   ];
   int _nextId = 1;
 
-  void _navigate(String? root, String path) {
+  void _navigate(String? root, String path, bool unwatched) {
     final previous = _locations.lastIndexWhere(
       (location) => location.root == root && location.path == path,
     );
@@ -78,7 +84,12 @@ class _FolderBrowserNavigationState extends State<FolderBrowser> {
       if (previous >= 0) {
         _locations.removeRange(previous + 1, _locations.length);
       } else {
-        _locations.add((id: _nextId++, root: root, path: path));
+        _locations.add((
+          id: _nextId++,
+          root: root,
+          path: path,
+          unwatched: unwatched,
+        ));
       }
     });
   }
@@ -102,6 +113,7 @@ class _FolderBrowserNavigationState extends State<FolderBrowser> {
               source: widget,
               root: location.root,
               path: location.path,
+              initialUnwatched: location.unwatched,
               onNavigate: _navigate,
             ),
           ),
@@ -123,12 +135,14 @@ class _FolderBrowserContent extends StatefulWidget {
     required this.source,
     this.root,
     this.path = '',
+    this.initialUnwatched = false,
     this.onNavigate,
   });
   final FolderBrowser source;
   final String? root;
   final String path;
-  final void Function(String?, String)? onNavigate;
+  final bool initialUnwatched;
+  final void Function(String?, String, bool)? onNavigate;
   @override
   State<_FolderBrowserContent> createState() => _FolderBrowserState();
 }
@@ -159,6 +173,7 @@ class _FolderBrowserState extends State<_FolderBrowserContent> {
     if (widget.onNavigate != null) {
       _root = widget.root;
       _path = widget.path;
+      _unwatched = widget.initialUnwatched;
     }
     _showSearch = !_watching;
   }
@@ -222,7 +237,7 @@ class _FolderBrowserState extends State<_FolderBrowserContent> {
 
   void _navigate(String? root, String path) {
     if (widget.onNavigate != null) {
-      widget.onNavigate!(root, path);
+      widget.onNavigate!(root, path, _unwatched);
       return;
     }
     setState(() {
@@ -261,14 +276,15 @@ class _FolderBrowserState extends State<_FolderBrowserContent> {
                 .map((e) => e.media)
                 .toList();
     }
-    if (_query.isEmpty && !_unwatched) return _source;
+    final query = _query.trim().toLowerCase();
+    if (query.isEmpty && !_unwatched) return _source;
     return _source
         .where(
           (media) =>
-              (_query.isEmpty ||
+              (query.isEmpty ||
                   '${media.name} ${folderMediaTitle(media, config.metadata)}'
                       .toLowerCase()
-                      .contains(_query.toLowerCase())) &&
+                      .contains(query)) &&
               (!_unwatched || _record(media) == null),
         )
         .toList();
@@ -298,10 +314,45 @@ class _FolderBrowserState extends State<_FolderBrowserContent> {
         for (var i = 1; i <= segments.length; i++) segments.take(i).join('/'),
       ];
       final sideList = _watching && config.header == null;
-      final folderStats = root == null
-          ? '${library.roots.length} 个目录来源 · 已导入'
-          : '当前文件夹 · ${folders.length} 个子文件夹';
-      final scoped = _query.trim().isNotEmpty || _unwatched;
+      final libraryPage = config.libraryHeader != null;
+      final atRoot = _root == null;
+      final showSources = !grouped && atRoot && library.roots.isNotEmpty;
+      final showVideos =
+          !libraryPage || (atRoot ? config.imported.isNotEmpty : root != null);
+      final inset = config.libraryInset;
+      final searching = _query.trim().isNotEmpty;
+      final scoped = searching || _unwatched;
+      final loading =
+          library.loading ||
+          (atRoot ? config.importedLoading : library.scanningRoot == _root);
+      final accessIssue =
+          library.error != null ||
+          root?.issue != null ||
+          (atRoot && config.importedUnavailable);
+      final searchHint = grouped
+          ? '搜索剧集'
+          : atRoot
+          ? '搜索已导入的视频'
+          : '搜索当前文件夹';
+      final emptyLibrary =
+          libraryPage &&
+          atRoot &&
+          !showSources &&
+          config.imported.isEmpty &&
+          !loading &&
+          !library.scanning &&
+          !accessIssue;
+      final emptyMessage = items.isNotEmpty
+          ? null
+          : _emptyMessage(
+              libraryPage: libraryPage,
+              atRoot: atRoot,
+              emptyLibrary: emptyLibrary,
+              hasChildren: folders.isNotEmpty,
+              searching: searching,
+              loading: loading,
+              accessIssue: accessIssue,
+            );
 
       final toolbar = Padding(
         padding: const EdgeInsets.fromLTRB(20, 16, 16, 10),
@@ -398,11 +449,17 @@ class _FolderBrowserState extends State<_FolderBrowserContent> {
                       style: TextStyle(color: colors.error),
                     ),
                   ),
-                if (!grouped && root == null && library.roots.isNotEmpty)
+                if (showSources)
                   Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    padding: EdgeInsets.symmetric(horizontal: inset),
                     child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        if (libraryPage)
+                          Text(
+                            '媒体来源 · ${library.roots.length} 个目录',
+                            style: Theme.of(context).textTheme.titleSmall,
+                          ),
                         for (final source in library.roots)
                           ListTile(
                             contentPadding: EdgeInsets.zero,
@@ -437,7 +494,9 @@ class _FolderBrowserState extends State<_FolderBrowserContent> {
                   ),
                 if (!grouped && root != null) ...[
                   Padding(
-                    padding: const EdgeInsets.only(left: 12, right: 12),
+                    padding: EdgeInsets.symmetric(
+                      horizontal: libraryPage ? inset : 12,
+                    ),
                     child: Row(
                       children: [
                         IconButton(
@@ -482,7 +541,7 @@ class _FolderBrowserState extends State<_FolderBrowserContent> {
                   ),
                   if (root.issue != null)
                     Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      padding: EdgeInsets.symmetric(horizontal: inset),
                       child: Row(
                         children: [
                           Expanded(
@@ -511,7 +570,7 @@ class _FolderBrowserState extends State<_FolderBrowserContent> {
                         child: SizedBox(
                           height: 36,
                           child: ListView.separated(
-                            padding: const EdgeInsets.symmetric(horizontal: 20),
+                            padding: EdgeInsets.symmetric(horizontal: inset),
                             scrollDirection: Axis.horizontal,
                             itemCount: library
                                 .children(root.id, level, directories: true)
@@ -540,9 +599,22 @@ class _FolderBrowserState extends State<_FolderBrowserContent> {
                         ),
                       ),
                 ],
-                if (_showSearch)
+                if (libraryPage && atRoot && showVideos)
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
+                    padding: EdgeInsets.fromLTRB(
+                      inset,
+                      OrvexMetrics.small,
+                      inset,
+                      0,
+                    ),
+                    child: Text(
+                      '独立导入',
+                      style: Theme.of(context).textTheme.titleSmall,
+                    ),
+                  ),
+                if (_showSearch && showVideos)
+                  Padding(
+                    padding: EdgeInsets.fromLTRB(inset, 8, inset, 8),
                     child: Row(
                       children: [
                         Expanded(
@@ -551,49 +623,60 @@ class _FolderBrowserState extends State<_FolderBrowserContent> {
                             initialValue: _query,
                             onChanged: (value) =>
                                 setState(() => _query = value),
-                            decoration: InputDecoration(
-                              isDense: true,
-                              prefixIcon: const Icon(
-                                Icons.search_rounded,
-                                size: 20,
-                              ),
-                              hintText: grouped
-                                  ? '搜索剧集'
-                                  : root == null
-                                  ? '搜索已导入的视频'
-                                  : '搜索当前文件夹',
-                            ),
+                            decoration: libraryPage
+                                ? librarySearchDecoration(searchHint)
+                                : InputDecoration(
+                                    isDense: true,
+                                    prefixIcon: const Icon(
+                                      Icons.search_rounded,
+                                      size: 20,
+                                    ),
+                                    hintText: searchHint,
+                                  ),
                           ),
                         ),
-                        const SizedBox(width: 8),
+                        const SizedBox(width: OrvexMetrics.small),
                         FilterChip(
-                          label: const Text('未播放'),
+                          label: Text(libraryPage ? '仅未播放' : '未播放'),
+                          tooltip: libraryPage ? '仅显示没有播放记录的视频' : null,
                           selected: _unwatched,
+                          showCheckmark: true,
+                          selectedColor: libraryPage
+                              ? colors.accent.withValues(alpha: .14)
+                              : null,
+                          checkmarkColor: libraryPage ? colors.accent : null,
+                          labelStyle: libraryPage && _unwatched
+                              ? TextStyle(color: colors.accent)
+                              : null,
                           onSelected: (value) =>
                               setState(() => _unwatched = value),
                         ),
                       ],
                     ),
                   ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 4, 20, 10),
-                  child: Text(
-                    config.libraryHeader != null
-                        ? '$folderStats · ${scoped ? '当前结果 ' : ''}${items.length} 个视频'
-                        : '${grouped
-                              ? config.collectionTitle ?? '剧集'
-                              : root == null
-                              ? '已导入'
-                              : _path.isEmpty
-                              ? root.name
-                              : leafName(_path)} · ${items.length} 个视频',
-                    style: TextStyle(color: colors.secondary, fontSize: 12),
-                  ),
-                ),
-                if (items.isEmpty)
+                if (showVideos)
                   Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 24,
+                    padding: EdgeInsets.fromLTRB(inset, 4, inset, 10),
+                    child: Text(
+                      libraryPage
+                          ? [
+                              if (!atRoot) '${folders.length} 个子文件夹',
+                              '${scoped ? '当前结果 · ' : ''}${items.length} 个视频',
+                            ].join(' · ')
+                          : '${grouped
+                                ? config.collectionTitle ?? '剧集'
+                                : root == null
+                                ? '已导入'
+                                : _path.isEmpty
+                                ? root.name
+                                : leafName(_path)} · ${items.length} 个视频',
+                      style: TextStyle(color: colors.secondary, fontSize: 12),
+                    ),
+                  ),
+                if (emptyMessage != null)
+                  Padding(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: inset,
                       vertical: 28,
                     ),
                     child: Center(
@@ -606,16 +689,24 @@ class _FolderBrowserState extends State<_FolderBrowserContent> {
                             color: colors.secondary,
                             size: 32,
                           ),
-                          const SizedBox(height: 12),
+                          const SizedBox(height: OrvexMetrics.gap),
                           Text(
-                            folders.isNotEmpty
-                                ? '选择上方文件夹，浏览其中的视频'
-                                : _query.isNotEmpty || _unwatched
-                                ? '没有符合条件的视频'
-                                : '这里还没有视频',
+                            emptyMessage,
+                            textAlign: TextAlign.center,
                             style: TextStyle(color: colors.secondary),
                           ),
-                          if (root == null && !_watching)
+                          if (_unwatched && libraryPage && showVideos)
+                            TextButton(
+                              onPressed: () =>
+                                  setState(() => _unwatched = false),
+                              child: const Text('清除筛选'),
+                            ),
+                          if (emptyLibrary ||
+                              (!libraryPage &&
+                                  atRoot &&
+                                  !_watching &&
+                                  !scoped &&
+                                  !showSources))
                             TextButton.icon(
                               onPressed: library.scanning
                                   ? null
@@ -646,6 +737,7 @@ class _FolderBrowserState extends State<_FolderBrowserContent> {
                 current: current,
                 playback: current ? config.playback : null,
                 playbackList: _watching,
+                pageInset: libraryPage ? inset : null,
                 onTap: () => config.onOpen(media),
                 onMetadata: () => config.onMetadata(media),
               );
@@ -664,6 +756,35 @@ class _FolderBrowserState extends State<_FolderBrowserContent> {
           : content;
     },
   );
+
+  String? _emptyMessage({
+    required bool libraryPage,
+    required bool atRoot,
+    required bool emptyLibrary,
+    required bool hasChildren,
+    required bool searching,
+    required bool loading,
+    required bool accessIssue,
+  }) {
+    if (!libraryPage) {
+      if (hasChildren) return '选择上方文件夹，浏览其中的视频';
+      return searching || _unwatched ? '没有符合条件的视频' : '这里还没有视频';
+    }
+    if (loading || (atRoot && library.scanning && library.roots.isEmpty)) {
+      return '正在读取媒体…';
+    }
+    if (!atRoot && library.root(_root!) == null) return '此目录已无法访问';
+    if (accessIssue) return null; // The source or scan card explains the issue.
+    if (emptyLibrary) return '尚未添加媒体';
+    if (atRoot && config.imported.isEmpty) return null;
+    if (searching && _unwatched) {
+      return '当前范围没有符合搜索的未播放视频';
+    }
+    if (searching) return '当前范围没有符合搜索的视频';
+    if (_unwatched) return '当前范围没有未播放的视频';
+    if (hasChildren) return '选择上方子文件夹，浏览其中的视频';
+    return '此文件夹没有视频';
+  }
 
   Widget _rootMenu(FolderRoot root) => PopupMenuButton<String>(
     tooltip: '目录操作',
@@ -696,6 +817,7 @@ class _VideoRow extends StatefulWidget {
     required this.current,
     this.playback,
     required this.playbackList,
+    this.pageInset,
     required this.onTap,
     required this.onMetadata,
   });
@@ -707,6 +829,7 @@ class _VideoRow extends StatefulWidget {
   final PlaybackRecord? record;
   final PlaybackSession? playback;
   final bool current, playbackList;
+  final double? pageInset;
   final VoidCallback onTap, onMetadata;
   @override
   State<_VideoRow> createState() => _VideoRowState();
@@ -810,7 +933,12 @@ class _VideoRowState extends State<_VideoRow> {
                 duration: OrvexMetrics.duration(context),
                 padding: widget.playbackList
                     ? const EdgeInsets.fromLTRB(16, 12, 4, 12)
-                    : const EdgeInsets.fromLTRB(20, 10, 8, 10),
+                    : EdgeInsets.fromLTRB(
+                        widget.pageInset ?? 20,
+                        10,
+                        widget.pageInset ?? 8,
+                        10,
+                      ),
                 color: widget.current
                     ? colors.accent.withValues(alpha: 0.055)
                     : null,

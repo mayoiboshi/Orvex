@@ -11,6 +11,7 @@ import 'package:orvex/features/folder_library/folder_library.dart';
 import 'package:orvex/features/folder_library/folder_models.dart';
 import 'package:orvex/features/folder_library/thumbnail_cache.dart';
 import 'package:orvex/features/library/domain/library_overview.dart';
+import 'package:orvex/features/library/domain/playback_record.dart';
 import 'package:orvex/features/library/presentation/series_library.dart';
 import 'package:orvex/features/player/domain/playback_engine.dart';
 
@@ -38,6 +39,156 @@ class _NoPreviewCache extends ThumbnailCache {
 }
 
 void main() {
+  for (final brightness in Brightness.values) {
+    testWidgets('folder scope and unwatched controls in ${brightness.name}', (
+      tester,
+    ) async {
+      final library = FolderLibrary(access: _NoPreviewAccess());
+      final cache = _NoPreviewCache(library);
+      final metadata = AnimeMetadataController(
+        client: FakeBangumiClient(),
+        store: MemoryMetadataStore(),
+      );
+      addTearDown(() {
+        cache.dispose();
+        library.dispose();
+        metadata.dispose();
+      });
+      tester.view.physicalSize = const Size(438, 834);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final root = FolderRoot(
+        id: 'source',
+        name: '本地文件',
+        grant: 'bookmark',
+        location: 'file:///source/',
+      )..scannedAt = DateTime.utc(2026);
+      final rootVideos = List.generate(
+        40,
+        (index) => FolderEntry(
+          id: 'video-$index',
+          rootId: root.id,
+          path: '视频-$index.mp4',
+          directory: false,
+        ),
+      );
+      final childVideo = FolderEntry(
+        id: 'child-video',
+        rootId: root.id,
+        path: '子目录/子集.mp4',
+        directory: false,
+      );
+      final history = [
+        for (final entry in [rootVideos.first, childVideo])
+          PlaybackRecord(
+            media: entry.media,
+            position: const Duration(seconds: 9),
+            duration: const Duration(minutes: 1),
+            updatedAt: DateTime.utc(2026),
+          ),
+      ];
+      final opened = <LocalMedia>[];
+      Widget app({
+        List<LocalMedia> imported = const [],
+        bool unavailable = false,
+      }) => MaterialApp(
+        theme: OrvexTheme.create(brightness),
+        home: Scaffold(
+          body: FolderBrowser(
+            library: library,
+            thumbnails: cache,
+            imported: imported,
+            importedUnavailable: unavailable,
+            history: history,
+            metadata: metadata,
+            onOpen: opened.add,
+            onImport: null,
+            onMetadata: (_) {},
+            libraryHeader: const SizedBox.shrink(),
+            libraryInset: 18,
+          ),
+        ),
+      );
+      Future<void> tap(Finder target) async {
+        await tester.tap(target);
+        await tester.pumpAndSettle();
+      }
+
+      await tester.pumpWidget(app());
+      expect(find.text('正在读取媒体…'), findsOneWidget);
+      library.loading = false;
+      library.changed();
+      await tester.pump();
+      expect(find.text('尚未添加媒体'), findsOneWidget);
+      expect(find.text('选择媒体根目录 · 保留原文件'), findsOneWidget);
+      await tester.pumpWidget(app(unavailable: true));
+      expect(find.text('尚未添加媒体'), findsNothing);
+      await tester.pumpWidget(app());
+
+      library.roots.add(root);
+      library.entries.addAll([
+        ...rootVideos,
+        FolderEntry(id: 'child', rootId: root.id, path: '子目录', directory: true),
+        childVideo,
+      ]);
+      library.changed();
+      await tester.pumpAndSettle();
+      expect(find.text('媒体来源 · 1 个目录'), findsOneWidget);
+      expect(find.text('41 个视频 · 已缓存目录'), findsOneWidget);
+      expect(find.text('独立导入'), findsNothing);
+      expect(find.text('这里还没有视频'), findsNothing);
+      expect(find.text('选择媒体根目录 · 保留原文件'), findsNothing);
+      await tap(find.text('本地文件'));
+
+      final filter = find.widgetWithText(FilterChip, '仅未播放');
+      expect(tester.widget<FilterChip>(filter).selected, isFalse);
+      expect(find.text('1 个子文件夹 · 40 个视频'), findsOneWidget);
+      expect(
+        find.byKey(ValueKey(rootVideos.first.media.resumeKey)),
+        findsOneWidget,
+      );
+      await tap(filter);
+      expect(tester.widget<FilterChip>(filter).selected, isTrue);
+      expect(find.text('1 个子文件夹 · 当前结果 · 39 个视频'), findsOneWidget);
+      expect(
+        find.byKey(ValueKey(rootVideos.first.media.resumeKey)),
+        findsNothing,
+      );
+      await tester.enterText(find.byType(TextFormField), '没有这个文件');
+      await tester.pumpAndSettle();
+      expect(find.text('当前范围没有符合搜索的未播放视频'), findsOneWidget);
+      await tap(find.text('清除筛选'));
+      expect(find.text('当前范围没有符合搜索的视频'), findsOneWidget);
+      await tester.enterText(find.byType(TextFormField), '');
+      await tester.pumpAndSettle();
+      await tap(filter);
+      await tap(find.widgetWithText(ChoiceChip, '子目录'));
+      expect(tester.widget<FilterChip>(filter).selected, isTrue);
+      expect(find.text('当前范围没有未播放的视频'), findsOneWidget);
+      await tap(find.text('清除筛选'));
+      expect(tester.widget<FilterChip>(filter).selected, isFalse);
+      await tap(find.byKey(ValueKey(childVideo.media.resumeKey)));
+      expect(opened.single.resumeKey, childVideo.media.resumeKey);
+      await tap(find.byTooltip('返回上一层目录'));
+      expect(tester.widget<FilterChip>(filter).selected, isTrue);
+      await tap(find.byTooltip('返回上一层目录'));
+      expect(find.text('媒体来源 · 1 个目录'), findsOneWidget);
+      expect(find.text('独立导入'), findsNothing);
+      final imported = LocalMedia(
+        uri: Uri.file('/test/独立视频.mp4'),
+        name: '独立视频.mp4',
+      );
+      await tester.pumpWidget(app(imported: [imported]));
+      await tester.pumpAndSettle();
+      expect(find.text('媒体来源 · 1 个目录'), findsOneWidget);
+      expect(find.text('独立导入'), findsOneWidget);
+      expect(find.text('1 个视频'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+  }
+
   testWidgets(
     'successful folder scans show a one-time toast above navigation',
     (tester) async {

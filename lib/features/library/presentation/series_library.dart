@@ -15,6 +15,7 @@ import '../../player/domain/playback_engine.dart';
 import '../domain/library_overview.dart';
 import '../domain/media_series.dart';
 import '../domain/playback_record.dart';
+import 'library_browse_style.dart';
 import 'library_views.dart' show MediaCover, PosterInfoButton;
 
 typedef LibraryImportStatus = ({
@@ -31,6 +32,8 @@ class SeriesLibrary extends StatefulWidget {
     required this.library,
     required this.thumbnails,
     required this.imported,
+    this.importedLoading = false,
+    this.importedUnavailable = false,
     required this.history,
     required this.metadata,
     required this.onOpen,
@@ -49,6 +52,7 @@ class SeriesLibrary extends StatefulWidget {
   final FolderLibrary library;
   final ThumbnailCache thumbnails;
   final List<LocalMedia> imported;
+  final bool importedLoading, importedUnavailable;
   final List<PlaybackRecord> history;
   final AnimeMetadataController metadata;
   final ValueChanged<LocalMedia> onOpen, onMetadata;
@@ -159,11 +163,14 @@ class _SeriesLibraryState extends State<SeriesLibrary> {
   FolderBrowser _browser({
     Widget? header,
     Widget? libraryHeader,
+    double libraryInset = 20,
     MediaSeries? group,
   }) => FolderBrowser(
     library: widget.library,
     thumbnails: widget.thumbnails,
     imported: widget.imported,
+    importedLoading: widget.importedLoading,
+    importedUnavailable: widget.importedUnavailable,
     history: widget.history,
     metadata: widget.metadata,
     onOpen: widget.onOpen,
@@ -171,6 +178,7 @@ class _SeriesLibraryState extends State<SeriesLibrary> {
     onMetadata: widget.onMetadata,
     header: header,
     libraryHeader: libraryHeader,
+    libraryInset: libraryInset,
     collection: group?.media,
     collectionTitle: group == null ? null : _title(group),
   );
@@ -183,7 +191,12 @@ class _SeriesLibraryState extends State<SeriesLibrary> {
       final selected = groups.where((g) => g.key == _selected).firstOrNull;
       if (widget.library.scanning) _dismissedScan = null;
       return _folders
-          ? _browser(libraryHeader: _header(context))
+          ? LayoutBuilder(
+              builder: (context, constraints) => _browser(
+                libraryHeader: _header(context),
+                libraryInset: libraryBrowseInset(constraints.maxWidth),
+              ),
+            )
           : OrvexBackStack(
               pages: [
                 orvexNavigationPage(
@@ -300,9 +313,6 @@ class _SeriesLibraryState extends State<SeriesLibrary> {
     LibraryKind.unknown => '类型未分类',
   };
 
-  double _inset(double width) =>
-      (width * .04).clamp(OrvexMetrics.space, OrvexMetrics.section * 2);
-
   Widget _header(BuildContext context) => LayoutBuilder(
     builder: (context, constraints) {
       final theme = Theme.of(context).textTheme;
@@ -311,9 +321,9 @@ class _SeriesLibraryState extends State<SeriesLibrary> {
       final lastRoot = scanRoot == null ? null : library.root(scanRoot);
       return Padding(
         padding: EdgeInsets.fromLTRB(
-          _inset(constraints.maxWidth),
+          libraryBrowseInset(constraints.maxWidth),
           20,
-          _inset(constraints.maxWidth),
+          libraryBrowseInset(constraints.maxWidth),
           OrvexMetrics.gap,
         ),
         child: Column(
@@ -470,7 +480,7 @@ class _SeriesLibraryState extends State<SeriesLibrary> {
     builder: (context, constraints) {
       final theme = Theme.of(context).textTheme;
       final colors = OrvexColors.of(context);
-      final inset = _inset(constraints.maxWidth);
+      final inset = libraryBrowseInset(constraints.maxWidth);
       final entries = browseLibrary(
         libraryEntries(
           groups,
@@ -511,25 +521,7 @@ class _SeriesLibraryState extends State<SeriesLibrary> {
                   TextFormField(
                     initialValue: _query,
                     onChanged: (query) => setState(() => _query = query),
-                    decoration: const InputDecoration(
-                      isDense: true,
-                      constraints: BoxConstraints(
-                        minHeight: OrvexMetrics.hitSize,
-                      ),
-                      contentPadding: EdgeInsets.symmetric(
-                        horizontal: OrvexMetrics.space,
-                        vertical: OrvexMetrics.small,
-                      ),
-                      prefixIconConstraints: BoxConstraints(
-                        minWidth: OrvexMetrics.hitSize,
-                        minHeight: OrvexMetrics.hitSize,
-                      ),
-                      prefixIcon: Icon(
-                        Icons.search_rounded,
-                        size: OrvexMetrics.iconSize,
-                      ),
-                      hintText: '搜索作品或文件名',
-                    ),
+                    decoration: librarySearchDecoration('搜索作品或文件名'),
                   ),
                   const SizedBox(height: OrvexMetrics.small),
                   Text(
@@ -615,7 +607,11 @@ class _SeriesLibraryState extends State<SeriesLibrary> {
           PopupMenuButton<LibrarySortField>(
             tooltip: '排序',
             key: const ValueKey('library-sort'),
-            initialValue: sorted.field,
+            position: PopupMenuPosition.under,
+            offset: const Offset(0, 4),
+            menuPadding: const EdgeInsets.all(OrvexMetrics.small),
+            shape: _menuShape,
+            clipBehavior: Clip.antiAlias,
             onSelected: (field) => widget.onSort((
               field: field,
               descending: field == sorted.field
@@ -624,10 +620,11 @@ class _SeriesLibraryState extends State<SeriesLibrary> {
             )),
             itemBuilder: (_) => [
               for (final field in LibrarySortField.values)
-                CheckedPopupMenuItem(
-                  value: field,
-                  checked: sorted.field == field,
-                  child: Text(_sortLabel(field)),
+                _menuItem(
+                  context,
+                  field,
+                  _sortLabel(field),
+                  selected: sorted.field == field,
                 ),
             ],
             child: _toolLabel(
@@ -652,14 +649,19 @@ class _SeriesLibraryState extends State<SeriesLibrary> {
           PopupMenuButton<LibraryKind>(
             tooltip: '筛选',
             key: const ValueKey('library-filter'),
-            initialValue: _filter,
+            position: PopupMenuPosition.under,
+            offset: const Offset(0, 4),
+            menuPadding: const EdgeInsets.all(OrvexMetrics.small),
+            shape: _menuShape,
+            clipBehavior: Clip.antiAlias,
             onSelected: (kind) => setState(() => _filter = kind),
             itemBuilder: (_) => [
               for (final kind in LibraryKind.values)
-                CheckedPopupMenuItem(
-                  value: kind,
-                  checked: _filter == kind,
-                  child: Text(_filterLabel(kind)),
+                _menuItem(
+                  context,
+                  kind,
+                  _filterLabel(kind),
+                  selected: _filter == kind,
                 ),
             ],
             child: Semantics(
@@ -698,6 +700,51 @@ class _SeriesLibraryState extends State<SeriesLibrary> {
           ),
         ),
       ],
+    );
+  }
+
+  static final _menuShape = RoundedRectangleBorder(
+    borderRadius: BorderRadius.circular(OrvexMetrics.controlRadius),
+  );
+
+  PopupMenuItem<T> _menuItem<T>(
+    BuildContext context,
+    T value,
+    String label, {
+    required bool selected,
+  }) {
+    final colors = OrvexColors.of(context);
+    return PopupMenuItem<T>(
+      value: value,
+      height: OrvexMetrics.hitSize,
+      padding: EdgeInsets.zero,
+      child: Semantics(
+        selected: selected,
+        child: Container(
+          constraints: const BoxConstraints(minHeight: OrvexMetrics.hitSize),
+          padding: const EdgeInsets.symmetric(horizontal: OrvexMetrics.gap),
+          decoration: BoxDecoration(
+            color: selected ? colors.accent.withValues(alpha: .12) : null,
+            borderRadius: BorderRadius.circular(OrvexMetrics.smallRadius),
+          ),
+          child: Row(
+            children: [
+              SizedBox.square(
+                dimension: OrvexMetrics.iconSize,
+                child: selected
+                    ? Icon(
+                        Icons.check_rounded,
+                        color: colors.accent,
+                        size: OrvexMetrics.iconSize,
+                      )
+                    : null,
+              ),
+              const SizedBox(width: OrvexMetrics.small),
+              Flexible(child: Text(label)),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -844,11 +891,19 @@ class _SeriesLibraryState extends State<SeriesLibrary> {
           style: theme.labelSmall,
         ),
         const SizedBox(height: 2),
-        Text(
-          '已收录 ${group.media.length} 个视频',
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: theme.labelSmall,
+        Wrap(
+          spacing: OrvexMetrics.small,
+          runSpacing: 2,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            Text(
+              '已收录 ${group.media.length} 个视频',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.labelSmall,
+            ),
+            if (compact && status != null) _statusBadge(context, status),
+          ],
         ),
       ],
     );
@@ -896,26 +951,7 @@ class _SeriesLibraryState extends State<SeriesLibrary> {
                         end: OrvexMetrics.small,
                         child: Align(
                           alignment: AlignmentDirectional.centerStart,
-                          child: DecoratedBox(
-                            decoration: BoxDecoration(
-                              color: OrvexColors.of(context).surface,
-                              borderRadius: BorderRadius.circular(
-                                OrvexMetrics.smallRadius,
-                              ),
-                            ),
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: OrvexMetrics.small,
-                                vertical: 4,
-                              ),
-                              child: Text(
-                                status,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: theme.labelSmall,
-                              ),
-                            ),
-                          ),
+                          child: _statusBadge(context, status),
                         ),
                       ),
                   ],
@@ -926,4 +962,23 @@ class _SeriesLibraryState extends State<SeriesLibrary> {
             ),
     );
   }
+
+  Widget _statusBadge(BuildContext context, String status) => DecoratedBox(
+    decoration: BoxDecoration(
+      color: OrvexColors.of(context).surface,
+      borderRadius: BorderRadius.circular(OrvexMetrics.smallRadius),
+    ),
+    child: Padding(
+      padding: const EdgeInsets.symmetric(
+        horizontal: OrvexMetrics.small,
+        vertical: 4,
+      ),
+      child: Text(
+        status,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: Theme.of(context).textTheme.labelSmall,
+      ),
+    ),
+  );
 }

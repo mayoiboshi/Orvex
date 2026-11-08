@@ -570,10 +570,32 @@ void main() {
           expect(session.media, same(mediaBefore));
           await tapLibrary(find.byTooltip('关闭番剧资料'));
         }
-        await tapLibrary(find.byKey(const ValueKey('library-sort')));
+        final sort = find.byKey(const ValueKey('library-sort'));
+        await tapLibrary(sort);
+        final selectedSort = find.widgetWithText(
+          PopupMenuItem<LibrarySortField>,
+          '最近添加',
+        );
+        expect(
+          tester.getTopLeft(selectedSort).dy,
+          greaterThan(tester.getBottomLeft(sort).dy),
+        );
+        expect(
+          find.descendant(
+            of: selectedSort,
+            matching: find.byIcon(Icons.check_rounded),
+          ),
+          findsOneWidget,
+        );
         await capture('library-sort-menu');
+        await tester.tapAt(tester.getCenter(libraryCard(0)));
+        await tester.pumpAndSettle();
+        expect(selectedSort, findsNothing);
+        expect(find.byTooltip('返回剧集'), findsNothing);
+        expect(session.media, isNull);
+        await tapLibrary(sort);
         await tapLibrary(
-          find.widgetWithText(CheckedPopupMenuItem<LibrarySortField>, '发行年份'),
+          find.widgetWithText(PopupMenuItem<LibrarySortField>, '发行年份'),
         );
         await tapLibrary(find.byTooltip('当前降序，切换升序'));
         expect(
@@ -582,9 +604,7 @@ void main() {
         );
         await tapLibrary(find.byKey(const ValueKey('library-filter')));
         await capture('library-filter-menu');
-        await tapLibrary(
-          find.widgetWithText(CheckedPopupMenuItem<LibraryKind>, '剧集'),
-        );
+        await tapLibrary(find.widgetWithText(PopupMenuItem<LibraryKind>, '剧集'));
         expect(find.byTooltip('重置筛选'), findsOneWidget);
         expect(find.text('电影测试样片'), findsNothing);
         expect(find.text('当前结果 · 2 部作品 · 5 个视频'), findsOneWidget);
@@ -599,6 +619,14 @@ void main() {
         await tapLibrary(find.byTooltip('重置筛选'));
         await tapLibrary(find.byTooltip('切换紧凑列表'));
         expect(find.text('紧凑列表'), findsOneWidget);
+        expect(
+          find.descendant(of: singleFile, matching: find.text('类型未分类')),
+          findsOneWidget,
+        );
+        expect(
+          find.descendant(of: singleFile, matching: find.text('已收录 1 个视频')),
+          findsOneWidget,
+        );
         await capture('library-list');
         final work = find.text('葬送的芙莉莲').hitTestable();
         expect(work, findsOneWidget);
@@ -613,7 +641,9 @@ void main() {
         expect(find.byTooltip('切换紧凑列表'), findsOneWidget);
         await tapLibrary(find.byKey(const ValueKey('folders-view')));
         expect(find.text('搜索已导入的视频'), findsOneWidget);
-        expect(find.text('0 个目录来源 · 已导入 · 8 个视频'), findsOneWidget);
+        expect(find.text('独立导入'), findsOneWidget);
+        expect(find.text('8 个视频'), findsOneWidget);
+        await capture('library-folders-light');
         await tapLibrary(find.byKey(const ValueKey('series-view')));
 
         final copy = Completer<void>();
@@ -645,6 +675,9 @@ void main() {
 
         await appearance.setMode(ThemeMode.dark);
         await capture('library-dark');
+        await tapLibrary(find.byKey(const ValueKey('folders-view')));
+        await capture('library-folders-dark');
+        await tapLibrary(find.byKey(const ValueKey('series-view')));
         tester.view.physicalSize =
             Size(landscape.height, landscape.width) *
             tester.view.devicePixelRatio;
@@ -653,8 +686,17 @@ void main() {
             Size(438, landscape.height) * tester.view.devicePixelRatio;
         await capture('library-narrow');
         await tapLibrary(find.byKey(const ValueKey('library-filter')));
+        final menuOption = find.widgetWithText(
+          PopupMenuItem<LibraryKind>,
+          '类型未分类',
+        );
+        final menuBounds = tester.getRect(menuOption);
+        expect(menuBounds.left, greaterThanOrEqualTo(0));
+        expect(menuBounds.right, lessThanOrEqualTo(438));
+        expect(menuBounds.bottom, lessThanOrEqualTo(landscape.height));
+        await capture('library-narrow-filter-menu');
         await tapLibrary(
-          find.widgetWithText(CheckedPopupMenuItem<LibraryKind>, '类型未分类'),
+          find.widgetWithText(PopupMenuItem<LibraryKind>, '类型未分类'),
         );
         expect(find.text('当前结果 · 2 项媒体 · 2 个视频'), findsOneWidget);
         expect(singleFile, findsOneWidget);
