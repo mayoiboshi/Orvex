@@ -786,16 +786,56 @@ void main() {
           of: settingsPage,
           matching: find.byType(OrvexBrand),
         );
+        Future<void> checkSettingsLicenses({
+          required Finder bottomOverlay,
+          required String screenshot,
+        }) async {
+          ScrollPosition position() => tester
+              .state<ScrollableState>(
+                find
+                    .descendant(
+                      of: settingsPage,
+                      matching: find.byType(Scrollable),
+                    )
+                    .first,
+              )
+              .position;
+          final scroll = position();
+          scroll.jumpTo(scroll.maxScrollExtent);
+          await tester.pump(const Duration(milliseconds: 450));
+          final licenseRow = find.widgetWithText(ListTile, '开源许可');
+          final bounds = tester.getRect(licenseRow);
+          expect(bounds.top, greaterThan(tester.getRect(settingsPage).top));
+          expect(bounds.bottom, lessThan(tester.getRect(bottomOverlay).top));
+          await capture(screenshot);
+          await tester.tap(licenseRow.hitTestable());
+          await tester.pump(const Duration(milliseconds: 450));
+          final licensePage = find.byType(LicensePage);
+          expect(licensePage, findsOneWidget);
+          Navigator.of(tester.element(licensePage)).pop();
+          await tester.pump(const Duration(milliseconds: 450));
+          position().jumpTo(0);
+          await tester.pump(const Duration(milliseconds: 450));
+        }
+
         expect(
           tester.getTopLeft(settingsBrand).dx,
           closeTo(librarySearchBounds.left, .01),
         );
         final settingsFormBounds = tester.getRect(themePicker);
         expect(settingsFormBounds.left, closeTo(librarySearchBounds.left, .01));
-        expect(
-          settingsFormBounds.right,
-          closeTo(librarySearchBounds.right, .01),
+        expect(settingsFormBounds.width, closeTo(800, .01));
+        expect(settingsFormBounds.right, lessThan(librarySearchBounds.right));
+        final settingsCards = find.descendant(
+          of: settingsPage,
+          matching: find.byType(GlassSurface),
         );
+        expect(settingsCards, findsNWidgets(4));
+        for (var i = 0; i < 4; i++) {
+          final card = tester.getRect(settingsCards.at(i));
+          expect(card.left, closeTo(settingsFormBounds.left, .01));
+          expect(card.width, closeTo(settingsFormBounds.width, .01));
+        }
         expect(find.text('导入本地视频'), findsNothing);
         final version = (await PackageInfo.fromPlatform()).version;
         await until(
@@ -817,6 +857,11 @@ void main() {
         await tester.tap(find.byKey(const ValueKey('theme-dark')));
         await capture('library-settings-dark');
         expect(appearance.mode, ThemeMode.dark);
+        expect(find.byTooltip('展开播放器'), findsNothing);
+        await checkSettingsLicenses(
+          bottomOverlay: navSurface,
+          screenshot: 'library-settings-landscape-bottom',
+        );
         await appearance.setMode(ThemeMode.light);
         await tester.pump(const Duration(milliseconds: 450));
         observations['navigationStableAcrossTabs'] = true;
@@ -1237,27 +1282,34 @@ void main() {
         await appearance.setMode(ThemeMode.dark);
         await tester.pump(const Duration(milliseconds: 450));
         expect(tester.getRect(mini), miniBounds);
-        final settingsScroll = tester
-            .state<ScrollableState>(
-              find
-                  .descendant(
-                    of: settingsPage,
-                    matching: find.byType(Scrollable),
-                  )
-                  .first,
-            )
-            .position;
-        settingsScroll.jumpTo(settingsScroll.maxScrollExtent);
-        await tester.pump(const Duration(milliseconds: 450));
-        final licenses = find.text('开源许可');
-        expect(
-          tester.getBottomLeft(licenses).dy,
-          lessThan(tester.getTopLeft(mini).dy),
+        await checkSettingsLicenses(
+          bottomOverlay: mini,
+          screenshot: 'library-settings-narrow-bottom',
         );
-        await capture('library-settings-narrow-bottom');
-        await tester.tap(licenses.hitTestable());
-        await tester.pump(const Duration(milliseconds: 450));
-        expect(find.byType(LicensePage), findsOneWidget);
+        final matchNote = find.textContaining('来源为 Bangumi。');
+        final noteHeight = tester.getSize(matchNote).height;
+        tester.platformDispatcher.textScaleFactorTestValue = 2;
+        try {
+          await tester.pump(const Duration(milliseconds: 450));
+          expect(tester.getSize(matchNote).height, greaterThan(noteHeight));
+          final note = tester.renderObject<RenderParagraph>(matchNote);
+          final lineTops = note
+              .getBoxesForSelection(
+                TextSelection(
+                  baseOffset: 0,
+                  extentOffset: note.text.toPlainText().length,
+                ),
+              )
+              .map((box) => box.top)
+              .toSet();
+          expect(lineTops.length, greaterThan(1));
+          await checkSettingsLicenses(
+            bottomOverlay: mini,
+            screenshot: 'library-settings-narrow-large-text',
+          );
+        } finally {
+          tester.platformDispatcher.clearTextScaleFactorTestValue();
+        }
         observations['settingsPreservePlaybackAndLicenses'] = true;
       }
       passed = true;
