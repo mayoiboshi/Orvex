@@ -730,8 +730,10 @@ class LibraryViews extends StatelessWidget {
     Duration? duration,
   }) {
     final series = work?.subject;
-    final movie = home && series == null ? _movieSubject(media) : null;
-    final subject = series ?? movie;
+    final standalone = home && series == null
+        ? _standalonePosterSubject(media)
+        : null;
+    final subject = series ?? standalone;
     void showMetadata() => onMetadata(media, group: work?.files);
     return SizedBox(
       width: width,
@@ -763,7 +765,7 @@ class LibraryViews extends StatelessWidget {
                             media,
                             duration,
                             series: series,
-                            movie: movie,
+                            standalone: standalone,
                           )
                         : _cover(media, poster: true),
                     Positioned(
@@ -936,18 +938,24 @@ class LibraryViews extends StatelessWidget {
     posterPath: metadata.posterPath(metadata.subjectFor(media)?.id ?? 0),
   );
 
-  AnimeSubject? _movieSubject(LocalMedia media) {
+  AnimeSubject? _standalonePosterSubject(LocalMedia media) {
     final match = metadata.matchFor(media);
-    if (match?.status != AnimeMatchStatus.matched) return null;
     final subject = match?.subject;
-    return subject?.platform.trim() == '剧场版' ? subject : null;
+    if (match?.status != AnimeMatchStatus.matched || subject == null) {
+      return null;
+    }
+    final platform = subject.platform.trim();
+    return platform == '剧场版' ||
+            (platform.toUpperCase() == 'WEB' && subject.episodes == 1)
+        ? subject
+        : null;
   }
 
   Widget _recentArtwork(
     LocalMedia media,
     Duration? duration, {
     required AnimeSubject? series,
-    required AnimeSubject? movie,
+    required AnimeSubject? standalone,
   }) {
     if (series != null) {
       return MediaCover(
@@ -965,7 +973,9 @@ class LibraryViews extends StatelessWidget {
       showDuration: true,
       knownDuration: duration ?? Duration(milliseconds: entry?.duration ?? 0),
     );
-    final poster = movie == null ? null : metadata.posterPath(movie.id);
+    final poster = standalone == null
+        ? null
+        : metadata.posterPath(standalone.id);
     if (poster == null) return preview;
     return MediaCover(
       media: media,
@@ -978,7 +988,6 @@ class LibraryViews extends StatelessWidget {
   String _recentTitle(LocalMedia media) {
     final subject = metadata.subjectFor(media);
     if (subject == null) return mediaTitle(media.name);
-    if (_movieSubject(media) != null) return subject.title;
     final episode =
         thumbnails?.library.identityFor(media).episode ??
         AnimeFilename.parse(media.name).episode;

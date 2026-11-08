@@ -773,7 +773,13 @@ void main() {
       );
       await metadata.select(
         movie,
-        const AnimeSubject(id: 3, name: '超辉夜姬！', nameCn: '', platform: '剧场版'),
+        const AnimeSubject(
+          id: 3,
+          name: '超辉夜姬！',
+          nameCn: '',
+          platform: 'WEB',
+          episodes: 1,
+        ),
       );
       await tester.pumpAndSettle();
 
@@ -788,6 +794,11 @@ void main() {
       expect(find.text('已收录 28 个视频'), findsOneWidget);
       expect(find.text('已收录 12 个视频'), findsOneWidget);
       final movieCard = find.byKey(ValueKey('home-recent-${movie.resumeKey}'));
+      final artwork = find.descendant(
+        of: movieCard,
+        matching: find.byType(AspectRatio),
+      );
+      expect(tester.widget<AspectRatio>(artwork).aspectRatio, 2 / 3);
       await Scrollable.ensureVisible(tester.element(movieCard), alignment: 0.2);
       await tester.pumpAndSettle();
       await tester.tap(movieCard);

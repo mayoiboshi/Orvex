@@ -121,7 +121,7 @@ void main() {
           id: 101,
           name: '电影测试样片',
           nameCn: '电影测试样片',
-          platform: '剧场版',
+          platform: 'WEB',
           episodes: 1,
         ),
         3 => const AnimeSubject(
@@ -379,6 +379,14 @@ void main() {
         );
         expect(recentImage(videos[6], 'bangumi-cover-101.img'), isNotNull);
         expect(recentImage(videos[6], '/thumbnails-v1/'), isNull);
+        expect(
+          tester
+              .widgetList<Image>(
+                find.descendant(of: hero, matching: find.byType(Image)),
+              )
+              .map(imageFilePath),
+          contains(recentImage(videos[6], 'bangumi-cover-101.img')),
+        );
         expect(recentImage(videos[4], 'bangumi-cover-899.img'), isNotNull);
         expect(recentImage(videos[4], '/thumbnails-v1/'), isNull);
         expect(recentCard(videos[4]), findsOneWidget);
@@ -455,6 +463,20 @@ void main() {
         await tester.tap(find.byKey(const ValueKey('tab-0')));
         await tester.pump(const Duration(milliseconds: 450));
         await scrollHome();
+        await tester.tap(find.text('继续播放'));
+        await until(
+          () =>
+              session.ready &&
+              session.frame.duration.inSeconds > 10 &&
+              session.frame.position.inSeconds >= 6,
+          'native Home resume',
+        );
+        expect(session.media?.resumeKey, videos[resumeIndex].resumeKey);
+        expect(created, 1);
+        await session.pauseForInterruption();
+        await tester.tap(find.byTooltip('返回首页'));
+        await tester.pump(const Duration(milliseconds: 450));
+        await scrollHome();
         final workCard = recentCard(videos[4]);
         await Scrollable.ensureVisible(
           tester.element(workCard),
@@ -482,23 +504,33 @@ void main() {
           'work detail shows local frames for both episodes',
         );
         await capture('work-detail');
+        await tester.ensureVisible(episode);
+        await tester.tap(episode);
+        await until(
+          () =>
+              session.ready &&
+              session.media?.resumeKey == videos[4].resumeKey &&
+              session.frame.duration.inSeconds > 10,
+          'first episode plays from the work',
+        );
+        expect(session.playlist.map((media) => media.resumeKey), [
+          videos[4].resumeKey,
+          videos[5].resumeKey,
+        ]);
+        final openingNext = session.next();
+        await until(
+          () =>
+              session.ready && session.media?.resumeKey == videos[5].resumeKey,
+          'next episode plays from the work queue',
+        );
+        await openingNext;
+        await tester.tap(find.byTooltip('返回首页'));
+        await tester.pump(const Duration(milliseconds: 450));
         await tester.tap(find.byType(BackButton));
         await tester.pump(const Duration(milliseconds: 450));
         await scrollHome();
         observations['recentWorkDetail'] = true;
-        await tester.tap(find.text('继续播放'));
-        await until(
-          () =>
-              session.ready &&
-              session.frame.duration.inSeconds > 10 &&
-              session.frame.position.inSeconds >= 6,
-          'native Home resume',
-        );
-        expect(session.media?.resumeKey, videos[resumeIndex].resumeKey);
-        expect(created, 1);
-        await session.pauseForInterruption();
-        await tester.tap(find.byTooltip('返回首页'));
-        await tester.pump(const Duration(milliseconds: 450));
+        expect(created, 3);
         await appearance.setReduceTransparency(true);
         await scrollHome();
         await capture('reduced-transparency');
