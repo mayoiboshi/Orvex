@@ -2,6 +2,16 @@
 
 更新日期：2026-11-08。当前交付优先 iPadOS。iPhone 核心播放、Bangumi 柯南个案和历史路径修复已有用户反馈；其余平台与场景按下文区分。本文件保留验证历史，当前能力清单统一见 [ROADMAP](../ROADMAP.md)。
 
+## 第二批十次交付独立审查（2026-11-08）
+
+范围为 `cebd4c6..8e996ed`，包含十个已推送修复或功能。子智能体只读审查，按源码定位并区分新增与既有问题。
+
+- **P2 · 本批新增**：移动端复制成功后，列表刷新遇到读取错误或被更新请求取代时，导入任务仍会显示完成。读取失败时还会出现「请下拉重试」，而媒体库页面没有下拉刷新入口。见 [导入任务结束](../../lib/features/player/presentation/player_page.dart#L249) 与 [列表刷新](../../lib/features/player/presentation/player_page.dart#L393)。
+- **P3 · 本批新增**：从首页作品详情开播后，播放中更正 Bangumi 关联，当前视频标题可更新，队列区标题仍读取会话启动时的作品资料。见 [作品播放队列](../../lib/features/player/presentation/player_page.dart#L314) 与 [播放列表标题](../../lib/features/player/presentation/player_page.dart#L734)。
+- **性能待测 · 本批新增**：复制进度更新可能使媒体库重新遍历全部文件、解析自动匹配并排序。已确认重复计算路径，尚未测量真实大库的卡顿。见 [导入状态更新](../../lib/features/player/presentation/player_page.dart#L204) 与 [媒体库条目计算](../../lib/features/library/presentation/series_library.dart#L426)。
+- **P3 · 既有**：首页作品详情按原 Bangumi ID 查找当前聚合，更正或取消关联后若旧 ID 消失，当前详情可能显示暂无单集。见 [作品详情](../../lib/features/player/presentation/player_page.dart#L677)。
+- 当前资料按钮改动未发现阻塞问题。审查没有执行真机操作。以上问题留待独立任务处理。
+
 ## 媒体库海报资料按钮（2026-11-08）
 
 - 格式、静态分析、153 项测试和 iPad 模拟器集成测试通过。验证了深浅主题下的资料按钮、44 点触控区域、点击隔离、两行标题和收录数对齐，以及单话 WEB 样片筛选。见 [局部对比与分类核验](library-finish/README.md)。
