@@ -246,7 +246,7 @@ class _SeriesLibraryState extends State<SeriesLibrary> {
     LibraryKind.all => '全部',
     LibraryKind.movie => '电影',
     LibraryKind.series => '剧集',
-    LibraryKind.unknown => '未识别',
+    LibraryKind.unknown => '类型未分类',
   };
 
   double _inset(double width) =>
@@ -282,7 +282,6 @@ class _SeriesLibraryState extends State<SeriesLibrary> {
                 GlassIconButton(
                   tooltip: '添加媒体文件夹',
                   icon: Icons.create_new_folder_outlined,
-                  prominent: true,
                   onPressed: library.loading || library.scanning
                       ? null
                       : () => unawaited(library.add()),
@@ -440,6 +439,13 @@ class _SeriesLibraryState extends State<SeriesLibrary> {
       final cardWidth = (width - (columns - 1) * OrvexMetrics.gap) / columns;
       final scale = MediaQuery.textScalerOf(context).scale(14) / 14;
       final searchActive = _query.trim().isNotEmpty;
+      final scoped = searchActive || _filter != LibraryKind.all;
+      final unit =
+          entries.every(
+            (entry) => entry.subject != null || entry.group.identity.episodic,
+          )
+          ? '部作品'
+          : '项媒体';
       final count = entries.fold<int>(
         0,
         (count, entry) => count + entry.group.media.length,
@@ -458,99 +464,32 @@ class _SeriesLibraryState extends State<SeriesLibrary> {
                     initialValue: _query,
                     onChanged: (query) => setState(() => _query = query),
                     decoration: const InputDecoration(
-                      prefixIcon: Icon(Icons.search_rounded),
+                      isDense: true,
+                      constraints: BoxConstraints(
+                        minHeight: OrvexMetrics.hitSize,
+                      ),
+                      contentPadding: EdgeInsets.symmetric(
+                        horizontal: OrvexMetrics.space,
+                        vertical: OrvexMetrics.small,
+                      ),
+                      prefixIconConstraints: BoxConstraints(
+                        minWidth: OrvexMetrics.hitSize,
+                        minHeight: OrvexMetrics.hitSize,
+                      ),
+                      prefixIcon: Icon(
+                        Icons.search_rounded,
+                        size: OrvexMetrics.iconSize,
+                      ),
                       hintText: '搜索作品或文件名',
                     ),
                   ),
-                  const SizedBox(height: OrvexMetrics.gap),
+                  const SizedBox(height: OrvexMetrics.small),
                   Text(
-                    '${entries.length} 项 · $count 个视频',
+                    '${scoped ? '当前结果 · ' : ''}${entries.length} $unit · $count 个视频',
                     style: theme.bodySmall,
                   ),
                   const SizedBox(height: OrvexMetrics.small),
-                  Wrap(
-                    spacing: OrvexMetrics.small,
-                    runSpacing: OrvexMetrics.small,
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    children: [
-                      PopupMenuButton<LibrarySortField>(
-                        tooltip: '排序',
-                        key: const ValueKey('library-sort'),
-                        initialValue: widget.sort.field,
-                        onSelected: (field) => widget.onSort((
-                          field: field,
-                          descending: field == widget.sort.field
-                              ? widget.sort.descending
-                              : field != LibrarySortField.name,
-                        )),
-                        itemBuilder: (_) => [
-                          for (final field in LibrarySortField.values)
-                            CheckedPopupMenuItem(
-                              value: field,
-                              checked: widget.sort.field == field,
-                              child: Text(_sortLabel(field)),
-                            ),
-                        ],
-                        child: _tool(
-                          context,
-                          Icons.sort_rounded,
-                          _sortLabel(widget.sort.field),
-                        ),
-                      ),
-                      IconButton(
-                        tooltip: widget.sort.descending
-                            ? '当前降序，切换升序'
-                            : '当前升序，切换降序',
-                        onPressed: () => widget.onSort((
-                          field: widget.sort.field,
-                          descending: !widget.sort.descending,
-                        )),
-                        icon: Icon(
-                          widget.sort.descending
-                              ? Icons.arrow_downward_rounded
-                              : Icons.arrow_upward_rounded,
-                        ),
-                      ),
-                      PopupMenuButton<LibraryKind>(
-                        tooltip: '筛选',
-                        key: const ValueKey('library-filter'),
-                        initialValue: _filter,
-                        onSelected: (kind) => setState(() => _filter = kind),
-                        itemBuilder: (_) => [
-                          for (final kind in LibraryKind.values)
-                            CheckedPopupMenuItem(
-                              value: kind,
-                              checked: _filter == kind,
-                              child: Text(_filterLabel(kind)),
-                            ),
-                        ],
-                        child: _tool(
-                          context,
-                          Icons.filter_list_rounded,
-                          _filter == LibraryKind.all
-                              ? '筛选'
-                              : _filterLabel(_filter),
-                          selected: _filter != LibraryKind.all,
-                        ),
-                      ),
-                      if (_filter != LibraryKind.all)
-                        IconButton(
-                          tooltip: '重置筛选',
-                          onPressed: () =>
-                              setState(() => _filter = LibraryKind.all),
-                          icon: const Icon(Icons.close_rounded),
-                        ),
-                      IconButton(
-                        tooltip: widget.compact ? '切换海报网格' : '切换紧凑列表',
-                        onPressed: () => widget.onCompact(!widget.compact),
-                        icon: Icon(
-                          widget.compact
-                              ? Icons.grid_view_rounded
-                              : Icons.view_list_rounded,
-                        ),
-                      ),
-                    ],
-                  ),
+                  _toolbar(context),
                   if (widget.metadata.busy)
                     Padding(
                       padding: const EdgeInsets.only(top: OrvexMetrics.small),
@@ -615,7 +554,150 @@ class _SeriesLibraryState extends State<SeriesLibrary> {
     },
   );
 
-  Widget _tool(
+  Widget _toolbar(BuildContext context) {
+    final sorted = widget.sort;
+    final filtered = _filter != LibraryKind.all;
+    return Wrap(
+      spacing: OrvexMetrics.small,
+      runSpacing: OrvexMetrics.small,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        _toolGroup(
+          context,
+          PopupMenuButton<LibrarySortField>(
+            tooltip: '排序',
+            key: const ValueKey('library-sort'),
+            initialValue: sorted.field,
+            onSelected: (field) => widget.onSort((
+              field: field,
+              descending: field == sorted.field
+                  ? sorted.descending
+                  : field != LibrarySortField.name,
+            )),
+            itemBuilder: (_) => [
+              for (final field in LibrarySortField.values)
+                CheckedPopupMenuItem(
+                  value: field,
+                  checked: sorted.field == field,
+                  child: Text(_sortLabel(field)),
+                ),
+            ],
+            child: _toolLabel(
+              context,
+              Icons.sort_rounded,
+              _sortLabel(sorted.field),
+            ),
+          ),
+          action: _toolIcon(
+            sorted.descending ? '当前降序，切换升序' : '当前升序，切换降序',
+            sorted.descending
+                ? Icons.arrow_downward_rounded
+                : Icons.arrow_upward_rounded,
+            () => widget.onSort((
+              field: sorted.field,
+              descending: !sorted.descending,
+            )),
+          ),
+        ),
+        _toolGroup(
+          context,
+          PopupMenuButton<LibraryKind>(
+            tooltip: '筛选',
+            key: const ValueKey('library-filter'),
+            initialValue: _filter,
+            onSelected: (kind) => setState(() => _filter = kind),
+            itemBuilder: (_) => [
+              for (final kind in LibraryKind.values)
+                CheckedPopupMenuItem(
+                  value: kind,
+                  checked: _filter == kind,
+                  child: Text(_filterLabel(kind)),
+                ),
+            ],
+            child: Semantics(
+              selected: filtered,
+              child: _toolLabel(
+                context,
+                filtered ? Icons.filter_alt_rounded : Icons.filter_list_rounded,
+                filtered ? _filterLabel(_filter) : '筛选',
+                selected: filtered,
+              ),
+            ),
+          ),
+          selected: filtered,
+          action: filtered
+              ? _toolIcon(
+                  '重置筛选',
+                  Icons.close_rounded,
+                  () => setState(() => _filter = LibraryKind.all),
+                )
+              : null,
+        ),
+        _toolGroup(
+          context,
+          Tooltip(
+            message: widget.compact ? '切换海报网格' : '切换紧凑列表',
+            child: InkWell(
+              onTap: () => widget.onCompact(!widget.compact),
+              child: _toolLabel(
+                context,
+                widget.compact
+                    ? Icons.view_list_rounded
+                    : Icons.grid_view_rounded,
+                widget.compact ? '紧凑列表' : '海报网格',
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _toolGroup(
+    BuildContext context,
+    Widget control, {
+    Widget? action,
+    bool selected = false,
+  }) {
+    final colors = OrvexColors.of(context);
+    return Material(
+      color: selected ? colors.accent.withValues(alpha: .12) : colors.surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(OrvexMetrics.controlRadius),
+        side: BorderSide(color: colors.divider),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: action == null
+          ? control
+          : Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Flexible(child: control),
+                SizedBox(
+                  width: 1,
+                  height: OrvexMetrics.iconSize,
+                  child: ColoredBox(color: colors.divider),
+                ),
+                action,
+              ],
+            ),
+    );
+  }
+
+  Widget _toolIcon(String tooltip, IconData icon, VoidCallback onPressed) =>
+      IconButton(
+        tooltip: tooltip,
+        iconSize: OrvexMetrics.iconSize,
+        style: IconButton.styleFrom(
+          fixedSize: const Size.square(OrvexMetrics.hitSize),
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          visualDensity: VisualDensity.standard,
+        ),
+        onPressed: onPressed,
+        icon: Icon(icon),
+      );
+
+  Widget _toolLabel(
     BuildContext context,
     IconData icon,
     String label, {
@@ -625,17 +707,13 @@ class _SeriesLibraryState extends State<SeriesLibrary> {
     return Container(
       constraints: const BoxConstraints(minHeight: OrvexMetrics.hitSize),
       padding: const EdgeInsets.symmetric(horizontal: OrvexMetrics.gap),
-      decoration: BoxDecoration(
-        color: selected ? colors.accent.withValues(alpha: .12) : colors.surface,
-        borderRadius: BorderRadius.circular(OrvexMetrics.controlRadius),
-      ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(
             icon,
             color: selected ? colors.accent : colors.secondary,
-            size: 19,
+            size: OrvexMetrics.iconSize,
           ),
           const SizedBox(width: OrvexMetrics.small),
           Flexible(
@@ -643,7 +721,8 @@ class _SeriesLibraryState extends State<SeriesLibrary> {
               label,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: Theme.of(context).textTheme.labelLarge,
+              style: Theme.of(context).textTheme.labelLarge
+                  ?.copyWith(color: selected ? colors.accent : colors.text),
             ),
           ),
         ],
@@ -662,11 +741,26 @@ class _SeriesLibraryState extends State<SeriesLibrary> {
         : entry.title;
     final theme = Theme.of(context).textTheme;
     final caption = [
-      '${group.media.length} 个视频',
       if (entry.year case final year?) '$year',
       if (entry.score case final score?) '★ ${score.toStringAsFixed(1)}',
-      if (entry.kind == LibraryKind.unknown) '未识别',
     ].join(' · ');
+    final hasMatch =
+        entry.subject != null ||
+        group.media.any(
+          (media) =>
+              widget.metadata.matchFor(media)?.status ==
+              AnimeMatchStatus.matched,
+        );
+    final status = entry.kind != LibraryKind.unknown
+        ? null
+        : hasMatch
+        ? '类型未分类'
+        : '资料未匹配';
+    final titleStyle = theme.titleSmall!.copyWith(height: 1.3);
+    final titleHeight =
+        MediaQuery.textScalerOf(context).scale(titleStyle.fontSize!) *
+        titleStyle.height! *
+        2;
     final poster = ClipRRect(
       borderRadius: BorderRadius.circular(OrvexMetrics.coverRadius),
       child: AspectRatio(
@@ -679,7 +773,7 @@ class _SeriesLibraryState extends State<SeriesLibrary> {
       ),
     );
     final info = GlassIconButton(
-      tooltip: '番剧资料',
+      tooltip: status == null ? '番剧资料' : '番剧资料 · $status',
       onPressed: () => widget.onMetadata(group.representative),
       icon: Icons.info_outline_rounded,
     );
@@ -687,18 +781,28 @@ class _SeriesLibraryState extends State<SeriesLibrary> {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          title,
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-          style: theme.titleSmall,
+        SizedBox(
+          height: compact ? null : titleHeight,
+          child: Text(
+            title,
+            maxLines: compact ? 1 : 2,
+            overflow: TextOverflow.ellipsis,
+            style: titleStyle,
+          ),
         ),
         const SizedBox(height: 4),
         Text(
-          caption,
-          maxLines: 2,
+          caption.isEmpty ? ' ' : caption,
+          maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: theme.bodySmall,
+          style: theme.labelSmall,
+        ),
+        const SizedBox(height: 2),
+        Text(
+          '已收录 ${group.media.length} 个视频',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: theme.labelSmall,
         ),
       ],
     );
@@ -727,6 +831,35 @@ class _SeriesLibraryState extends State<SeriesLibrary> {
                   children: [
                     poster,
                     PositionedDirectional(top: 4, end: 4, child: info),
+                    if (status != null)
+                      PositionedDirectional(
+                        bottom: OrvexMetrics.small,
+                        start: OrvexMetrics.small,
+                        end: OrvexMetrics.small,
+                        child: Align(
+                          alignment: AlignmentDirectional.centerStart,
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              color: OrvexColors.of(context).surface,
+                              borderRadius: BorderRadius.circular(
+                                OrvexMetrics.smallRadius,
+                              ),
+                            ),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: OrvexMetrics.small,
+                                vertical: 4,
+                              ),
+                              child: Text(
+                                status,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: theme.labelSmall,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
                   ],
                 ),
                 const SizedBox(height: OrvexMetrics.small),

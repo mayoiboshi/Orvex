@@ -517,6 +517,10 @@ void main() {
           await tester.pump(const Duration(milliseconds: 450));
         }
 
+        expect(find.text('类型未分类'), findsOneWidget);
+        expect(find.text('资料未匹配'), findsOneWidget);
+        expect(find.text('已收录 1 个视频'), findsNWidgets(3));
+        expect(find.text('海报网格'), findsOneWidget);
         await capture('library-default-light');
         await tapLibrary(find.byKey(const ValueKey('library-sort')));
         await capture('library-sort-menu');
@@ -529,11 +533,13 @@ void main() {
           'year:asc',
         );
         await tapLibrary(find.byKey(const ValueKey('library-filter')));
+        await capture('library-filter-menu');
         await tapLibrary(
           find.widgetWithText(CheckedPopupMenuItem<LibraryKind>, '剧集'),
         );
         expect(find.byTooltip('重置筛选'), findsOneWidget);
         expect(find.text('电影测试样片'), findsNothing);
+        expect(find.text('当前结果 · 2 部作品 · 5 个视频'), findsOneWidget);
         await capture('library-filtered');
         await tester.enterText(find.byType(TextFormField).first, '615');
         await tester.pump(const Duration(milliseconds: 450));
@@ -544,6 +550,7 @@ void main() {
         await tester.pump(const Duration(milliseconds: 500));
         await tapLibrary(find.byTooltip('重置筛选'));
         await tapLibrary(find.byTooltip('切换紧凑列表'));
+        expect(find.text('紧凑列表'), findsOneWidget);
         await capture('library-list');
         final work = find.text('葬送的芙莉莲').hitTestable();
         expect(work, findsOneWidget);
@@ -558,6 +565,7 @@ void main() {
         expect(find.byTooltip('切换紧凑列表'), findsOneWidget);
         await tapLibrary(find.byKey(const ValueKey('folders-view')));
         expect(find.text('搜索已导入的视频'), findsOneWidget);
+        expect(find.text('0 个目录来源 · 已导入 · 8 个视频'), findsOneWidget);
         await tapLibrary(find.byKey(const ValueKey('series-view')));
 
         final copy = Completer<void>();
@@ -596,6 +604,13 @@ void main() {
         tester.view.physicalSize =
             Size(438, landscape.height) * tester.view.devicePixelRatio;
         await capture('library-narrow');
+        await tapLibrary(find.byKey(const ValueKey('library-filter')));
+        await tapLibrary(
+          find.widgetWithText(CheckedPopupMenuItem<LibraryKind>, '类型未分类'),
+        );
+        expect(find.text('当前结果 · 2 项媒体 · 2 个视频'), findsOneWidget);
+        await capture('library-narrow-filtered');
+        await tapLibrary(find.byTooltip('重置筛选'));
         final libraryScroll = tester
             .state<ScrollableState>(
               find

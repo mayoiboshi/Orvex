@@ -298,6 +298,11 @@ class _FolderBrowserState extends State<_FolderBrowserContent> {
         for (var i = 1; i <= segments.length; i++) segments.take(i).join('/'),
       ];
       final sideList = _watching && config.header == null;
+      final folderStats = root == null
+          ? '${library.roots.length} 个目录来源 · 已导入'
+          : '当前文件夹 · ${folders.length} 个子文件夹';
+      final scoped = _query.trim().isNotEmpty || _unwatched;
+
       final toolbar = Padding(
         padding: const EdgeInsets.fromLTRB(20, 16, 16, 10),
         child: Row(
@@ -573,13 +578,15 @@ class _FolderBrowserState extends State<_FolderBrowserContent> {
                 Padding(
                   padding: const EdgeInsets.fromLTRB(20, 4, 20, 10),
                   child: Text(
-                    '${grouped
-                        ? config.collectionTitle ?? '剧集'
-                        : root == null
-                        ? '已导入'
-                        : _path.isEmpty
-                        ? root.name
-                        : leafName(_path)} · ${items.length} 个视频',
+                    config.libraryHeader != null
+                        ? '$folderStats · ${scoped ? '当前结果 ' : ''}${items.length} 个视频'
+                        : '${grouped
+                              ? config.collectionTitle ?? '剧集'
+                              : root == null
+                              ? '已导入'
+                              : _path.isEmpty
+                              ? root.name
+                              : leafName(_path)} · ${items.length} 个视频',
                     style: TextStyle(color: colors.secondary, fontSize: 12),
                   ),
                 ),
