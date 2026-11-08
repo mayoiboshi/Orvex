@@ -776,31 +776,9 @@ class LibraryViews extends StatelessWidget {
                       top: home ? 2 : 6,
                       right: home ? 2 : 6,
                       child: home
-                          ? IconButton(
+                          ? PosterInfoButton(
                               tooltip: '番剧资料',
                               onPressed: showMetadata,
-                              style: IconButton.styleFrom(
-                                minimumSize: const Size.square(
-                                  OrvexMetrics.hitSize,
-                                ),
-                                padding: EdgeInsets.zero,
-                              ),
-                              icon: DecoratedBox(
-                                decoration: BoxDecoration(
-                                  color: OrvexColors.player.overlay,
-                                  borderRadius: BorderRadius.circular(
-                                    OrvexMetrics.pillRadius,
-                                  ),
-                                ),
-                                child: Padding(
-                                  padding: const EdgeInsets.all(5),
-                                  child: Icon(
-                                    Icons.info_outline_rounded,
-                                    size: 16,
-                                    color: OrvexColors.player.text,
-                                  ),
-                                ),
-                              ),
                             )
                           : GlassIconButton(
                               immersive: true,
@@ -1408,6 +1386,42 @@ class _HomeVideoArtworkState extends State<_HomeVideoArtwork> {
           ),
         ),
       ],
+    );
+  }
+}
+
+class PosterInfoButton extends StatelessWidget {
+  const PosterInfoButton({
+    super.key,
+    required this.tooltip,
+    required this.onPressed,
+    this.solidBackground = false,
+  });
+
+  final String tooltip;
+  final VoidCallback onPressed;
+  final bool solidBackground;
+
+  @override
+  Widget build(BuildContext context) {
+    const colors = OrvexColors.player;
+    return IconButton(
+      tooltip: tooltip,
+      onPressed: onPressed,
+      style: IconButton.styleFrom(
+        minimumSize: const Size.square(OrvexMetrics.hitSize),
+        padding: EdgeInsets.zero,
+      ),
+      icon: DecoratedBox(
+        decoration: BoxDecoration(
+          color: solidBackground ? colors.surface : colors.overlay,
+          shape: BoxShape.circle,
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(5),
+          child: Icon(Icons.info_outline_rounded, size: 16, color: colors.text),
+        ),
+      ),
     );
   }
 }

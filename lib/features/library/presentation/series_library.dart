@@ -15,7 +15,7 @@ import '../../player/domain/playback_engine.dart';
 import '../domain/library_overview.dart';
 import '../domain/media_series.dart';
 import '../domain/playback_record.dart';
-import 'library_views.dart' show MediaCover;
+import 'library_views.dart' show MediaCover, PosterInfoButton;
 
 typedef LibraryImportStatus = ({
   String title,
@@ -772,11 +772,9 @@ class _SeriesLibraryState extends State<SeriesLibrary> {
         ),
       ),
     );
-    final info = GlassIconButton(
-      tooltip: status == null ? '番剧资料' : '番剧资料 · $status',
-      onPressed: () => widget.onMetadata(group.representative),
-      icon: Icons.info_outline_rounded,
-    );
+    final infoTooltip = status == null ? '番剧资料' : '番剧资料 · $status';
+    void showMetadata() => widget.onMetadata(group.representative);
+
     final labels = Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -820,7 +818,11 @@ class _SeriesLibraryState extends State<SeriesLibrary> {
                   SizedBox(width: 42, child: poster),
                   const SizedBox(width: OrvexMetrics.gap),
                   Expanded(child: labels),
-                  info,
+                  GlassIconButton(
+                    tooltip: infoTooltip,
+                    onPressed: showMetadata,
+                    icon: Icons.info_outline_rounded,
+                  ),
                 ],
               ),
             )
@@ -830,7 +832,15 @@ class _SeriesLibraryState extends State<SeriesLibrary> {
                 Stack(
                   children: [
                     poster,
-                    PositionedDirectional(top: 4, end: 4, child: info),
+                    PositionedDirectional(
+                      top: 4,
+                      end: 4,
+                      child: PosterInfoButton(
+                        tooltip: infoTooltip,
+                        onPressed: showMetadata,
+                        solidBackground: true,
+                      ),
+                    ),
                     if (status != null)
                       PositionedDirectional(
                         bottom: OrvexMetrics.small,

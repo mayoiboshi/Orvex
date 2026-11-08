@@ -145,6 +145,7 @@ void main() {
     final metadataStore = MetadataStore(
       directoryProvider: () async => Directory('${root.path}/metadata'),
     );
+    const longTitle = '封面损坏测试样片：需要跨两行显示的超长作品名称';
     final entries = <String, AnimeMatch>{};
     for (var i = 0; i < videos.length; i++) {
       if (i == 7) continue; // Unmatched local file.
@@ -161,7 +162,7 @@ void main() {
         3 => const AnimeSubject(
           id: 102,
           name: '封面损坏测试样片',
-          nameCn: '封面损坏测试样片',
+          nameCn: longTitle,
           platform: '剧场版',
           episodes: 1,
         ),
@@ -521,7 +522,54 @@ void main() {
         expect(find.text('资料未匹配'), findsOneWidget);
         expect(find.text('已收录 1 个视频'), findsNWidgets(3));
         expect(find.text('海报网格'), findsOneWidget);
+        Finder libraryCard(int index) => find.byKey(
+          ValueKey('series-${folders.identityFor(videos[index]).key}'),
+        );
+        final longCard = libraryCard(3);
+        final singleFile = libraryCard(6);
+        final paragraph = tester.renderObject<RenderParagraph>(
+          find.descendant(of: longCard, matching: find.text(longTitle)),
+        );
+        final lines = paragraph
+            .getBoxesForSelection(
+              const TextSelection(
+                baseOffset: 0,
+                extentOffset: longTitle.length,
+              ),
+            )
+            .map((box) => box.top)
+            .toSet();
+        expect(lines, hasLength(2));
+        double countBaseline(Finder card) => tester
+            .getTopLeft(
+              find.descendant(of: card, matching: find.text('已收录 1 个视频')),
+            )
+            .dy;
+        expect(countBaseline(longCard), countBaseline(singleFile));
+        final info = find.descendant(
+          of: find.byKey(const PageStorageKey('series-overview')),
+          matching: find.byType(PosterInfoButton),
+        );
+        expect(info, findsNWidgets(5));
+        for (final button in info.evaluate()) {
+          final size = (button.findRenderObject()! as RenderBox).size;
+          expect(size.width, greaterThanOrEqualTo(44));
+          expect(size.height, greaterThanOrEqualTo(44));
+        }
         await capture('library-default-light');
+        for (final index in [4, 6]) {
+          final mediaBefore = session.media;
+          await tapLibrary(
+            find.descendant(
+              of: libraryCard(index),
+              matching: find.byType(PosterInfoButton),
+            ),
+          );
+          expect(find.byTooltip('关闭番剧资料'), findsOneWidget);
+          expect(find.byTooltip('返回剧集'), findsNothing);
+          expect(session.media, same(mediaBefore));
+          await tapLibrary(find.byTooltip('关闭番剧资料'));
+        }
         await tapLibrary(find.byKey(const ValueKey('library-sort')));
         await capture('library-sort-menu');
         await tapLibrary(
@@ -609,6 +657,8 @@ void main() {
           find.widgetWithText(CheckedPopupMenuItem<LibraryKind>, '类型未分类'),
         );
         expect(find.text('当前结果 · 2 项媒体 · 2 个视频'), findsOneWidget);
+        expect(singleFile, findsOneWidget);
+        expect(find.text('类型未分类'), findsNWidgets(2));
         await capture('library-narrow-filtered');
         await tapLibrary(find.byTooltip('重置筛选'));
         final libraryScroll = tester
