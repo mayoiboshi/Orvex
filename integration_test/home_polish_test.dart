@@ -1,7 +1,9 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:ui' as ui;
 
+import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
@@ -16,6 +18,7 @@ import 'package:orvex/features/anime_metadata/application/anime_metadata_control
 import 'package:orvex/features/anime_metadata/domain/anime_subject.dart';
 import 'package:orvex/features/anime_metadata/infrastructure/metadata_store.dart';
 import 'package:orvex/features/folder_library/folder_library.dart';
+import 'package:orvex/features/library/domain/library_overview.dart';
 import 'package:orvex/features/library/infrastructure/playback_history_store.dart';
 import 'package:orvex/features/library/presentation/library_views.dart';
 import 'package:orvex/features/media_sources/imported_file_store.dart';
@@ -24,16 +27,41 @@ import 'package:orvex/features/player/application/playback_session.dart';
 import 'package:orvex/features/player/domain/playback_engine.dart';
 import 'package:orvex/features/player/infrastructure/media_kit_engine.dart';
 import 'package:orvex/features/player/infrastructure/preferences_resume_store.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
 import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
 
 class _Files extends LocalFileSource {
   _Files(ImportedFileStore store) : super(imports: store);
   int pickerCalls = 0;
+  Completer<XFile?>? pendingSelection;
   @override
-  Future<LocalMedia?> pickVideo() async {
+  Future<LocalMedia?> pickVideo({
+    void Function(VideoImportProgress)? onProgress,
+  }) async {
     pickerCalls++;
-    return null;
+    final source = await pendingSelection?.future;
+    if (source == null) return null;
+    onProgress?.call((
+      phase: VideoImportPhase.preparing,
+      name: source.name,
+      fraction: null,
+    ));
+    return imports.import(source, onProgress: onProgress);
+  }
+}
+
+class _PausedCopy extends XFile {
+  _PausedCopy(super.path, this.bytes, this.finish) : super(name: '模拟器导入样片.mp4');
+  final Uint8List bytes;
+  final Future<void> finish;
+
+  @override
+  Stream<Uint8List> openRead([int? start, int? end]) async* {
+    final middle = bytes.length ~/ 2;
+    yield Uint8List.sublistView(bytes, 0, middle);
+    await finish;
+    yield Uint8List.sublistView(bytes, middle);
   }
 }
 
@@ -74,16 +102,20 @@ void main() {
     for (var i = 0; i < 8; i++) {
       final title = i < 4 ? '葬送的芙莉莲' : '名侦探柯南';
       final episode = i < 4 ? i + 1 : i + 611;
-      final relative = 'Imports/home-$i/$title - $episode.mp4';
+      final filename = stage == 'before'
+          ? '$title - $episode.mp4'
+          : switch (i) {
+              3 => '封面损坏测试样片.mp4',
+              6 => '电影测试样片.mp4',
+              7 => '普通本地样片.mp4',
+              _ => '$title - $episode.mp4',
+            };
+      final relative = 'Imports/home-$i/$filename';
       final file = File('${root.path}/documents/$relative');
       await file.parent.create(recursive: true);
       await file.writeAsBytes(source.buffer.asUint8List());
       videos.add(
-        LocalMedia(
-          uri: file.uri,
-          name: '$title - $episode.mp4',
-          importPath: relative,
-        ),
+        LocalMedia(uri: file.uri, name: filename, importPath: relative),
       );
     }
     // Reuse only earlier simulator visual-test cache. No network or user media.
@@ -480,6 +512,119 @@ void main() {
         await tester.pump(const Duration(milliseconds: 450));
         expect(find.byType(TextFormField), findsWidgets);
         expect(tester.getRect(navSurface), homeNavRect);
+        Future<void> tapLibrary(Finder target) async {
+          await tester.tap(target);
+          await tester.pump(const Duration(milliseconds: 450));
+        }
+
+        await capture('library-default-light');
+        await tapLibrary(find.byKey(const ValueKey('library-sort')));
+        await capture('library-sort-menu');
+        await tapLibrary(
+          find.widgetWithText(CheckedPopupMenuItem<LibrarySortField>, '发行年份'),
+        );
+        await tapLibrary(find.byTooltip('当前降序，切换升序'));
+        expect(
+          await SharedPreferencesAsync().getString('orvex.library.sort.v1'),
+          'year:asc',
+        );
+        await tapLibrary(find.byKey(const ValueKey('library-filter')));
+        await tapLibrary(
+          find.widgetWithText(CheckedPopupMenuItem<LibraryKind>, '剧集'),
+        );
+        expect(find.byTooltip('重置筛选'), findsOneWidget);
+        expect(find.text('电影测试样片'), findsNothing);
+        await capture('library-filtered');
+        await tester.enterText(find.byType(TextFormField).first, '615');
+        await tester.pump(const Duration(milliseconds: 450));
+        expect(find.text('名侦探柯南'), findsOneWidget);
+        expect(find.text('葬送的芙莉莲'), findsNothing);
+        await tester.enterText(find.byType(TextFormField).first, '');
+        FocusManager.instance.primaryFocus?.unfocus();
+        await tester.pump(const Duration(milliseconds: 500));
+        await tapLibrary(find.byTooltip('重置筛选'));
+        await tapLibrary(find.byTooltip('切换紧凑列表'));
+        await capture('library-list');
+        final work = find.text('葬送的芙莉莲').hitTestable();
+        expect(work, findsOneWidget);
+        await tapLibrary(work);
+        expect(find.byTooltip('番剧资料'), findsWidgets);
+        await tapLibrary(find.byTooltip('返回剧集'));
+        await until(
+          () => find.byTooltip('切换海报网格').hitTestable().evaluate().isNotEmpty,
+          'returned to the library',
+        );
+        await tapLibrary(find.byTooltip('切换海报网格'));
+        expect(find.byTooltip('切换紧凑列表'), findsOneWidget);
+        await tapLibrary(find.byKey(const ValueKey('folders-view')));
+        expect(find.text('搜索已导入的视频'), findsOneWidget);
+        await tapLibrary(find.byKey(const ValueKey('series-view')));
+
+        final copy = Completer<void>();
+        files.pendingSelection = Completer<XFile?>();
+        await tapLibrary(find.byTooltip('导入单个视频'));
+        expect(find.text('正在准备'), findsNothing);
+        expect(find.byType(LinearProgressIndicator), findsNothing);
+        final sample = File('${root.path}/import-sample.mp4');
+        final bytes = source.buffer.asUint8List();
+        await sample.writeAsBytes(bytes);
+        files.pendingSelection!.complete(
+          _PausedCopy(sample.path, bytes, copy.future),
+        );
+        files.pendingSelection = null;
+        await until(
+          () => find.textContaining('正在复制 ·').evaluate().isNotEmpty,
+          'measured copy progress',
+        );
+        try {
+          await capture('library-import');
+        } finally {
+          copy.complete();
+        }
+        await until(
+          () => find.text('已在媒体库中').evaluate().isNotEmpty,
+          'duplicate import reused',
+        );
+        await tapLibrary(find.widgetWithText(TextButton, '关闭'));
+
+        await appearance.setMode(ThemeMode.dark);
+        await capture('library-dark');
+        tester.view.physicalSize =
+            Size(landscape.height, landscape.width) *
+            tester.view.devicePixelRatio;
+        await capture('library-portrait');
+        tester.view.physicalSize =
+            Size(438, landscape.height) * tester.view.devicePixelRatio;
+        await capture('library-narrow');
+        final libraryScroll = tester
+            .state<ScrollableState>(
+              find
+                  .descendant(
+                    of: find.byKey(const PageStorageKey('series-overview')),
+                    matching: find.byType(Scrollable),
+                  )
+                  .first,
+            )
+            .position;
+        libraryScroll.jumpTo(libraryScroll.maxScrollExtent);
+        await tester.pump(const Duration(milliseconds: 450));
+        expect(
+          tester
+              .getBottomLeft(
+                find
+                    .byKey(
+                      ValueKey('series-${folders.identityFor(videos[7]).key}'),
+                    )
+                    .hitTestable(),
+              )
+              .dy,
+          lessThan(tester.getTopLeft(navSurface).dy),
+        );
+        await capture('library-bottom');
+        tester.view.physicalSize = landscape * tester.view.devicePixelRatio;
+        await appearance.setMode(ThemeMode.light);
+        await tester.pump(const Duration(milliseconds: 450));
+        observations['libraryControlsAndImport'] = true;
         await tester.tap(find.byKey(const ValueKey('tab-0')));
         await tester.pump(const Duration(milliseconds: 450));
         await scrollHome();

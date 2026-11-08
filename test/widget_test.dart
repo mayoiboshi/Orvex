@@ -720,8 +720,10 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('tab-1')));
       await tester.pumpAndSettle();
       final groupKey = identifySeries(imports.videos.first).key;
-      expect(find.byKey(ValueKey('series-$groupKey')), findsOneWidget);
-      await tester.tap(find.byKey(ValueKey('series-$groupKey')));
+      final work = find.byKey(ValueKey('series-$groupKey'));
+      await tester.ensureVisible(work);
+      await tester.pumpAndSettle();
+      await tester.tap(work);
       await tester.pumpAndSettle();
       expect(find.byTooltip('返回剧集'), findsOneWidget);
       final second = imports.videos.singleWhere((m) => m.name.contains('- 2.'));

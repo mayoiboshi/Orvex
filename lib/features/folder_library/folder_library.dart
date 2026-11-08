@@ -23,7 +23,7 @@ class FolderLibrary extends ChangeNotifier {
   final List<FolderRoot> roots = [];
   final List<FolderEntry> entries = [];
   bool loading = true, scanning = false, disposed = false;
-  String? scanningRoot, error;
+  String? scanningRoot, lastScanRoot, error;
   int discovered = 0, foldersScanned = 0, _scanGeneration = 0;
   Future<void> _writes = Future.value();
   bool _canBackupPrimary = false;
@@ -253,6 +253,7 @@ class FolderLibrary extends ChangeNotifier {
     final generation = ++_scanGeneration;
     scanning = true;
     scanningRoot = root.id;
+    lastScanRoot = null;
     discovered = 0;
     foldersScanned = 0;
     error = null;
@@ -363,6 +364,7 @@ class FolderLibrary extends ChangeNotifier {
       }
       scanning = false;
       scanningRoot = null;
+      lastScanRoot = root.id;
       await save();
       changed();
     }

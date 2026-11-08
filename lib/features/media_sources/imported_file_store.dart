@@ -8,6 +8,14 @@ import 'package:path_provider/path_provider.dart';
 import '../player/domain/playback_engine.dart';
 import '../subtitles/domain/subtitle_models.dart' show isSubtitleName;
 
+enum VideoImportPhase { preparing, copying, checking, reused }
+
+typedef VideoImportProgress = ({
+  VideoImportPhase phase,
+  String name,
+  double? fraction,
+});
+
 /// Mobile document pickers return temporary copies. Keep a durable app-owned
 /// copy rather than retaining a transient or security-scoped picker path.
 class ImportedFileStore {
@@ -18,13 +26,21 @@ class ImportedFileStore {
 
   Future<void> _imports = Future.value();
 
-  Future<LocalMedia> import(XFile source) {
-    final result = _imports.then((_) => _import(source));
+  Future<LocalMedia> import(
+    XFile source, {
+    void Function(VideoImportProgress)? onProgress,
+  }) {
+    final result = _imports.then((_) => _import(source, onProgress));
     _imports = result.then<void>((_) {}).catchError((Object _) {});
     return result;
   }
 
-  Future<LocalMedia> _import(XFile source) async {
+  Future<LocalMedia> _import(
+    XFile source,
+    void Function(VideoImportProgress)? onProgress,
+  ) async {
+    void report(VideoImportPhase phase, [double? fraction]) =>
+        onProgress?.call((phase: phase, name: source.name, fraction: fraction));
     if (source.name.isEmpty || source.name == '.' || source.name == '..') {
       throw const FormatException('文件名为空，无法导入');
     }
@@ -36,6 +52,17 @@ class ImportedFileStore {
     final partial = File('${targetDirectory.path}/$safeName.part');
     final target = File('${targetDirectory.path}/$safeName');
     try {
+      int? total;
+      if (onProgress != null) {
+        try {
+          total = await source.length();
+        } on Exception {
+          // Some providers only expose the length after opening the stream.
+        }
+      }
+      var copied = 0;
+      var lastPercent = 0;
+      report(VideoImportPhase.copying, total != null && total > 0 ? 0 : null);
       final digestSink = _DigestSink();
       final hasher = sha256.startChunkedConversion(digestSink);
       final sink = partial.openWrite();
@@ -43,6 +70,17 @@ class ImportedFileStore {
         await sink.addStream(
           source.openRead().map((chunk) {
             hasher.add(chunk);
+            if (total != null && total > 0) {
+              copied += chunk.length;
+              final percent = (copied * 100 ~/ total).clamp(0, 100);
+              if (percent != lastPercent) {
+                lastPercent = percent;
+                report(
+                  VideoImportPhase.copying,
+                  copied <= total ? percent / 100 : null,
+                );
+              }
+            }
             return chunk;
           }),
         );
@@ -51,6 +89,7 @@ class ImportedFileStore {
         await sink.close();
         hasher.close();
       }
+      report(VideoImportPhase.checking);
       if (await partial.length() != await source.length()) {
         throw const FileSystemException('文件未完整导入，请重试');
       }
@@ -67,6 +106,7 @@ class ImportedFileStore {
         if (existing != null) {
           await targetDirectory.delete(recursive: true);
           await _saveHashes(imports, hashes);
+          report(VideoImportPhase.reused);
           return existing;
         }
       }

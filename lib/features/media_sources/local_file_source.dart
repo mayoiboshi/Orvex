@@ -10,7 +10,9 @@ class LocalFileSource {
     : imports = imports ?? ImportedFileStore();
   final ImportedFileStore imports;
 
-  Future<LocalMedia?> pickVideo() async {
+  Future<LocalMedia?> pickVideo({
+    void Function(VideoImportProgress)? onProgress,
+  }) async {
     final file = await openFile(
       acceptedTypeGroups: Platform.isIOS
           ? []
@@ -23,10 +25,17 @@ class LocalFileSource {
             ],
     );
     if (file == null) return null;
+    onProgress?.call((
+      phase: VideoImportPhase.preparing,
+      name: file.name,
+      fraction: null,
+    ));
     if (!ImportedFileStore.isVideoName(file.name)) {
       throw const FormatException('请选择 MP4、MKV、MOV、M4V、WebM、AVI 或 TS 视频');
     }
-    if (Platform.isIOS || Platform.isAndroid) return imports.import(file);
+    if (Platform.isIOS || Platform.isAndroid) {
+      return imports.import(file, onProgress: onProgress);
+    }
     return LocalMedia(uri: _uri(file.path), name: file.name);
   }
 

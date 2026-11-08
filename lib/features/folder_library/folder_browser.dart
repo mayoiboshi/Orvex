@@ -42,6 +42,7 @@ class FolderBrowser extends StatefulWidget {
     required this.onMetadata,
     this.current,
     this.header,
+    this.libraryHeader,
     this.playback,
     this.collection,
     this.collectionTitle,
@@ -52,9 +53,10 @@ class FolderBrowser extends StatefulWidget {
   final List<PlaybackRecord> history;
   final AnimeMetadataController metadata;
   final ValueChanged<LocalMedia> onOpen, onMetadata;
-  final VoidCallback onImport;
+  final VoidCallback? onImport;
   final LocalMedia? current;
   final Widget? header;
+  final Widget? libraryHeader;
   final PlaybackSession? playback;
   final List<LocalMedia>? collection;
   final String? collectionTitle;
@@ -358,8 +360,9 @@ class _FolderBrowserState extends State<_FolderBrowserContent> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 if (config.header != null) config.header!,
-                if (!sideList) toolbar,
-                if (library.scanning)
+                if (config.libraryHeader != null) config.libraryHeader!,
+                if (!sideList && config.libraryHeader == null) toolbar,
+                if (library.scanning && config.libraryHeader == null)
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 20),
                     child: Column(
@@ -382,7 +385,7 @@ class _FolderBrowserState extends State<_FolderBrowserContent> {
                       ],
                     ),
                   ),
-                if (library.error != null)
+                if (library.error != null && config.libraryHeader == null)
                   Padding(
                     padding: const EdgeInsets.all(20),
                     child: Text(

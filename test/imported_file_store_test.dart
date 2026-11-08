@@ -75,6 +75,32 @@ void main() {
     },
   );
 
+  test(
+    'progress follows real copied bytes and reports duplicate reuse',
+    () async {
+      final source = await File('${directory.path}/episode.mp4')
+          .writeAsBytes([7, 8, 9]);
+      final progress = <VideoImportProgress>[];
+      final first = await store.import(
+        XFile(source.path),
+        onProgress: progress.add,
+      );
+      expect(progress.map((event) => (event.phase, event.fraction)), [
+        (VideoImportPhase.copying, 0),
+        (VideoImportPhase.copying, 1),
+        (VideoImportPhase.checking, null),
+      ]);
+      progress.clear();
+      final duplicate = await store.import(
+        XFile(source.path),
+        onProgress: progress.add,
+      );
+      expect(duplicate.resumeKey, first.resumeKey);
+      expect(progress.last.phase, VideoImportPhase.reused);
+      expect((await store.listVideos()).length, 1);
+    },
+  );
+
   test('concurrent identical imports only create one video', () async {
     final source = await File('${directory.path}/episode.mp4')
         .writeAsBytes([7, 8, 9]);

@@ -14,9 +14,11 @@ import '../../anime_metadata/application/anime_metadata_controller.dart';
 import '../../anime_metadata/presentation/anime_metadata_sheet.dart';
 import '../../anime_metadata/presentation/episode_details.dart';
 import '../../media_sources/local_file_source.dart';
+import '../../media_sources/imported_file_store.dart';
 import '../../folder_library/folder_browser.dart';
 import '../../folder_library/folder_library.dart';
 import '../../library/domain/playback_record.dart';
+import '../../library/domain/library_overview.dart';
 import '../../library/domain/recent_work.dart';
 import '../../library/infrastructure/recent_arrival_index.dart';
 import '../../library/presentation/library_views.dart';
@@ -65,6 +67,11 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
   Timer? _catalogTimer;
   String? _libraryError;
   bool _picking = false;
+  LibraryImportStatus? _importStatus;
+  LibrarySort _librarySort = defaultLibrarySort;
+  Future<void> _sortWrites = Future.value();
+  int _sortRevision = 0;
+  bool _compactLibrary = false;
   bool _fullscreen = false;
   bool _widePlayback = false;
   final _inlinePlayerKey = GlobalKey();
@@ -177,11 +184,56 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
   Future<void> _pick({bool subtitle = false}) async {
     if (_picking || widget.startupError != null) return;
     final currentMedia = _session.media;
-    setState(() => _picking = true);
+    final originTab = _tab;
+    final originOpen = _openGeneration;
+    final libraryImport = !subtitle && _tab == 1 && !_showPlayer;
+    String? fileName;
+    var reused = false;
+    setState(() {
+      _picking = true;
+      if (!subtitle) _importStatus = null;
+    });
+    void showTask(
+      String title, {
+      String? detail,
+      double? fraction,
+      bool failed = false,
+      bool done = false,
+    }) {
+      if (!mounted) return;
+      setState(
+        () => _importStatus = (
+          title: title,
+          detail: [if (fileName != null) fileName!, ?detail].join(' · '),
+          fraction: fraction,
+          failed: failed,
+          active: !failed && !done,
+        ),
+      );
+    }
+
     try {
       final source = subtitle
           ? await _files.pickSubtitle()
-          : await _files.pickVideo();
+          : await _files.pickVideo(
+              onProgress: (update) {
+                fileName = update.name;
+                switch (update.phase) {
+                  case VideoImportPhase.preparing:
+                    showTask('正在准备', detail: '第 1 / 1 个文件');
+                  case VideoImportPhase.copying:
+                    showTask(
+                      '正在复制',
+                      detail: '第 1 / 1 个文件',
+                      fraction: update.fraction,
+                    );
+                  case VideoImportPhase.checking:
+                    showTask('正在校验并整理', detail: '第 1 / 1 个文件');
+                  case VideoImportPhase.reused:
+                    reused = true;
+                }
+              },
+            );
       if (!mounted || source == null) return;
       if (subtitle) {
         if (identical(currentMedia, _session.media)) {
@@ -193,15 +245,41 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
         }
       } else {
         if (Platform.isIOS || Platform.isAndroid) {
-          unawaited(_reload());
+          fileName ??= source.name;
+          showTask('正在更新媒体库', detail: '第 1 / 1 个文件');
+          await _reload();
+          if (!mounted) return;
+          showTask(
+            reused ? '已在媒体库中' : '导入完成',
+            detail: reused ? '已复用 1 个文件' : '成功 1 个',
+            done: true,
+          );
           // A large import can finish after the app was backgrounded. Leave
           // it in the imported list rather than starting playback unattended.
-          if (!_foreground) return;
+          if (!_foreground ||
+              libraryImport ||
+              _tab != originTab ||
+              _openGeneration != originOpen) {
+            return;
+          }
+        } else {
+          setState(() => _importStatus = null);
         }
         await _open(source);
       }
     } catch (error) {
-      if (mounted) _session.reportError('文件未能打开：$error');
+      if (mounted) {
+        if (!subtitle) {
+          showTask(
+            '导入失败',
+            detail: fileName == null ? '$error' : '失败 1 个 · $error',
+            failed: true,
+          );
+        }
+        if (!libraryImport && (subtitle || _tab != 1)) {
+          _session.reportError('文件未能打开：$error');
+        }
+      }
     } finally {
       if (mounted) setState(() => _picking = false);
     }
@@ -262,6 +340,45 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
     } catch (_) {
       if (mounted) setState(() => _libraryError = '首页偏好未能读取');
     }
+    final revision = _sortRevision;
+    try {
+      final saved = (await _preferences.getString('orvex.library.sort.v1'))
+          ?.split(':');
+      if (!mounted ||
+          revision != _sortRevision ||
+          revision != 0 ||
+          saved?.length != 2) {
+        return;
+      }
+      final field = LibrarySortField.values
+          .where((field) => field.name == saved![0])
+          .firstOrNull;
+      if (field != null && const ['asc', 'desc'].contains(saved![1])) {
+        setState(
+          () => _librarySort = (field: field, descending: saved[1] == 'desc'),
+        );
+      }
+    } catch (_) {
+      // A missing preference leaves the library on its default order.
+    }
+  }
+
+  void _setLibrarySort(LibrarySort sort) {
+    ++_sortRevision;
+    setState(() => _librarySort = sort);
+    _sortWrites = _sortWrites
+        .then(
+          (_) => _preferences.setString(
+            'orvex.library.sort.v1',
+            '${sort.field.name}:${sort.descending ? 'desc' : 'asc'}',
+          ),
+        )
+        .catchError((Object _) {
+          if (mounted) {
+            ScaffoldMessenger.of(context)
+                .showSnackBar(const SnackBar(content: Text('排序偏好未能保存')));
+          }
+        });
   }
 
   Future<void> _setShowContinue(bool value) async {
@@ -453,16 +570,6 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
                             ),
                           ),
                         ),
-                      if (_picking) ...[
-                        const LinearProgressIndicator(minHeight: 2),
-                        const Padding(
-                          padding: EdgeInsets.all(6),
-                          child: Text(
-                            '正在读取文件…',
-                            style: TextStyle(fontSize: 12),
-                          ),
-                        ),
-                      ],
                       if (widget.startupError ?? _libraryError ?? _session.error
                           case final String message)
                         Padding(
@@ -554,8 +661,15 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
     history: _history,
     metadata: _metadata,
     onOpen: (media) => unawaited(_open(media)),
-    onImport: () => _pick(),
+    onImport: _picking || widget.startupError != null ? null : () => _pick(),
     onMetadata: _showMetadata,
+    arrivals: _arrivals,
+    sort: _librarySort,
+    onSort: _setLibrarySort,
+    compact: _compactLibrary,
+    onCompact: (compact) => setState(() => _compactLibrary = compact),
+    importStatus: _importStatus,
+    onDismissImport: () => setState(() => _importStatus = null),
     selection: _seriesSelection,
     onSelection: (key) => _seriesSelection = key,
   );
