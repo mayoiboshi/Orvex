@@ -740,12 +740,27 @@ void main() {
     await mount(tester, const Size(1194, 834));
     await metadata.selectMany(
       videos,
-      const AnimeSubject(id: 55, name: '示例番剧', nameCn: '示例番剧', platform: 'TV'),
+      const AnimeSubject(
+        id: 55,
+        name: '示例番剧',
+        nameCn: '示例番剧',
+        platform: 'TV',
+        date: '2026-01-01',
+        score: 7.5,
+      ),
     );
     await tester.pumpAndSettle();
     final card = find.byKey(const ValueKey('home-recent-bangumi:55'));
     expect(card, findsOneWidget);
-    expect(find.textContaining('已收录 2 个视频'), findsOneWidget);
+    expect(find.text('已收录 2 个视频'), findsOneWidget);
+    expect(find.text('2026 · ★ 7.5'), findsOneWidget);
+    final poster = find.descendant(
+      of: card,
+      matching: find.byType(AspectRatio),
+    );
+    final size = tester.getSize(poster);
+    expect(size.width / size.height, closeTo(2 / 3, 0.001));
+    expect(tester.getTopLeft(card).dx, tester.getTopLeft(find.text('最近添加')).dx);
     await tester.ensureVisible(card);
     await tester.tap(card);
     await tester.pumpAndSettle();

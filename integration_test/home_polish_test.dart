@@ -329,6 +329,31 @@ void main() {
           await scrollHome(bottom: true);
           if (stage != 'before') expectLastRowVisible();
           await capture('$name-bottom');
+          if (stage != 'before') {
+            for (final (index, ratio) in [
+              (4, 2 / 3),
+              (6, 2 / 3),
+              (7, 16 / 9),
+            ]) {
+              final artwork = find.descendant(
+                of: recentCard(videos[index]),
+                matching: find.byType(AspectRatio),
+              );
+              final size = tester.getSize(artwork);
+              expect(size.width / size.height, closeTo(ratio, 0.001));
+            }
+            await until(
+              () =>
+                  recentImage(videos[4], 'bangumi-cover-899.img') != null &&
+                  recentImage(videos[7], '/thumbnails-v1/') != null,
+              'recent posters and video frames are ready',
+            );
+            await Scrollable.ensureVisible(
+              tester.element(find.text('最近添加')),
+              alignment: 0.07,
+            );
+            await capture('$name-recent');
+          }
         }
       }
       tester.view.physicalSize = landscape * tester.view.devicePixelRatio;
@@ -360,16 +385,16 @@ void main() {
         expect(recentKey(videos[4]), recentKey(videos[5]));
         expect(find.textContaining('已收录 3 个视频'), findsOneWidget);
         expect(find.textContaining('已收录 2 个视频'), findsOneWidget);
-        final artwork = find.descendant(
-          of: recentCard(videos[6]),
-          matching: find.byType(AspectRatio),
+        final poster = find.descendant(
+          of: recentCard(videos[4]),
+          matching: find.byWidgetPredicate(
+            (widget) =>
+                widget is Image &&
+                imageFilePath(widget)?.contains('bangumi-cover-899.img') ==
+                    true,
+          ),
         );
-        expect(
-          tester
-              .widgetList<AspectRatio>(artwork)
-              .map((view) => view.aspectRatio),
-          containsAll([4 / 3, 2 / 3]),
-        );
+        expect(tester.widget<Image>(poster).fit, BoxFit.cover);
         observations['recentMixedArtwork'] = true;
         final card = tester.getSize(hero);
         expect(covers, findsWidgets);

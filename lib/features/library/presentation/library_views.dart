@@ -711,126 +711,144 @@ class LibraryViews extends StatelessWidget {
         runSpacing: home ? OrvexMetrics.section : 22,
         children: [
           for (final media in items)
-            SizedBox(
+            _posterTile(
+              context,
+              media,
               width: width,
-              child: InkWell(
-                key: home
-                    ? ValueKey(
-                        'home-recent-${grouped[media.resumeKey]?.key ?? media.resumeKey}',
-                      )
-                    : null,
-                borderRadius: BorderRadius.circular(OrvexMetrics.coverRadius),
-                onTap: () {
-                  final work = grouped[media.resumeKey];
-                  if (work != null && onOpenWork != null) {
-                    onOpenWork!(work);
-                  } else {
-                    onOpen(media);
-                  }
-                },
-                onLongPress: () => onMetadata(media),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(
-                        OrvexMetrics.coverRadius,
-                      ),
-                      child: AspectRatio(
-                        aspectRatio: home ? 4 / 3 : 2 / 3,
-                        child: Stack(
-                          fit: StackFit.expand,
-                          children: [
-                            home
-                                ? _recentArtwork(
-                                    media,
-                                    durations[media.resumeKey],
-                                    grouped[media.resumeKey]?.subject,
-                                  )
-                                : _cover(media, poster: true),
-                            Positioned(
-                              top: home ? 2 : 6,
-                              right: home ? 2 : 6,
-                              child: home
-                                  ? IconButton(
-                                      tooltip: '番剧资料',
-                                      onPressed: () => onMetadata(media),
-                                      style: IconButton.styleFrom(
-                                        minimumSize: const Size.square(
-                                          OrvexMetrics.hitSize,
-                                        ),
-                                        padding: EdgeInsets.zero,
-                                      ),
-                                      icon: DecoratedBox(
-                                        decoration: BoxDecoration(
-                                          color: OrvexColors.player.overlay,
-                                          borderRadius: BorderRadius.circular(
-                                            OrvexMetrics.pillRadius,
-                                          ),
-                                        ),
-                                        child: Padding(
-                                          padding: const EdgeInsets.all(5),
-                                          child: Icon(
-                                            Icons.info_outline_rounded,
-                                            size: 16,
-                                            color: OrvexColors.player.text,
-                                          ),
-                                        ),
-                                      ),
-                                    )
-                                  : GlassIconButton(
-                                      immersive: true,
-                                      icon: Icons.info_outline_rounded,
-                                      tooltip: '番剧资料',
-                                      onPressed: () => onMetadata(media),
-                                    ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    SizedBox(height: home ? OrvexMetrics.small : 10),
-                    if (home)
-                      SizedBox(
-                        height:
-                            MediaQuery.textScalerOf(context).scale(14) *
-                            1.3 *
-                            2,
-                        child: Text(
-                          grouped[media.resumeKey]?.subject?.title ??
-                              _recentTitle(media),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: Theme.of(context).textTheme.titleSmall
-                              ?.copyWith(height: 1.3),
-                        ),
-                      )
-                    else
-                      Text(
-                        _mediaTitle(media),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.titleSmall,
-                      ),
-                    const SizedBox(height: 4),
-                    Text(
-                      switch (grouped[media.resumeKey]) {
-                        final RecentWork work =>
-                          '已收录 ${work.files.length} 个视频 · ${_mediaCaption(media)}',
-                        null => _mediaCaption(media),
-                      },
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.labelSmall,
-                    ),
-                  ],
-                ),
-              ),
+              home: home,
+              work: grouped[media.resumeKey],
+              duration: durations[media.resumeKey],
             ),
         ],
       );
     },
   );
+
+  Widget _posterTile(
+    BuildContext context,
+    LocalMedia media, {
+    required double width,
+    required bool home,
+    RecentWork? work,
+    Duration? duration,
+  }) {
+    final series = work?.subject;
+    final movie = home && series == null ? _movieSubject(media) : null;
+    final subject = series ?? movie;
+    return SizedBox(
+      width: width,
+      child: InkWell(
+        key: home
+            ? ValueKey('home-recent-${work?.key ?? media.resumeKey}')
+            : null,
+        borderRadius: BorderRadius.circular(OrvexMetrics.coverRadius),
+        onTap: () {
+          if (work != null && onOpenWork != null) {
+            onOpenWork!(work);
+          } else {
+            onOpen(media);
+          }
+        },
+        onLongPress: () => onMetadata(media),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(OrvexMetrics.coverRadius),
+              child: AspectRatio(
+                aspectRatio: !home || subject != null ? 2 / 3 : 16 / 9,
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    home
+                        ? _recentArtwork(
+                            media,
+                            duration,
+                            series: series,
+                            movie: movie,
+                          )
+                        : _cover(media, poster: true),
+                    Positioned(
+                      top: home ? 2 : 6,
+                      right: home ? 2 : 6,
+                      child: home
+                          ? IconButton(
+                              tooltip: '番剧资料',
+                              onPressed: () => onMetadata(media),
+                              style: IconButton.styleFrom(
+                                minimumSize: const Size.square(
+                                  OrvexMetrics.hitSize,
+                                ),
+                                padding: EdgeInsets.zero,
+                              ),
+                              icon: DecoratedBox(
+                                decoration: BoxDecoration(
+                                  color: OrvexColors.player.overlay,
+                                  borderRadius: BorderRadius.circular(
+                                    OrvexMetrics.pillRadius,
+                                  ),
+                                ),
+                                child: Padding(
+                                  padding: const EdgeInsets.all(5),
+                                  child: Icon(
+                                    Icons.info_outline_rounded,
+                                    size: 16,
+                                    color: OrvexColors.player.text,
+                                  ),
+                                ),
+                              ),
+                            )
+                          : GlassIconButton(
+                              immersive: true,
+                              icon: Icons.info_outline_rounded,
+                              tooltip: '番剧资料',
+                              onPressed: () => onMetadata(media),
+                            ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            SizedBox(height: home ? OrvexMetrics.small : 10),
+            if (home)
+              SizedBox(
+                height: MediaQuery.textScalerOf(context).scale(14) * 1.3 * 2,
+                child: Text(
+                  subject?.title ?? _recentTitle(media),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.titleSmall
+                      ?.copyWith(height: 1.3),
+                ),
+              )
+            else
+              Text(
+                _mediaTitle(media),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.titleSmall,
+              ),
+            const SizedBox(height: 4),
+            Text(
+              series == null
+                  ? _mediaCaption(media)
+                  : _subjectCaption(series, includeSource: false),
+              maxLines: series == null ? 1 : null,
+              overflow: series == null ? TextOverflow.ellipsis : null,
+              style: Theme.of(context).textTheme.labelSmall,
+            ),
+            if (work != null) ...[
+              const SizedBox(height: 2),
+              Text(
+                '已收录 ${work.files.length} 个视频',
+                style: Theme.of(context).textTheme.labelSmall,
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
 
   Widget _history(BuildContext context) => Column(
     crossAxisAlignment: CrossAxisAlignment.start,
@@ -929,16 +947,15 @@ class LibraryViews extends StatelessWidget {
 
   Widget _recentArtwork(
     LocalMedia media,
-    Duration? duration,
-    AnimeSubject? series,
-  ) {
+    Duration? duration, {
+    required AnimeSubject? series,
+    required AnimeSubject? movie,
+  }) {
     if (series != null) {
       return MediaCover(
         media: media,
         poster: true,
         posterPath: metadata.posterPath(series.id),
-        fit: BoxFit.contain,
-        artworkRatio: 2 / 3,
       );
     }
     final entry = thumbnails?.library.entry(media);
@@ -950,15 +967,12 @@ class LibraryViews extends StatelessWidget {
       showDuration: true,
       knownDuration: duration ?? Duration(milliseconds: entry?.duration ?? 0),
     );
-    final movie = _movieSubject(media);
     final poster = movie == null ? null : metadata.posterPath(movie.id);
     if (poster == null) return preview;
     return MediaCover(
       media: media,
       poster: true,
       posterPath: poster,
-      fit: BoxFit.contain,
-      artworkRatio: 2 / 3,
       missingArtwork: preview,
     );
   }
@@ -983,19 +997,22 @@ class LibraryViews extends StatelessWidget {
   String _mediaCaption(LocalMedia media) {
     final match = metadata.matchFor(media);
     final subject = match?.subject;
-    if (subject != null) {
-      return [
-        if (subject.date.length >= 4) subject.date.substring(0, 4),
-        if (subject.score > 0) '★ ${subject.score.toStringAsFixed(1)}',
-        'Bangumi',
-      ].join(' · ');
-    }
+    if (subject != null) return _subjectCaption(subject);
     return switch (match?.status) {
       AnimeMatchStatus.queued => '正在匹配番剧…',
       AnimeMatchStatus.needsReview => '匹配待确认',
       AnimeMatchStatus.failed => '匹配失败 · 可重试',
       _ => '${media.name.split('.').last.toUpperCase()} · 本地视频',
     };
+  }
+
+  String _subjectCaption(AnimeSubject subject, {bool includeSource = true}) {
+    final details = [
+      if (subject.date.length >= 4) subject.date.substring(0, 4),
+      if (subject.score > 0) '★ ${subject.score.toStringAsFixed(1)}',
+    ];
+    if (includeSource || details.isEmpty) details.add('Bangumi');
+    return details.join(' · ');
   }
 
   Widget _metadataStatus(BuildContext context) => Row(
@@ -1391,14 +1408,12 @@ class MediaCover extends StatelessWidget {
     this.poster = false,
     this.fit = BoxFit.cover,
     this.posterPath,
-    this.artworkRatio,
     this.missingArtwork,
   });
   final LocalMedia media;
   final bool poster;
   final BoxFit fit;
   final String? posterPath;
-  final double? artworkRatio;
   final Widget? missingArtwork;
   @override
   Widget build(BuildContext context) {
@@ -1427,21 +1442,13 @@ class MediaCover extends StatelessWidget {
     );
     final path = posterPath;
     if (path == null) return missingArtwork ?? fallback;
-    final ratio = artworkRatio;
     final image = Image.file(
       File(path),
       fit: fit,
       cacheWidth: 600,
       gaplessPlayback: true,
       errorBuilder: (_, _, _) => missingArtwork ?? fallback,
-      frameBuilder: (context, child, frame, _) {
-        if (frame == null) return fallback;
-        return ratio == null
-            ? child
-            : Center(
-                child: AspectRatio(aspectRatio: ratio, child: child),
-              );
-      },
+      frameBuilder: (_, child, frame, _) => frame == null ? fallback : child,
     );
     return fit == BoxFit.contain
         ? ColoredBox(color: colors.elevated, child: image)
