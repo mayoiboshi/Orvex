@@ -172,7 +172,11 @@ class OrvexBrand extends StatelessWidget {
             borderRadius: BorderRadius.circular(9),
             border: Border.all(color: colors.accent.withValues(alpha: 0.25)),
           ),
-          child: Icon(Icons.play_arrow_rounded, size: 20, color: colors.accent),
+          child: Image.asset(
+            'assets/brand/orbit-mark.png',
+            color: colors.accent,
+            excludeFromSemantics: true,
+          ),
         ),
         if (!compact) ...[
           const SizedBox(width: 9),

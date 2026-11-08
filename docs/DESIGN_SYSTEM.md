@@ -122,4 +122,5 @@
 只为已复用的视觉行为增加共享组件，不创建空的设计组件目录或第二套主题状态管理。当前外观控制器沿用 ChangeNotifier 与 Riverpod 装配，只管理外观，不进入播放会话。
 
 - iOS/iPadOS 启动器使用「切环 Orbit Cut」的原生 Icon Composer 文件 `ios/Runner/AppIcon.icon`。背景、主体矢量及外观在同一文件维护，由 Xcode 按部署目标生成旧系统图标。
+- 应用内的 `OrvexBrand` 使用同一切环轮廓的单色透明素材，按主题强调色显示。播放器中的播放三角保留操作语义。
 - 应用内原生 Liquid Glass、更多原生平台交互及移动端性能和功耗仍待验证。macOS 现有出站网络授权缺口见验证记录。

@@ -125,12 +125,32 @@ void main() {
       final controller = await mount(tester);
       Brightness brightness() =>
           Theme.of(tester.element(find.byType(LibraryViews))).brightness;
+      void expectOrbitMark() {
+        final brands = find.byType(OrvexBrand);
+        expect(brands, findsWidgets);
+        for (final brand in brands.evaluate()) {
+          final mark = find.descendant(
+            of: find.byWidget(brand.widget),
+            matching: find.byType(Image),
+          );
+          final image = tester.widget<Image>(mark);
+          expect(
+            (image.image as AssetImage).assetName,
+            'assets/brand/orbit-mark.png',
+          );
+          expect(image.color, OrvexColors.of(brand).accent);
+        }
+      }
+
       expect(brightness(), Brightness.light);
+      expectOrbitMark();
       await tester.tap(find.byKey(const ValueKey('tab-3')));
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('theme-dark')));
       await tester.pumpAndSettle();
       expect(brightness(), Brightness.dark);
+      expect(find.widgetWithText(ListTile, 'Orvex'), findsOneWidget);
+      expectOrbitMark();
       expect(
         await SharedPreferencesAsync().getString(AppearanceController.themeKey),
         'dark',
