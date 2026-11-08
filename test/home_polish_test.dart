@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:orvex/design/appearance_controller.dart';
 import 'package:orvex/design/orvex_theme.dart';
+import 'package:orvex/design/glass.dart';
 import 'package:orvex/features/anime_metadata/application/anime_metadata_controller.dart';
 import 'package:orvex/features/library/domain/playback_record.dart';
+import 'package:orvex/features/library/presentation/library_browse_style.dart';
 import 'package:orvex/features/library/presentation/library_views.dart';
 import 'package:orvex/features/player/domain/playback_engine.dart';
 
@@ -68,6 +70,13 @@ void main() {
       }
 
       await show([]);
+      final emptyPanel = find.ancestor(
+        of: find.text('还没有播放记录'),
+        matching: find.byType(GlassSurface),
+      );
+      final emptyBounds = tester.getRect(emptyPanel);
+      expect(emptyBounds.left, libraryBrowseInset(360));
+      expect(360 - emptyBounds.right, libraryBrowseInset(360));
       expect(find.byTooltip('打开本地视频'), findsNothing);
       await tester.tap(find.text('前往媒体库'));
       expect(tabs, [1]);

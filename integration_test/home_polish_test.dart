@@ -1022,6 +1022,73 @@ void main() {
           closeTo(8 / 18, .001),
         );
         final historyBefore = await history.list();
+
+        Future<void> compareBrowseEdges(Size size, {String? screenshot}) async {
+          tester.view.physicalSize = size * tester.view.devicePixelRatio;
+          await tester.pump(const Duration(milliseconds: 450));
+          historyPosition().jumpTo(0);
+          await tester.pump(const Duration(milliseconds: 450));
+          final historyPage = find.byKey(const PageStorageKey('library-tab-2'));
+          final row = tester.getRect(firstRow);
+          final historyBrand = tester.getTopLeft(
+            find.descendant(of: historyPage, matching: find.byType(OrvexBrand)),
+          );
+          final historyTitle = tester.getTopLeft(
+            find.descendant(of: historyPage, matching: find.text('播放记录')),
+          );
+          expect(
+            tester.getTopLeft(find.text('最近播放')).dx,
+            closeTo(row.left, .01),
+          );
+          expect(
+            tester.getTopRight(find.text('${historyBefore.length} 条记录')).dx,
+            closeTo(row.right, .01),
+          );
+          final historyNav = tester.getRect(navSurface);
+          final historyMini = tester.getRect(mini);
+          if (screenshot != null) {
+            await capture('library-inset-history-$screenshot');
+          }
+
+          await tester.tap(find.byKey(const ValueKey('tab-1')));
+          await tester.pump(const Duration(milliseconds: 500));
+          final overview = find.byKey(const PageStorageKey('series-overview'));
+          final overviewScroll = find
+              .descendant(of: overview, matching: find.byType(Scrollable))
+              .first;
+          tester.state<ScrollableState>(overviewScroll).position.jumpTo(0);
+          await tester.pump(const Duration(milliseconds: 450));
+          final field = tester.getRect(
+            find.descendant(of: overview, matching: find.byType(TextFormField)),
+          );
+          final libraryBrand = tester.getTopLeft(
+            find.descendant(of: overview, matching: find.byType(OrvexBrand)),
+          );
+          final libraryTitle = tester.getTopLeft(
+            find.descendant(of: overview, matching: find.text('媒体库')),
+          );
+          expect(historyBrand.dx, closeTo(libraryBrand.dx, .01));
+          expect(historyTitle.dx, closeTo(libraryTitle.dx, .01));
+          expect(row.left, closeTo(field.left, .01));
+          expect(row.right, closeTo(field.right, .01));
+          expect(tester.getRect(navSurface), historyNav);
+          expect(tester.getRect(mini), historyMini);
+          if (screenshot != null) {
+            await capture('library-inset-library-$screenshot');
+          }
+          await tester.tap(find.byKey(const ValueKey('tab-2')));
+          await tester.pump(const Duration(milliseconds: 500));
+        }
+
+        await compareBrowseEdges(landscape, screenshot: 'landscape');
+        await compareBrowseEdges(Size(landscape.height, landscape.width));
+        await compareBrowseEdges(
+          Size(438, landscape.height),
+          screenshot: 'narrow',
+        );
+        tester.view.physicalSize = landscape * tester.view.devicePixelRatio;
+        await tester.pump(const Duration(milliseconds: 450));
+        observations['historyBrowseInsetsAligned'] = true;
         await capture('library-history-dark');
         await appearance.setMode(ThemeMode.light);
         await capture('library-history-light');

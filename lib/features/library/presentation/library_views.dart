@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
@@ -16,6 +15,7 @@ import '../../folder_library/thumbnail_cache.dart';
 import '../../player/presentation/playback_surface.dart';
 import '../domain/playback_record.dart';
 import '../domain/recent_work.dart';
+import 'library_browse_style.dart';
 
 class LibraryViews extends StatelessWidget {
   const LibraryViews({
@@ -81,7 +81,7 @@ class LibraryViews extends StatelessWidget {
         child: tab == 2
             ? _history(
                 context,
-                math.max(inset, (constraints.maxWidth - 1160) / 2),
+                libraryBrowseInset(constraints.maxWidth),
                 bottom,
               )
             : SingleChildScrollView(
