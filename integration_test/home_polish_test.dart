@@ -759,6 +759,7 @@ void main() {
         await tester.pump(const Duration(milliseconds: 450));
         expect(find.byType(TextFormField), findsWidgets);
         expect(find.byKey(const ValueKey('home-library')), findsNothing);
+        final libraryHeaderLeft = tester.getTopLeft(find.byType(OrvexBrand)).dx;
         await tester.tap(find.byKey(const ValueKey('tab-0')));
         await tester.pump(const Duration(milliseconds: 450));
         await scrollHome(bottom: true);
@@ -781,8 +782,12 @@ void main() {
           matching: find.byType(OrvexBrand),
         );
         expect(
-          tester.getTopLeft(themePicker).dx,
           tester.getTopLeft(settingsBrand).dx,
+          closeTo(libraryHeaderLeft, .01),
+        );
+        expect(
+          tester.getCenter(themePicker).dx,
+          closeTo(tester.getCenter(settingsPage).dx, .01),
         );
         expect(
           tester.getSize(themePicker).width,
@@ -1191,6 +1196,18 @@ void main() {
         await tester.tap(find.byKey(const ValueKey('tab-3')));
         await tester.pump(const Duration(milliseconds: 450));
         final miniBounds = tester.getRect(mini);
+        final narrowThemeBounds = tester.getRect(themePicker);
+        final narrowPageBounds = tester.getRect(settingsPage);
+        final narrowInset =
+            tester.getTopLeft(settingsBrand).dx - narrowPageBounds.left;
+        expect(
+          narrowThemeBounds.left - narrowPageBounds.left,
+          closeTo(narrowInset, .01),
+        );
+        expect(
+          narrowPageBounds.right - narrowThemeBounds.right,
+          closeTo(narrowInset, .01),
+        );
         await tester.tap(find.widgetWithText(SwitchListTile, '显示继续观看'));
         await tester.pump(const Duration(milliseconds: 450));
         expect(

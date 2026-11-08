@@ -95,9 +95,11 @@ class LibraryViews extends StatelessWidget {
             children: [
               _header(context),
               const SizedBox(height: OrvexMetrics.section),
-              ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 760),
-                child: _settings(context),
+              Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 760),
+                  child: _settings(context),
+                ),
               ),
             ],
           ),
