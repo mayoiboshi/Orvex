@@ -765,11 +765,23 @@ void main() {
       await mount(tester, const Size(1194, 834));
       await metadata.selectMany(
         conan,
-        const AnimeSubject(id: 1, name: '名侦探柯南', nameCn: '', platform: 'TV'),
+        const AnimeSubject(
+          id: 1,
+          name: '名侦探柯南',
+          nameCn: '',
+          platform: 'TV',
+          date: '1996-01-08',
+        ),
       );
       await metadata.selectMany(
         tooMany,
-        const AnimeSubject(id: 2, name: '败犬女主太多了！', nameCn: '', platform: 'TV'),
+        const AnimeSubject(
+          id: 2,
+          name: '败犬女主太多了！',
+          nameCn: '',
+          platform: 'TV',
+          score: 8.1,
+        ),
       );
       await metadata.select(
         movie,
@@ -779,6 +791,8 @@ void main() {
           nameCn: '',
           platform: 'WEB',
           episodes: 1,
+          date: '2026-01-22',
+          score: 8.0,
         ),
       );
       await tester.pumpAndSettle();
@@ -794,6 +808,31 @@ void main() {
       expect(find.text('已收录 28 个视频'), findsOneWidget);
       expect(find.text('已收录 12 个视频'), findsOneWidget);
       final movieCard = find.byKey(ValueKey('home-recent-${movie.resumeKey}'));
+      for (final (card, expected) in [
+        (
+          find.byKey(const ValueKey('home-recent-bangumi:1')),
+          ['名侦探柯南', '1996', '已收录 28 个视频'],
+        ),
+        (
+          find.byKey(const ValueKey('home-recent-bangumi:2')),
+          ['败犬女主太多了！', '★ 8.1', '已收录 12 个视频'],
+        ),
+        (movieCard, ['超辉夜姬！', '2026 · ★ 8.0']),
+      ]) {
+        final labels = tester.widgetList<Text>(
+          find.descendant(of: card, matching: find.byType(Text)),
+        );
+        final captions = labels.where(
+          (label) => find
+              .ancestor(
+                of: find.byWidget(label),
+                matching: find.byType(AspectRatio),
+              )
+              .evaluate()
+              .isEmpty,
+        );
+        expect(captions.map((label) => label.data), expected);
+      }
       final artwork = find.descendant(
         of: movieCard,
         matching: find.byType(AspectRatio),

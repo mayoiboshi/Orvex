@@ -123,6 +123,8 @@ void main() {
           nameCn: '电影测试样片',
           platform: 'WEB',
           episodes: 1,
+          date: '2026-01-22',
+          score: 8.0,
         ),
         3 => const AnimeSubject(
           id: 102,
@@ -207,11 +209,20 @@ void main() {
     }
 
     final home = find.byKey(const PageStorageKey('library-tab-0'));
+    final navSurface = find
+        .descendant(
+          of: find.byType(LibraryTabBar),
+          matching: find.byType(GlassSurface),
+        )
+        .first;
+    ScrollPosition homePosition() => tester
+        .state<ScrollableState>(
+          find.descendant(of: home, matching: find.byType(Scrollable)).first,
+        )
+        .position;
     Future<void> scrollHome({bool bottom = false}) async {
-      final scroll = tester.state<ScrollableState>(
-        find.descendant(of: home, matching: find.byType(Scrollable)).first,
-      );
-      scroll.position.jumpTo(bottom ? scroll.position.maxScrollExtent : 0);
+      final position = homePosition();
+      position.jumpTo(bottom ? position.maxScrollExtent : 0);
       await tester.pump(const Duration(milliseconds: 450));
     }
 
@@ -241,6 +252,7 @@ void main() {
         if ((card.top - last.top).abs() < 1) {
           expect(card.top, greaterThanOrEqualTo(scrollTop));
           expect(card.bottom, lessThan(navTop));
+          expect(recentCard(media).hitTestable(), findsOneWidget);
         }
       }
     }
@@ -354,18 +366,45 @@ void main() {
               alignment: 0.07,
             );
             await capture('$name-recent');
+            final panel =
+                tester
+                        .widget<DecoratedBox>(
+                          find
+                              .descendant(
+                                of: navSurface,
+                                matching: find.byType(DecoratedBox),
+                              )
+                              .first,
+                        )
+                        .decoration
+                    as BoxDecoration;
+            expect(panel.color?.a, 1);
+            if (narrow) {
+              final poster = find.descendant(
+                of: recentCard(videos[4]),
+                matching: find.byType(AspectRatio),
+              );
+              final position = homePosition();
+              final overlapOffset =
+                  position.pixels +
+                  tester.getCenter(poster).dy -
+                  tester.getCenter(navSurface).dy;
+              position.jumpTo(
+                overlapOffset.clamp(0.0, position.maxScrollExtent),
+              );
+              await tester.pump(const Duration(milliseconds: 450));
+              expect(
+                tester.getRect(poster).overlaps(tester.getRect(navSurface)),
+                isTrue,
+              );
+              await capture('$name-nav-over-poster');
+            }
           }
         }
       }
       tester.view.physicalSize = landscape * tester.view.devicePixelRatio;
       await appearance.setMode(ThemeMode.light);
       await scrollHome();
-      final navSurface = find
-          .descendant(
-            of: find.byType(LibraryTabBar),
-            matching: find.byType(GlassSurface),
-          )
-          .first;
       final homeNavRect = tester.getRect(navSurface);
       final nav = homeNavRect.size;
       observations['navigationSize'] = [nav.width, nav.height];
@@ -379,6 +418,22 @@ void main() {
         );
         expect(recentImage(videos[6], 'bangumi-cover-101.img'), isNotNull);
         expect(recentImage(videos[6], '/thumbnails-v1/'), isNull);
+        expect(
+          find.descendant(
+            of: recentCard(videos[6]),
+            matching: find.text('2026 · ★ 8.0'),
+          ),
+          findsOneWidget,
+        );
+        for (final index in [0, 4, 6]) {
+          expect(
+            find.descendant(
+              of: recentCard(videos[index]),
+              matching: find.textContaining('Bangumi'),
+            ),
+            findsNothing,
+          );
+        }
         expect(
           tester
               .widgetList<Image>(

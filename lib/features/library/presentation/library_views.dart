@@ -734,6 +734,10 @@ class LibraryViews extends StatelessWidget {
         ? _standalonePosterSubject(media)
         : null;
     final subject = series ?? standalone;
+    final captionSubject = home ? subject ?? metadata.subjectFor(media) : null;
+    final caption = captionSubject == null
+        ? _mediaCaption(media)
+        : _subjectCaption(captionSubject, includeSource: false);
     void showMetadata() => onMetadata(media, group: work?.files);
     return SizedBox(
       width: width,
@@ -828,17 +832,17 @@ class LibraryViews extends StatelessWidget {
                 overflow: TextOverflow.ellipsis,
                 style: Theme.of(context).textTheme.titleSmall,
               ),
-            const SizedBox(height: 4),
-            Text(
-              series == null
-                  ? _mediaCaption(media)
-                  : _subjectCaption(series, includeSource: false),
-              maxLines: series == null ? 1 : null,
-              overflow: series == null ? TextOverflow.ellipsis : null,
-              style: Theme.of(context).textTheme.labelSmall,
-            ),
-            if (work != null) ...[
-              const SizedBox(height: 2),
+            if (caption.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Text(
+                caption,
+                maxLines: home ? null : 1,
+                overflow: home ? null : TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.labelSmall,
+              ),
+            ],
+            if (work != null && work.files.length > 1) ...[
+              SizedBox(height: caption.isEmpty ? 4 : 2),
               Text(
                 '已收录 ${work.files.length} 个视频',
                 style: Theme.of(context).textTheme.labelSmall,
@@ -1018,7 +1022,7 @@ class LibraryViews extends StatelessWidget {
       if (subject.date.length >= 4) subject.date.substring(0, 4),
       if (subject.score > 0) '★ ${subject.score.toStringAsFixed(1)}',
     ];
-    if (includeSource || details.isEmpty) details.add('Bangumi');
+    if (includeSource) details.add('Bangumi');
     return details.join(' · ');
   }
 
@@ -1502,7 +1506,6 @@ class LibraryTabBar extends StatelessWidget {
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 500),
           child: GlassSurface(
-            translucent: true,
             subtle: true,
             radius: OrvexMetrics.navigationRadius,
             padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
