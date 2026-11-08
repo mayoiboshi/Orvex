@@ -25,11 +25,7 @@ func render(_ size: Int, at url: URL, inset: Bool) throws {
   try bitmap.representation(using: .png, properties: [:])!.write(to: url)
 }
 let manager = FileManager.default
-let ios = root.appendingPathComponent("ios/Runner/Assets.xcassets/AppIcon.appiconset")
-for file in try manager.contentsOfDirectory(at: ios, includingPropertiesForKeys: nil) where file.pathExtension == "png" {
-  let original = NSBitmapImageRep(data: try Data(contentsOf: file))!
-  try render(original.pixelsWide, at: file, inset: false)
-}
+// The iOS/iPadOS launcher icon is maintained in ios/Runner/AppIcon.icon.
 let mac = root.appendingPathComponent("macos/Runner/Assets.xcassets/AppIcon.appiconset")
 for file in try manager.contentsOfDirectory(at: mac, includingPropertiesForKeys: nil) where file.pathExtension == "png" {
   let original = NSBitmapImageRep(data: try Data(contentsOf: file))!
