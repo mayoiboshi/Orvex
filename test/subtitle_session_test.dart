@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:orvex/design/orvex_theme.dart';
 import 'package:orvex/features/player/presentation/playback_surface.dart';
 import 'package:orvex/features/player/application/playback_session.dart';
+import 'package:orvex/features/player/domain/playback_defaults.dart';
 import 'package:orvex/features/player/domain/playback_engine.dart';
 import 'package:orvex/features/subtitles/domain/subtitle_models.dart';
 
@@ -148,6 +149,47 @@ void main() {
     sessions.add(session);
     return session;
   }
+
+  test(
+    'subtitle language uses tags and respects existing media memory',
+    () async {
+      const en = MediaTrack('1', 'Original title', language: 'eng');
+      const zh = MediaTrack('2', 'Simplified', language: 'zh-Hans');
+      final session = create(embedded: [en, zh]);
+      session.defaults = const PlaybackDefaults(
+        subtitleLanguage: TrackLanguage.chinese,
+      );
+      await session.open(_one);
+      await session.subtitlesReady;
+      expect(engines.last.selected, ['2']);
+      expect(support.discoveries, 0);
+      await session.selectSubtitle('1');
+      await session.open(_one);
+      await session.subtitlesReady;
+      expect(engines.last.selected, ['1']);
+      await session.selectSubtitle('no');
+      await session.open(_one);
+      await session.subtitlesReady;
+      expect(engines.last.selected, ['no']);
+    },
+  );
+
+  test(
+    'unavailable subtitle language falls back to existing local matching',
+    () async {
+      support.matches[_one.resumeKey] = [
+        const SubtitleCandidate(_a, SubtitleMatch.exact),
+      ];
+      final session = create(embedded: [const MediaTrack('1', '中文')]);
+      session.defaults = const PlaybackDefaults(
+        subtitleLanguage: TrackLanguage.chinese,
+      );
+      await session.open(_one);
+      await session.subtitlesReady;
+      expect(engines.last.loaded.single.path, '/Imports/a/same.ass');
+      expect(support.discoveries, 1);
+    },
+  );
 
   tearDown(() async {
     for (final session in sessions) {

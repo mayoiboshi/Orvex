@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/widgets.dart';
+import 'package:orvex/features/player/domain/playback_defaults.dart';
 import 'package:orvex/features/player/domain/playback_engine.dart';
 
 class FakeEngine implements PlaybackEngine {
@@ -11,6 +12,7 @@ class FakeEngine implements PlaybackEngine {
   final seeks = <Duration>[];
   final rates = <double>[];
   final volumes = <double>[];
+  final audioSelections = <String>[];
   Duration? openedAt;
   Completer<void>? openGate;
   bool disposed = false;
@@ -28,7 +30,8 @@ class FakeEngine implements PlaybackEngine {
   Stream<PlaybackInterruption> get interruptions =>
       interruptionController.stream;
   @override
-  Widget buildVideo() => const ColoredBox(color: Color(0xFF000000));
+  Widget buildVideo({PlaybackFit fit = PlaybackFit.contain}) =>
+      const ColoredBox(color: Color(0xFF000000));
   @override
   Future<void> open(LocalMedia media, {required Duration start}) async {
     openedAt = start;
@@ -52,7 +55,7 @@ class FakeEngine implements PlaybackEngine {
   }
 
   @override
-  Future<void> selectAudio(String id) async {}
+  Future<void> selectAudio(String id) async => audioSelections.add(id);
   @override
   Future<void> setRate(double rate) async {
     rates.add(rate);

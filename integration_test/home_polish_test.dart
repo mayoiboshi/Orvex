@@ -11,6 +11,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:media_kit/media_kit.dart';
+import 'package:media_kit_video/media_kit_video.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:orvex/app/orvex_app.dart';
 import 'package:orvex/design/appearance_controller.dart';
@@ -25,9 +26,11 @@ import 'package:orvex/features/library/presentation/library_views.dart';
 import 'package:orvex/features/media_sources/imported_file_store.dart';
 import 'package:orvex/features/media_sources/local_file_source.dart';
 import 'package:orvex/features/player/application/playback_session.dart';
+import 'package:orvex/features/player/domain/playback_defaults.dart';
 import 'package:orvex/features/player/domain/playback_engine.dart';
 import 'package:orvex/features/player/infrastructure/media_kit_engine.dart';
 import 'package:orvex/features/player/infrastructure/preferences_resume_store.dart';
+import 'package:orvex/features/subtitles/infrastructure/local_subtitles.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
 import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
@@ -73,6 +76,7 @@ void main() {
     'ORVEX_HOME_UI_STAGE',
     defaultValue: 'after',
   );
+  const taggedPlayback = bool.fromEnvironment('ORVEX_TAGGED_PLAYBACK_TEST');
   testWidgets('home polish $stage: themes, sections, actions and resume', (
     tester,
   ) async {
@@ -102,6 +106,7 @@ void main() {
     final alternate = File(
       '${Directory.systemTemp.path}/orvex-visual-library/history-episode.mp4',
     );
+    if (taggedPlayback) expect(await alternate.exists(), isTrue);
     final videos = <LocalMedia>[];
     for (var i = 0; i < 8; i++) {
       final title = i < 4 ? '葬送的芙莉莲' : '名侦探柯南';
@@ -222,6 +227,9 @@ void main() {
       },
       resumeStore: resume,
       onCheckpoint: history.record,
+      subtitleSupport: taggedPlayback
+          ? LocalSubtitles(folders: folders, imports: store)
+          : null,
     );
     final screen = GlobalKey();
     final observations = <String, Object?>{
@@ -832,8 +840,8 @@ void main() {
           of: settingsPage,
           matching: find.byType(GlassSurface),
         );
-        expect(settingsCards, findsNWidgets(4));
-        for (var i = 0; i < 4; i++) {
+        expect(settingsCards, findsNWidgets(6));
+        for (var i = 0; i < 6; i++) {
           final card = tester.getRect(settingsCards.at(i));
           expect(card.left, closeTo(settingsFormBounds.left, .01));
           expect(card.width, closeTo(settingsFormBounds.width, .01));
@@ -1258,7 +1266,9 @@ void main() {
           narrowPageBounds.right - narrowThemeBounds.right,
           closeTo(narrowInset, .01),
         );
-        await tester.tap(find.widgetWithText(SwitchListTile, '显示继续观看'));
+        final continueSwitch = find.widgetWithText(SwitchListTile, '显示继续观看');
+        await tester.ensureVisible(continueSwitch);
+        await tester.tap(continueSwitch);
         await tester.pump(const Duration(milliseconds: 450));
         expect(
           await SharedPreferencesAsync().getBool('orvex.home.continue.v1'),
@@ -1279,7 +1289,8 @@ void main() {
         expect(session.frame.position, settingsPosition);
         await tester.tap(find.byKey(const ValueKey('tab-3')));
         await tester.pump(const Duration(milliseconds: 450));
-        await tester.tap(find.widgetWithText(SwitchListTile, '显示继续观看'));
+        await tester.ensureVisible(continueSwitch);
+        await tester.tap(continueSwitch);
         await tester.pump(const Duration(milliseconds: 450));
         await appearance.setMode(ThemeMode.dark);
         await tester.pump(const Duration(milliseconds: 450));
@@ -1313,6 +1324,62 @@ void main() {
           tester.platformDispatcher.clearTextScaleFactorTestValue();
         }
         observations['settingsPreservePlaybackAndLicenses'] = true;
+        if (taggedPlayback) {
+          Future<void> choose(String title, String value) async {
+            final row = find.byKey(ValueKey(title));
+            await tester.ensureVisible(row);
+            await tester.tap(row);
+            await tester.pump(const Duration(milliseconds: 450));
+            await tester.tap(find.byKey(ValueKey((title, value))));
+            await tester.pump(const Duration(milliseconds: 450));
+          }
+
+          await choose('默认播放速度', '1.25×');
+          await choose('默认画面适配', '填满画面');
+          await choose('字幕偏好', '中文');
+          await choose('音轨偏好', '日语');
+          expect(session.currentDefaults.rate, 1);
+          expect(session.pictureFit, PlaybackFit.contain);
+          await session.close();
+          await tester.pump(const Duration(milliseconds: 450));
+          await tester.tap(find.byKey(const ValueKey('tab-2')));
+          await tester.pump(const Duration(milliseconds: 450));
+          await tester.ensureVisible(firstRow);
+          await tester.tap(
+            find.descendant(of: firstRow, matching: find.byTooltip('继续播放')),
+          );
+          await until(
+            () {
+              final frame = session.frame;
+              return session.ready &&
+                  session.media?.resumeKey == videos[5].resumeKey &&
+                  frame.rate == 1.25 &&
+                  frame.audioTracks.any(
+                    (track) =>
+                        track.id == frame.audioTrackId &&
+                        TrackLanguage.japanese.matches(track.language),
+                  ) &&
+                  frame.subtitleTracks.any(
+                    (track) =>
+                        track.id == frame.subtitleTrackId &&
+                        TrackLanguage.chinese.matches(track.language),
+                  );
+            },
+            'native defaults apply to the opened video and actual language tags',
+          );
+          expect(tester.widget<Video>(find.byType(Video)).fit, BoxFit.cover);
+          session.setPictureFit(PlaybackFit.contain);
+          await session.setRate(1.5);
+          await until(
+            () =>
+                session.frame.rate == 1.5 &&
+                tester.widget<Video>(find.byType(Video)).fit == BoxFit.contain,
+            'temporary speed and picture fit applied',
+          );
+          expect(session.defaults.rate, 1.25);
+          expect(session.defaults.fit, PlaybackFit.cover);
+          observations['nativePlaybackDefaults'] = true;
+        }
       }
       passed = true;
     } finally {

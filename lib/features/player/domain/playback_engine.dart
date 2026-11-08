@@ -1,5 +1,7 @@
 import 'package:flutter/widgets.dart';
 
+import 'playback_defaults.dart';
+
 class LocalMedia {
   const LocalMedia({
     required this.uri,
@@ -55,9 +57,10 @@ bool validImportPath(String path) {
 }
 
 class MediaTrack {
-  const MediaTrack(this.id, this.label);
+  const MediaTrack(this.id, this.label, {this.language});
   final String id;
   final String label;
+  final String? language;
 }
 
 class PlaybackFrame {
@@ -94,7 +97,7 @@ abstract interface class PlaybackEngine {
   Stream<PlaybackFrame> get frames;
   Stream<String> get errors;
   Stream<PlaybackInterruption> get interruptions;
-  Widget buildVideo();
+  Widget buildVideo({PlaybackFit fit = PlaybackFit.contain});
   Future<void> open(LocalMedia media, {required Duration start});
   Future<void> togglePause();
   Future<void> pause();

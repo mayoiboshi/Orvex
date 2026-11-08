@@ -20,7 +20,9 @@ import 'package:orvex/features/library/presentation/library_views.dart';
 import 'package:orvex/features/media_sources/imported_file_store.dart';
 import 'package:orvex/features/media_sources/local_file_source.dart';
 import 'package:orvex/features/player/application/playback_session.dart';
+import 'package:orvex/features/player/domain/playback_defaults.dart';
 import 'package:orvex/features/player/domain/playback_engine.dart';
+import 'package:orvex/features/player/infrastructure/playback_preferences.dart';
 import 'package:orvex/features/player/presentation/playback_surface.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
@@ -155,7 +157,9 @@ void main() {
         expect(tester.takeException(), isNull);
       }
       expect(find.text('显示继续观看'), findsOneWidget);
-      await tester.tap(find.widgetWithText(SwitchListTile, '显示继续观看'));
+      final toggle = find.widgetWithText(SwitchListTile, '显示继续观看');
+      await tester.ensureVisible(toggle);
+      await tester.tap(toggle);
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('tab-0')));
       await tester.pumpAndSettle();
@@ -163,6 +167,174 @@ void main() {
       expect(find.byKey(const ValueKey('tab-3')), findsOneWidget);
     });
   }
+
+  testWidgets(
+    'playback settings drive defaults and read back after reopening the app',
+    (tester) async {
+      await mount(tester, const Size(438, 834));
+      await tester.tap(find.byKey(const ValueKey('tab-3')));
+      await tester.pumpAndSettle();
+
+      Future<void> choose(String title, String label) async {
+        final row = find.byKey(ValueKey(title));
+        await tester.ensureVisible(row);
+        await tester.tap(row);
+        await tester.pumpAndSettle();
+        final option = find.byKey(ValueKey((title, label)));
+        expect(option, findsOneWidget);
+        await tester.tap(option);
+        await tester.pumpAndSettle();
+        expect(
+          find.descendant(of: row, matching: find.text(label)),
+          findsOneWidget,
+        );
+      }
+
+      await choose('重新打开视频', '从头开始');
+      await choose('默认播放速度', '1.5×');
+      await choose('默认画面适配', '填满画面');
+      await choose('字幕偏好', '中文');
+      await choose('音轨偏好', '日语');
+      final automatic = find.widgetWithText(SwitchListTile, '自动播放下一集');
+      await tester.ensureVisible(automatic);
+      await tester.tap(automatic);
+      await tester.pumpAndSettle();
+      final controls = find.widgetWithText(ListTile, '操作与手势');
+      await tester.ensureVisible(controls);
+      await tester.tap(controls);
+      await tester.pumpAndSettle();
+      await choose('快进快退步长', '30 秒');
+      await tester.tap(find.widgetWithText(SwitchListTile, '触屏播放手势'));
+      await tester.pumpAndSettle();
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      expect(session.defaults.rate, 1.5);
+      expect(session.defaults.skipSeconds, 30);
+      expect(session.autoNext, isTrue);
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      session.dispose();
+      metadata.dispose();
+      await mount(tester, const Size(438, 834));
+      expect(session.defaults.reopen, ReopenBehavior.restart);
+      expect(session.defaults.rate, 1.5);
+      expect(session.defaults.fit, PlaybackFit.cover);
+      expect(session.defaults.skipSeconds, 30);
+      expect(session.defaults.touchGestures, isFalse);
+      expect(session.defaults.subtitleLanguage, TrackLanguage.chinese);
+      expect(session.defaults.audioLanguage, TrackLanguage.japanese);
+      expect(session.autoNext, isTrue);
+      await tester.tap(find.byKey(const ValueKey('tab-3')));
+      await tester.pumpAndSettle();
+      expect(
+        find.descendant(
+          of: find.byTooltip('默认播放速度'),
+          matching: find.text('1.5×'),
+        ),
+        findsOneWidget,
+      );
+    },
+    variant: TargetPlatformVariant.only(TargetPlatform.iOS),
+  );
+
+  testWidgets(
+    'ordinary opens ask while explicitly labelled resume bypasses the prompt',
+    (tester) async {
+      final video = datedVideo('旅行片段', 1);
+      imports.videos = [video];
+      final prefs = PlaybackPreferences(SharedPreferencesAsync());
+      await prefs.update((old) => old.copyWith(reopen: ReopenBehavior.ask));
+      prefs.dispose();
+      await PlaybackHistoryStore().record(
+        video,
+        const PlaybackFrame(
+          position: Duration(seconds: 31),
+          duration: Duration(minutes: 2),
+        ),
+      );
+      await mount(tester, const Size(900, 834));
+      await session.resumeStore.write(
+        video.resumeKey,
+        const Duration(seconds: 31),
+      );
+      await tester.tap(find.byKey(const ValueKey('tab-1')));
+      await tester.pumpAndSettle();
+      final ordinary = find.text('旅行片段');
+      await tester.ensureVisible(ordinary);
+      await tester.tap(ordinary);
+      await tester.pumpAndSettle();
+      expect(find.text('继续上次进度？'), findsOneWidget);
+      await tester.tap(find.widgetWithText(TextButton, '取消'));
+      await tester.pumpAndSettle();
+      expect(createdEngines, 0);
+      await tester.tap(ordinary);
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(TextButton, '从头开始'));
+      await tester.pumpAndSettle();
+      expect(engine.openedAt, Duration.zero);
+      engine.frameController.add(
+        const PlaybackFrame(
+          position: Duration(seconds: 15),
+          duration: Duration(minutes: 2),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('返回首页'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('tab-0')));
+      await tester.pumpAndSettle();
+      final resume = find.text('继续播放');
+      await tester.ensureVisible(resume);
+      await tester.tap(resume);
+      await tester.pumpAndSettle();
+      expect(find.text('继续上次进度？'), findsNothing);
+      expect(session.frame.position, const Duration(seconds: 15));
+      expect(createdEngines, 1);
+      expect(engine.seeks, isEmpty);
+    },
+  );
+
+  testWidgets(
+    'automatic next follows adjacent episodes without crossing to unrelated imports',
+    (tester) async {
+      final first = datedVideo('Test Show - 01', 1);
+      final second = datedVideo('Test Show - 02', 2);
+      final unrelated = datedVideo('旅行片段', 3);
+      imports.videos = [unrelated, first, second];
+      await SharedPreferencesAsync().setBool(
+        PlaybackPreferences.autoNextKey,
+        true,
+      );
+      await mount(tester, const Size(900, 834));
+      await tester.tap(find.byKey(const ValueKey('tab-1')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('旅行片段'));
+      await tester.pumpAndSettle();
+      expect(session.hasNext, isTrue);
+      engine.frameController.add(const PlaybackFrame(completed: true));
+      await tester.pumpAndSettle();
+      expect(session.media?.resumeKey, unrelated.resumeKey);
+      await tester.tap(find.byTooltip('返回首页'));
+      await tester.pumpAndSettle();
+      final series = find.byKey(
+        ValueKey('series-${identifySeries(first).key}'),
+      );
+      await tester.ensureVisible(series);
+      await tester.tap(series);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(ValueKey(first.resumeKey)));
+      await tester.pump();
+      await tester.runAsync(() => Future<void>.delayed(Duration.zero));
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(session.ready, isTrue);
+      engine.frameController.add(const PlaybackFrame(completed: true));
+      await tester.pump();
+      await tester.runAsync(() => Future<void>.delayed(Duration.zero));
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(session.ready, isTrue);
+      expect(session.media?.resumeKey, second.resumeKey);
+    },
+  );
 
   testWidgets(
     'library search opens media and returning shows real persisted history',

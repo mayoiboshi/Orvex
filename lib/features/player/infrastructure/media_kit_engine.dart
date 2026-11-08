@@ -7,6 +7,7 @@ import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 import 'package:path_provider/path_provider.dart';
 
+import '../domain/playback_defaults.dart';
 import '../domain/playback_engine.dart';
 
 class MediaKitEngine implements PlaybackEngine {
@@ -118,12 +119,20 @@ class MediaKitEngine implements PlaybackEngine {
       audioTracks: [
         for (final track in state.tracks.audio)
           if (track.id != 'auto' && track.id != 'no')
-            MediaTrack(track.id, label(track.id, track.title, track.language)),
+            MediaTrack(
+              track.id,
+              label(track.id, track.title, track.language),
+              language: track.language,
+            ),
       ],
       subtitleTracks: [
         for (final track in state.tracks.subtitle)
           if (track.id != 'auto' && track.id != 'no')
-            MediaTrack(track.id, label(track.id, track.title, track.language)),
+            MediaTrack(
+              track.id,
+              label(track.id, track.title, track.language),
+              language: track.language,
+            ),
       ],
       audioTrackId: state.track.audio.id,
       subtitleTrackId: state.track.subtitle.id,
@@ -131,7 +140,11 @@ class MediaKitEngine implements PlaybackEngine {
   }
 
   @override
-  Widget buildVideo() => Video(controller: _video, controls: NoVideoControls);
+  Widget buildVideo({PlaybackFit fit = PlaybackFit.contain}) => Video(
+    controller: _video,
+    controls: NoVideoControls,
+    fit: fit == PlaybackFit.cover ? BoxFit.cover : BoxFit.contain,
+  );
 
   @override
   Future<void> open(LocalMedia media, {required Duration start}) async {

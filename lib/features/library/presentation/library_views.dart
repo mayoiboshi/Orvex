@@ -7,7 +7,9 @@ import 'package:package_info_plus/package_info_plus.dart';
 import '../../../design/appearance_controller.dart';
 import '../../../design/glass.dart';
 import '../../../design/orvex_theme.dart';
+import '../../player/domain/playback_defaults.dart';
 import '../../player/domain/playback_engine.dart';
+import '../../player/infrastructure/playback_preferences.dart';
 import '../../anime_metadata/application/anime_metadata_controller.dart';
 import '../../anime_metadata/domain/anime_filename.dart';
 import '../../anime_metadata/domain/anime_subject.dart';
@@ -33,6 +35,8 @@ class LibraryViews extends StatelessWidget {
     required this.onQuery,
     required this.onImport,
     required this.onOpen,
+    this.onOpenWithIntent,
+    this.playbackPreferences,
     required this.onTab,
     required this.onRefresh,
     required this.onShowContinue,
@@ -53,6 +57,8 @@ class LibraryViews extends StatelessWidget {
   final ValueChanged<String> onQuery;
   final VoidCallback onImport;
   final ValueChanged<LocalMedia> onOpen;
+  final void Function(LocalMedia, PlaybackOpenIntent)? onOpenWithIntent;
+  final PlaybackPreferences? playbackPreferences;
   final ValueChanged<int> onTab;
   final Future<void> Function() onRefresh;
   final ValueChanged<bool> onShowContinue;
@@ -65,6 +71,15 @@ class LibraryViews extends StatelessWidget {
 
   List<PlaybackRecord> get continuing =>
       history.where((record) => record.canContinue).toList();
+
+  void _openWithIntent(LocalMedia media, PlaybackOpenIntent intent) {
+    final open = onOpenWithIntent;
+    if (open == null) {
+      onOpen(media);
+    } else {
+      open(media, intent);
+    }
+  }
 
   @override
   Widget build(BuildContext context) => LayoutBuilder(
@@ -524,7 +539,8 @@ class LibraryViews extends StatelessWidget {
               );
               final play = FilledButton.icon(
                 key: const ValueKey('home-resume'),
-                onPressed: () => onOpen(record.media),
+                onPressed: () =>
+                    _openWithIntent(record.media, PlaybackOpenIntent.resume),
                 style: FilledButton.styleFrom(
                   minimumSize: const Size(0, OrvexMetrics.hitSize),
                   padding: const EdgeInsets.symmetric(
@@ -621,7 +637,7 @@ class LibraryViews extends StatelessWidget {
   Widget _continueCard(BuildContext context, PlaybackRecord record) => InkWell(
     key: ValueKey('home-continue-${record.media.resumeKey}'),
     borderRadius: BorderRadius.circular(OrvexMetrics.coverRadius),
-    onTap: () => onOpen(record.media),
+    onTap: () => _openWithIntent(record.media, PlaybackOpenIntent.resume),
     onLongPress: () => onMetadata(record.media),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1063,7 +1079,11 @@ class LibraryViews extends StatelessWidget {
                       ? '继续播放'
                       : '播放视频',
                   color: colors.accent,
-                  onPressed: open,
+                  onPressed: record.completed
+                      ? () => _openWithIntent(media, PlaybackOpenIntent.restart)
+                      : record.canContinue
+                      ? () => _openWithIntent(media, PlaybackOpenIntent.resume)
+                      : open,
                   icon: const Icon(Icons.play_arrow_rounded),
                 ),
               ],
@@ -1288,6 +1308,8 @@ class LibraryViews extends StatelessWidget {
             ),
           ),
       ]),
+      if (playbackPreferences case final preferences?)
+        _playbackSettings(context, preferences),
       const SizedBox(height: OrvexMetrics.section),
       _section(context, '首页'),
       const SizedBox(height: OrvexMetrics.gap),
@@ -1335,6 +1357,198 @@ class LibraryViews extends StatelessWidget {
     ThemeMode.light => '浅色',
     ThemeMode.dark => '深色',
   };
+
+  Widget _playbackSettings(
+    BuildContext context,
+    PlaybackPreferences preferences,
+  ) => ListenableBuilder(
+    listenable: preferences,
+    builder: (context, _) {
+      final values = preferences.defaults;
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SizedBox(height: OrvexMetrics.section),
+          _section(context, '播放'),
+          const SizedBox(height: OrvexMetrics.gap),
+          _group([
+            _preferenceChoice(
+              '重新打开视频',
+              values.reopen,
+              ReopenBehavior.values,
+              (value) => value.label,
+              (value) =>
+                  preferences.update((old) => old.copyWith(reopen: value)),
+            ),
+            _settingsDivider,
+            _preferenceChoice(
+              '默认播放速度',
+              values.rate,
+              playbackRates,
+              (value) => '$value×',
+              (value) => preferences.update((old) => old.copyWith(rate: value)),
+            ),
+            _settingsDivider,
+            SwitchListTile.adaptive(
+              contentPadding: _settingsRowPadding,
+              title: const Text('自动播放下一集'),
+              subtitle: const Text('仅在播放队列有明确的相邻剧集时启用。'),
+              value: preferences.autoNext,
+              onChanged: preferences.setAutoNext,
+            ),
+            _settingsDivider,
+            _preferenceChoice(
+              '默认画面适配',
+              values.fit,
+              PlaybackFit.values,
+              (value) => value.label,
+              (value) => preferences.update((old) => old.copyWith(fit: value)),
+              note: '填满画面可能裁切边缘。',
+            ),
+            _settingsDivider,
+            ListTile(
+              contentPadding: _settingsRowPadding,
+              title: const Text('操作与手势'),
+              trailing: const Icon(Icons.chevron_right_rounded),
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => _playbackControls(preferences),
+                ),
+              ),
+            ),
+          ]),
+          const SizedBox(height: OrvexMetrics.section),
+          _section(context, '字幕与音轨'),
+          const SizedBox(height: OrvexMetrics.gap),
+          _group([
+            _preferenceChoice(
+              '字幕偏好',
+              values.subtitleLanguage,
+              TrackLanguage.values,
+              (value) => value.label,
+              (value) => preferences.update(
+                (old) => old.copyWith(subtitleLanguage: value),
+              ),
+              note: '按内嵌轨道的语言标签匹配。已记住的字幕优先。',
+            ),
+            _settingsDivider,
+            _preferenceChoice(
+              '音轨偏好',
+              values.audioLanguage,
+              TrackLanguage.values,
+              (value) => value.label,
+              (value) => preferences.update(
+                (old) => old.copyWith(audioLanguage: value),
+              ),
+              note: '没有匹配的语言时，沿用文件默认音轨。',
+            ),
+          ]),
+          if (preferences.error case final error?)
+            Padding(
+              padding: const EdgeInsets.all(OrvexMetrics.space),
+              child: Text(
+                error,
+                style: TextStyle(color: OrvexColors.of(context).error),
+              ),
+            ),
+        ],
+      );
+    },
+  );
+
+  Widget _playbackControls(PlaybackPreferences preferences) => Scaffold(
+    appBar: AppBar(title: const Text('操作与手势')),
+    body: SafeArea(
+      top: false,
+      child: LayoutBuilder(
+        builder: (context, constraints) => ListenableBuilder(
+          listenable: preferences,
+          builder: (context, _) {
+            final mobile = switch (Theme.of(context).platform) {
+              TargetPlatform.iOS || TargetPlatform.android => true,
+              _ => false,
+            };
+            return ListView(
+              padding: EdgeInsets.symmetric(
+                horizontal: libraryBrowseInset(constraints.maxWidth),
+                vertical: OrvexMetrics.page,
+              ),
+              children: [
+                _group([
+                  _preferenceChoice(
+                    '快进快退步长',
+                    preferences.defaults.skipSeconds,
+                    playbackSkipSteps,
+                    (value) => '$value 秒',
+                    (value) => preferences.update(
+                      (old) => old.copyWith(skipSeconds: value),
+                    ),
+                    note: mobile ? '用于跳转按钮、方向键和双击跳转。' : '用于跳转按钮和方向键。',
+                  ),
+                  if (mobile) ...[
+                    _settingsDivider,
+                    SwitchListTile.adaptive(
+                      contentPadding: _settingsRowPadding,
+                      title: const Text('触屏播放手势'),
+                      subtitle: const Text('控制双击跳转、滑动和中央长按临时倍速。亮度手势仅在设备支持时生效。'),
+                      value: preferences.defaults.touchGestures,
+                      onChanged: (value) => preferences.update(
+                        (old) => old.copyWith(touchGestures: value),
+                      ),
+                    ),
+                  ],
+                ]),
+                if (preferences.error case final error?)
+                  Padding(
+                    padding: const EdgeInsets.all(OrvexMetrics.space),
+                    child: Text(
+                      error,
+                      style: TextStyle(color: OrvexColors.of(context).error),
+                    ),
+                  ),
+              ],
+            );
+          },
+        ),
+      ),
+    ),
+  );
+
+  Widget _preferenceChoice<T>(
+    String title,
+    T selected,
+    List<T> choices,
+    String Function(T) label,
+    ValueChanged<T> onSelected, {
+    String? note,
+  }) => PopupMenuButton<T>(
+    key: ValueKey(title),
+    tooltip: title,
+    position: PopupMenuPosition.under,
+    onSelected: onSelected,
+    itemBuilder: (_) => [
+      for (final choice in choices)
+        CheckedPopupMenuItem(
+          key: ValueKey((title, label(choice))),
+          value: choice,
+          checked: choice == selected,
+          child: Text(label(choice)),
+        ),
+    ],
+    child: ListTile(
+      contentPadding: _settingsRowPadding,
+      title: Row(
+        children: [
+          Expanded(child: Text(title)),
+          const SizedBox(width: OrvexMetrics.small),
+          Expanded(child: Text(label(selected), textAlign: TextAlign.end)),
+          const SizedBox(width: OrvexMetrics.small),
+          const Icon(Icons.expand_more_rounded, size: OrvexMetrics.iconSize),
+        ],
+      ),
+      subtitle: note == null ? null : Text(note),
+    ),
+  );
 
   Widget _group(List<Widget> children) =>
       GlassSurface(child: Column(children: children));

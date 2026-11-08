@@ -25,7 +25,9 @@ import '../../library/infrastructure/recent_arrival_index.dart';
 import '../../library/presentation/library_views.dart';
 import '../../library/presentation/series_library.dart';
 import '../application/playback_session.dart';
+import '../domain/playback_defaults.dart';
 import '../domain/playback_engine.dart';
+import '../infrastructure/playback_preferences.dart';
 import 'mini_playback_card.dart';
 import 'playback_surface.dart';
 import 'watch_information.dart';
@@ -43,8 +45,8 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
   OrvexColors get _colors => OrvexColors.of(context);
   late LocalFileSource _files;
   late FolderLibrary _folders;
-  bool _autoNext = false;
   final _preferences = SharedPreferencesAsync();
+  late final _playbackPreferences = PlaybackPreferences(_preferences);
   late final _arrivalIndex = RecentArrivalIndex(_preferences);
   Map<String, DateTime> _arrivals = const {};
   String? _homeWorkKey;
@@ -145,6 +147,8 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
     _folders = ref.read(folderLibraryProvider);
     _folders.addListener(_onFoldersChanged);
     _session = ref.read(sessionProvider);
+    _playbackPreferences.addListener(_applyPlaybackPreferences);
+    unawaited(_playbackPreferences.initialized);
     _metadata = ref.read(animeMetadataProvider);
     _metadata.addListener(_onMetadataChanged);
     _session.addListener(_onSessionChanged);
@@ -177,6 +181,7 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _playbackPreferences.dispose();
     _session.removeListener(_onSessionChanged);
     _metadata.removeListener(_onMetadataChanged);
     _folders.removeListener(_onFoldersChanged);
@@ -338,9 +343,6 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
   Future<void> _loadPreferences() async {
     try {
       final show = await _preferences.getBool('orvex.home.continue.v1') ?? true;
-      _autoNext =
-          await _preferences.getBool('orvex.player.autoNext.v1') ?? false;
-      _session.autoNext = _autoNext;
       if (mounted) setState(() => _showContinue = show);
     } catch (_) {
       if (mounted) setState(() => _libraryError = '首页偏好未能读取');
@@ -366,6 +368,12 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
     } catch (_) {
       // A missing preference leaves the library on its default order.
     }
+  }
+
+  void _applyPlaybackPreferences() {
+    _session.defaults = _playbackPreferences.defaults;
+    _session.autoNext = _playbackPreferences.autoNext;
+    if (mounted && _showPlayer) setState(() {});
   }
 
   void _setLibrarySort(LibrarySort sort) {
@@ -439,7 +447,11 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
     return HistoryBrowseSnapshot.fromRecords(history);
   });
 
-  Future<void> _open(LocalMedia media, {RecentWork? work}) async {
+  Future<void> _open(
+    LocalMedia media, {
+    RecentWork? work,
+    PlaybackOpenIntent intent = PlaybackOpenIntent.ordinary,
+  }) async {
     final generation = ++_openGeneration;
     LocalMedia resolved;
     try {
@@ -452,10 +464,42 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
       }
       return;
     }
+    await _playbackPreferences.initialized;
     if (!mounted || generation != _openGeneration || !_foreground) return;
     final reuse =
-        _session.media?.resumeKey == resolved.resumeKey &&
-        _session.engine != null;
+        _session.media?.resumeKey == resolved.resumeKey && _session.ready;
+    Duration? startAt;
+    if (intent == PlaybackOpenIntent.restart) {
+      startAt = Duration.zero;
+    } else if (intent == PlaybackOpenIntent.ordinary) {
+      switch (_playbackPreferences.defaults.reopen) {
+        case ReopenBehavior.resume:
+          break;
+        case ReopenBehavior.restart:
+          startAt = Duration.zero;
+        case ReopenBehavior.ask:
+          try {
+            startAt = reuse
+                ? (_session.frame.completed
+                      ? Duration.zero
+                      : _session.frame.position)
+                : await _session.resumeStore.read(resolved.resumeKey);
+          } catch (_) {
+            // Let the session handle the normal storage-error fallback.
+          }
+          if (!mounted || generation != _openGeneration || !_foreground) return;
+          if (startAt != null && startAt > Duration.zero) {
+            final resume = await _askToResume(startAt);
+            if (!mounted ||
+                generation != _openGeneration ||
+                !_foreground ||
+                resume == null) {
+              return;
+            }
+            if (!resume) startAt = Duration.zero;
+          }
+      }
+    }
     _session.allowAutoNext = _foreground;
     setState(() {
       _keepLibraryVisible = false;
@@ -479,12 +523,87 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
           if (!catalog.any((m) => m.resumeKey == resolved.resumeKey)) resolved,
         ]),
       );
-      await _session.open(resolved, queue: queue);
+      await _session.open(
+        resolved,
+        queue: queue,
+        startAt: startAt,
+        canAutoAdvance: (queue, index) => _canAutoAdvance(queue, index, work),
+      );
     } else {
-      if (work != null) _session.replacePlaylist(work.files);
-      if (_session.frame.completed) await _session.seek(Duration.zero);
+      if (work != null) {
+        _session.replacePlaylist(
+          work.files,
+          canAutoAdvance: (queue, index) => _canAutoAdvance(queue, index, work),
+        );
+      }
+      if (startAt == Duration.zero || _session.frame.completed) {
+        await _session.seek(Duration.zero);
+      }
+      if (!mounted || generation != _openGeneration) return;
       if (!_session.frame.playing) await _session.togglePause();
     }
+  }
+
+  Future<bool?> _askToResume(Duration position) => showDialog<bool>(
+    context: context,
+    builder: (dialogContext) => AlertDialog(
+      title: const Text('继续上次进度？'),
+      content: Text('上次播放到 ${formatTime(position)}。'),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(dialogContext),
+          child: const Text('取消'),
+        ),
+        TextButton(
+          onPressed: () => Navigator.pop(dialogContext, false),
+          child: const Text('从头开始'),
+        ),
+        TextButton(
+          onPressed: () => Navigator.pop(dialogContext, true),
+          child: const Text('继续播放'),
+        ),
+      ],
+    ),
+  );
+
+  bool _canAutoAdvance(List<LocalMedia> queue, int index, RecentWork? work) {
+    if (!mounted) return false;
+    final current = queue[index];
+    final next = queue[index + 1];
+    final identity = _folders.identityFor(current);
+    final episode = identity.episode;
+    if (episode == null || episode <= 0) return false;
+    final currentSubject = _metadata.matchFor(current)?.subject?.id;
+    final workSubject = work?.subject?.id;
+    final season = identity.season ?? 1;
+    final nextSeason = _folders.identityFor(next).season ?? 1;
+    final expected = nextSeason == season
+        ? episode + 1
+        : workSubject != null && nextSeason == season + 1
+        ? 1
+        : null;
+    if (expected == null) return false;
+
+    int? episodeInSeries(LocalMedia media) {
+      final other = _folders.identityFor(media);
+      if ((other.season ?? 1) != nextSeason) return null;
+      final subject = _metadata.matchFor(media)?.subject?.id;
+      if (workSubject != null) {
+        return subject == workSubject && currentSubject == workSubject
+            ? other.episode
+            : null;
+      }
+      return identity.episodic &&
+              other.key == identity.key &&
+              (currentSubject == null ||
+                  subject == null ||
+                  currentSubject == subject)
+          ? other.episode
+          : null;
+    }
+
+    return episodeInSeries(next) == expected &&
+        queue.where((item) => episodeInSeries(item) == expected).length == 1;
   }
 
   Future<void> _returnToLibrary() async {
@@ -638,6 +757,9 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
                                     setState(() => _query = value),
                                 onImport: () => _pick(),
                                 onOpen: (media) => unawaited(_open(media)),
+                                onOpenWithIntent: (media, intent) =>
+                                    unawaited(_open(media, intent: intent)),
+                                playbackPreferences: _playbackPreferences,
                                 onTab: _selectTab,
                                 onRefresh: _tab == 2
                                     ? _refreshHistory
@@ -923,7 +1045,9 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
                         title: const Text('播放操作'),
                         content: Text(
                           Platform.isIOS || Platform.isAndroid
-                              ? '单击显示或隐藏控制栏。左右双击快退或快进 10 秒；中央长按临时 2 倍速。左侧上下滑动调亮度（设备支持时），右侧调音量。'
+                              ? (_session.currentDefaults.touchGestures
+                                    ? '单击显示或隐藏控制栏。左右双击快退或快进 ${_session.currentDefaults.skipSeconds} 秒；中央长按临时 2 倍速。左侧上下滑动调亮度（设备支持时），右侧调音量。'
+                                    : '单击显示或隐藏控制栏。触屏播放手势已在设置中关闭。')
                               : '单击显示或隐藏控制栏；双击全屏。空格播放或暂停，左右方向键快退或快进。',
                         ),
                         actions: [
@@ -991,7 +1115,7 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
                   ? () => _session.previous()
                   : null,
               onNext: _session.hasNext ? () => _session.next() : null,
-              autoNext: _autoNext,
+              autoNext: _playbackPreferences.autoNext,
               onAutoNext: (value) => _setAutoNext(value),
             ),
           ],
@@ -1033,14 +1157,9 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
   }
 
   Future<void> _setAutoNext(bool value) async {
-    setState(() {
-      _autoNext = value;
-      _session.autoNext = value;
-    });
-    try {
-      await _preferences.setBool('orvex.player.autoNext.v1', value);
-    } catch (_) {
-      _session.reportError('自动播放设置未能保存');
+    await _playbackPreferences.setAutoNext(value);
+    if (_playbackPreferences.error case final String error when mounted) {
+      _session.reportError(error);
     }
   }
 

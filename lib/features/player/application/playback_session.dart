@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 import '../domain/playback_engine.dart';
+import '../domain/playback_defaults.dart';
 import '../../subtitles/domain/subtitle_models.dart';
 
 class PlaybackSession extends ChangeNotifier {
@@ -35,22 +36,38 @@ class PlaybackSession extends ChangeNotifier {
   List<LocalMedia> playlist = const [];
   bool autoNext = false;
   bool allowAutoNext = true;
+  PlaybackDefaults defaults = const PlaybackDefaults();
+  PlaybackDefaults currentDefaults = const PlaybackDefaults();
+  PlaybackFit pictureFit = PlaybackFit.contain;
+  bool Function(List<LocalMedia>, int)? _canAutoAdvance;
   int get playlistIndex =>
       playlist.indexWhere((item) => item.resumeKey == media?.resumeKey);
   bool get hasPrevious => playlistIndex > 0;
   bool get hasNext => playlistIndex >= 0 && playlistIndex + 1 < playlist.length;
   Future<void> previous() => hasPrevious
-      ? open(playlist[playlistIndex - 1], queue: playlist)
+      ? open(
+          playlist[playlistIndex - 1],
+          queue: playlist,
+          canAutoAdvance: _canAutoAdvance,
+        )
       : Future.value();
   Future<void> next() => hasNext
-      ? open(playlist[playlistIndex + 1], queue: playlist)
+      ? open(
+          playlist[playlistIndex + 1],
+          queue: playlist,
+          canAutoAdvance: _canAutoAdvance,
+        )
       : Future.value();
 
-  void replacePlaylist(List<LocalMedia> queue) {
+  void replacePlaylist(
+    List<LocalMedia> queue, {
+    bool Function(List<LocalMedia>, int)? canAutoAdvance,
+  }) {
     if (_disposed || !queue.any((item) => item.resumeKey == media?.resumeKey)) {
       return;
     }
     playlist = List.unmodifiable(queue);
+    _canAutoAdvance = canAutoAdvance;
     _notify();
   }
 
@@ -85,7 +102,12 @@ class PlaybackSession extends ChangeNotifier {
     return _operations;
   }
 
-  Future<void> open(LocalMedia source, {List<LocalMedia>? queue}) {
+  Future<void> open(
+    LocalMedia source, {
+    List<LocalMedia>? queue,
+    Duration? startAt,
+    bool Function(List<LocalMedia>, int)? canAutoAdvance,
+  }) {
     if (_disposed) return Future.value();
     final generation = ++_generation;
     ++_subtitleRevision;
@@ -98,6 +120,9 @@ class PlaybackSession extends ChangeNotifier {
     subtitleBusy = findingSubtitles = false;
     media = source;
     playlist = List.unmodifiable(queue ?? [source]);
+    _canAutoAdvance = canAutoAdvance;
+    final preferences = currentDefaults = defaults;
+    pictureFit = preferences.fit;
     frame = const PlaybackFrame();
     loading = true;
     error = null;
@@ -106,11 +131,13 @@ class PlaybackSession extends ChangeNotifier {
       try {
         await _retire();
         if (_disposed || generation != _generation) return;
-        var start = Duration.zero;
-        try {
-          start = await resumeStore.read(source.resumeKey);
-        } catch (_) {
-          if (generation == _generation) error = '无法读取上次进度，将从头播放';
+        var start = startAt ?? Duration.zero;
+        if (startAt == null) {
+          try {
+            start = await resumeStore.read(source.resumeKey);
+          } catch (_) {
+            if (generation == _generation) error = '无法读取上次进度，将从头播放';
+          }
         }
         if (_disposed || generation != _generation) return;
         final prepared =
@@ -146,6 +173,13 @@ class PlaybackSession extends ChangeNotifier {
           }),
         ]);
         await active.engine.open(active.media, start: start);
+        if (_current(active) && preferences.rate != 1) {
+          try {
+            await active.engine.setRate(preferences.rate);
+          } catch (_) {
+            if (_current(active)) error = '默认倍速未能应用，已沿用播放器速度';
+          }
+        }
       } catch (exception) {
         if (generation == _generation) error = '无法打开视频：$exception';
         await _retire();
@@ -153,6 +187,7 @@ class PlaybackSession extends ChangeNotifier {
         if (!_disposed && generation == _generation) {
           loading = false;
           if (_active case final active?) {
+            _applyAudioDefault(active);
             _subtitleRestoration = _restoreSubtitles(active, _subtitleRevision);
           }
           _notify();
@@ -173,6 +208,7 @@ class PlaybackSession extends ChangeNotifier {
     if (next.subtitleTracks.isNotEmpty && !active.tracksReady.isCompleted) {
       active.tracksReady.complete();
     }
+    _applyAudioDefault(active);
     final pending = active.pendingSubtitle;
     if (pending != null) {
       for (final track in next.subtitleTracks) {
@@ -198,7 +234,12 @@ class PlaybackSession extends ChangeNotifier {
     }
     if (next.completed && !active.completedHandled) {
       active.completedHandled = true;
-      if (autoNext && allowAutoNext && hasNext) unawaited(this.next());
+      if (autoNext &&
+          allowAutoNext &&
+          hasNext &&
+          (_canAutoAdvance?.call(playlist, playlistIndex) ?? true)) {
+        unawaited(this.next());
+      }
     } else if (!next.completed) {
       active.completedHandled = false;
     }
@@ -257,6 +298,12 @@ class PlaybackSession extends ChangeNotifier {
 
   Future<void> setRate(double rate) =>
       _control((engine) => engine.setRate(rate.clamp(0.25, 3)));
+  void setPictureFit(PlaybackFit fit) {
+    if (!ready) return;
+    pictureFit = fit;
+    _notify();
+  }
+
   Future<void> setVolume(double volume) =>
       _control((engine) => engine.setVolume(volume.clamp(0, 100)));
 
@@ -267,8 +314,48 @@ class PlaybackSession extends ChangeNotifier {
     return engine.seek(Duration(milliseconds: bounded));
   });
 
-  Future<void> selectAudio(String id) =>
-      _control((engine) => engine.selectAudio(id));
+  Future<void> selectAudio(String id) {
+    if (_active case final active?) active.manualAudio = true;
+    return _control((engine) => engine.selectAudio(id));
+  }
+
+  void _applyAudioDefault(_ActiveSession active) {
+    if (loading ||
+        active.manualAudio ||
+        active.audioDefaultApplied ||
+        currentDefaults.audioLanguage == TrackLanguage.fileDefault ||
+        frame.audioTracks.isEmpty) {
+      return;
+    }
+    active.audioDefaultApplied = true;
+    final preferred = _preferredTrack(
+      frame.audioTracks,
+      frame.audioTrackId,
+      currentDefaults.audioLanguage,
+    );
+    if (preferred == null) return;
+    if (preferred.id == frame.audioTrackId) return;
+    unawaited(
+      _enqueue(() async {
+        if (_current(active) &&
+            !active.manualAudio &&
+            frame.audioTracks.any((track) => track.id == preferred.id)) {
+          await active.engine.selectAudio(preferred.id);
+        }
+      }),
+    );
+  }
+
+  MediaTrack? _preferredTrack(
+    List<MediaTrack> tracks,
+    String? selected,
+    TrackLanguage language,
+  ) {
+    final matches = tracks.where((track) => language.matches(track.language));
+    return matches.where((track) => track.id == selected).firstOrNull ??
+        matches.firstOrNull;
+  }
+
   Future<void> selectSubtitle(String id) {
     if (subtitleSupport == null) {
       return _control((engine) => engine.selectSubtitle(id));
@@ -425,7 +512,16 @@ class PlaybackSession extends ChangeNotifier {
             }
           });
         }
-      } else if (automatic) {
+      } else {
+        // An explicitly configured language takes precedence over filename matching.
+        if (await _applyPreferredSubtitle(active, revision) ||
+            !_subtitleCurrent(active, revision)) {
+          return;
+        }
+        if (!automatic) {
+          subtitleStatus = '本地字幕自动匹配已关闭';
+          return;
+        }
         final candidates = await refreshLocalSubtitles();
         if (!_subtitleCurrent(active, revision) || candidates == null) return;
         final match = uniqueSubtitleMatch(candidates);
@@ -442,17 +538,22 @@ class PlaybackSession extends ChangeNotifier {
             reason: match.reason,
           );
         }
-      } else {
-        subtitleStatus = '本地字幕自动匹配已关闭';
       }
       if (_subtitleCurrent(active, revision) &&
           saved.mode != SubtitleChoiceMode.automatic &&
           subtitleIssue.isNotEmpty) {
-        await _enqueue(() async {
-          if (_subtitleCurrent(active, revision)) {
-            await active.engine.selectSubtitle('no');
-          }
-        });
+        final preferred = await _applyPreferredSubtitle(active, revision);
+        if (!preferred) {
+          await _enqueue(() async {
+            if (_subtitleCurrent(active, revision)) {
+              final useFileDefault =
+                  currentDefaults.subtitleLanguage != TrackLanguage.fileDefault;
+              await active.engine.selectSubtitle(
+                useFileDefault ? 'auto' : 'no',
+              );
+            }
+          });
+        }
       }
     } catch (error) {
       if (_subtitleCurrent(active, revision)) {
@@ -464,6 +565,39 @@ class PlaybackSession extends ChangeNotifier {
         _notify();
       }
     }
+  }
+
+  Future<bool> _applyPreferredSubtitle(
+    _ActiveSession active,
+    int revision,
+  ) async {
+    final language = currentDefaults.subtitleLanguage;
+    if (language == TrackLanguage.fileDefault) return false;
+    if (frame.subtitleTracks.isEmpty) {
+      await active.tracksReady.future.timeout(
+        const Duration(seconds: 2),
+        onTimeout: () {},
+      );
+    }
+    if (!_subtitleCurrent(active, revision)) return false;
+    final preferred = _preferredTrack(
+      frame.subtitleTracks
+          .where((track) => !active.externalTracks.containsKey(track.id))
+          .toList(),
+      frame.subtitleTrackId,
+      language,
+    );
+    if (preferred == null) return false;
+    await _enqueue(() async {
+      if (!_subtitleCurrent(active, revision)) return;
+      if (frame.subtitleTrackId != preferred.id) {
+        await active.engine.selectSubtitle(preferred.id);
+      }
+      if (_subtitleCurrent(active, revision)) {
+        subtitleStatus = '已按语言偏好选择：${preferred.label}';
+      }
+    });
+    return _subtitleCurrent(active, revision);
   }
 
   Future<void> _applySubtitleReference(
@@ -640,6 +774,7 @@ class _ActiveSession {
   final PlaybackEngine engine;
   final Future<void> Function()? release;
   bool completedHandled = false;
+  bool manualAudio = false, audioDefaultApplied = false;
   final List<StreamSubscription<dynamic>> subscriptions = [];
   PlaybackFrame frame = const PlaybackFrame();
   Duration lastCheckpoint = Duration.zero;

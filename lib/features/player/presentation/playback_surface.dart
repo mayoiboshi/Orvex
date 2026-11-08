@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import '../../../design/glass.dart';
 import '../../../design/orvex_theme.dart';
 import '../application/playback_session.dart';
+import '../domain/playback_defaults.dart';
 import '../infrastructure/player_brightness.dart';
 import '../../subtitles/domain/subtitle_models.dart';
 
@@ -80,6 +81,8 @@ class _PlaybackSurfaceState extends State<PlaybackSurface>
   bool get _mobile =>
       defaultTargetPlatform == TargetPlatform.iOS ||
       defaultTargetPlatform == TargetPlatform.android;
+  bool get _touchGestures => _mobile && session.currentDefaults.touchGestures;
+  int get _step => session.currentDefaults.skipSeconds;
   bool get _interacting =>
       _dragging || _seekPending || _level != null || _previousRate != null;
 
@@ -348,9 +351,9 @@ class _PlaybackSurfaceState extends State<PlaybackSurface>
     }
     final key = event.logicalKey;
     if (key == LogicalKeyboardKey.arrowLeft) {
-      _skip(-10);
+      _skip(-_step);
     } else if (key == LogicalKeyboardKey.arrowRight) {
-      _skip(10);
+      _skip(_step);
     } else if (event is KeyDownEvent && key == LogicalKeyboardKey.space) {
       unawaited(session.togglePause());
       _showControls();
@@ -402,10 +405,10 @@ class _PlaybackSurfaceState extends State<PlaybackSurface>
                       if (!_locked) setState(() => _visible = !_visible);
                       _armHide();
                     },
-                    onDoubleTapDown: _locked
+                    onDoubleTapDown: _locked || !_touchGestures
                         ? null
                         : (details) => _doubleTapX = details.localPosition.dx,
-                    onDoubleTap: _locked
+                    onDoubleTap: _locked || (_mobile && !_touchGestures)
                         ? null
                         : () {
                             _focus.requestFocus();
@@ -413,17 +416,17 @@ class _PlaybackSurfaceState extends State<PlaybackSurface>
                               widget.onFullscreen();
                             } else if (_doubleTapX <
                                 constraints.maxWidth * 0.35) {
-                              _skip(-10);
+                              _skip(-_step);
                             } else if (_doubleTapX >
                                 constraints.maxWidth * 0.65) {
-                              _skip(10);
+                              _skip(_step);
                             }
                           },
-                    onHorizontalDragStart: !_mobile || _locked
+                    onHorizontalDragStart: !_touchGestures || _locked
                         ? null
                         : (_) =>
                               _startSeek(frame.position.inMilliseconds / 1000),
-                    onHorizontalDragUpdate: !_mobile || _locked
+                    onHorizontalDragUpdate: !_touchGestures || _locked
                         ? null
                         : (details) {
                             if (!_dragging) return;
@@ -439,14 +442,16 @@ class _PlaybackSurfaceState extends State<PlaybackSurface>
                                       );
                             });
                           },
-                    onHorizontalDragEnd: !_mobile || _locked
+                    onHorizontalDragEnd: !_touchGestures || _locked
                         ? null
                         : (_) => _commitSeek(),
-                    onHorizontalDragCancel: () {
-                      setState(_cancelSeek);
-                      _armHide();
-                    },
-                    onLongPressStart: !_mobile || _locked
+                    onHorizontalDragCancel: !_touchGestures || _locked
+                        ? null
+                        : () {
+                            setState(_cancelSeek);
+                            _armHide();
+                          },
+                    onLongPressStart: !_touchGestures || _locked
                         ? null
                         : (details) {
                             final x = details.localPosition.dx;
@@ -463,17 +468,24 @@ class _PlaybackSurfaceState extends State<PlaybackSurface>
                             unawaited(session.setRate(2));
                             _showFeedback('临时 2 倍速', persistent: true);
                           },
-                    onLongPressEnd: (_) => _endLongPress(),
-                    onLongPressCancel: _endLongPress,
+                    onLongPressEnd: !_touchGestures || _locked
+                        ? null
+                        : (_) => _endLongPress(),
+                    onLongPressCancel: !_touchGestures || _locked
+                        ? null
+                        : _endLongPress,
                     child: Stack(
                       fit: StackFit.expand,
                       children: [
                         ColoredBox(
                           color: OrvexColors.player.background,
                           child:
-                              session.engine?.buildVideo() ?? const SizedBox(),
+                              session.engine?.buildVideo(
+                                fit: session.pictureFit,
+                              ) ??
+                              const SizedBox(),
                         ),
-                        if (_mobile && !_locked)
+                        if (_touchGestures && !_locked)
                           Row(
                             children: [
                               for (final brightness in [true, false])
@@ -677,9 +689,13 @@ class _PlaybackSurfaceState extends State<PlaybackSurface>
       children: [
         if (!compact)
           IconButton(
-            tooltip: '后退 10 秒',
-            onPressed: () => _skip(-10),
-            icon: const Icon(Icons.replay_10_rounded, size: 23),
+            tooltip: '后退 $_step 秒',
+            onPressed: () => _skip(-_step),
+            icon: Icon(switch (_step) {
+              5 => Icons.replay_5_rounded,
+              30 => Icons.replay_30_rounded,
+              _ => Icons.replay_10_rounded,
+            }, size: 23),
           ),
         IconButton(
           style: IconButton.styleFrom(
@@ -702,9 +718,13 @@ class _PlaybackSurfaceState extends State<PlaybackSurface>
         ),
         if (!compact)
           IconButton(
-            tooltip: '快进 10 秒',
-            onPressed: () => _skip(10),
-            icon: const Icon(Icons.forward_10_rounded, size: 23),
+            tooltip: '快进 $_step 秒',
+            onPressed: () => _skip(_step),
+            icon: Icon(switch (_step) {
+              5 => Icons.forward_5_rounded,
+              30 => Icons.forward_30_rounded,
+              _ => Icons.forward_10_rounded,
+            }, size: 23),
           ),
       ],
     ),
@@ -858,7 +878,7 @@ class _PlaybackSurfaceState extends State<PlaybackSurface>
       _closedMenu();
     },
     itemBuilder: (_) => [
-      for (final rate in [0.5, 0.75, 1.0, 1.25, 1.5, 2.0])
+      for (final rate in playbackRates)
         CheckedPopupMenuItem(
           value: rate,
           checked: session.frame.rate == rate,
@@ -909,6 +929,27 @@ class _PlaybackSurfaceState extends State<PlaybackSurface>
                     ],
                   ),
                   if (session.subtitleSupport != null) _localSubtitleSettings(),
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('当前画面适配'),
+                    subtitle: const Text('填满画面可能裁切边缘。'),
+                    trailing: PopupMenuButton<PlaybackFit>(
+                      tooltip: '当前画面适配',
+                      onSelected: session.setPictureFit,
+                      itemBuilder: (_) => [
+                        for (final fit in PlaybackFit.values)
+                          CheckedPopupMenuItem(
+                            value: fit,
+                            checked: fit == session.pictureFit,
+                            child: Text(fit.label),
+                          ),
+                      ],
+                      child: Padding(
+                        padding: const EdgeInsets.all(OrvexMetrics.small),
+                        child: Text(session.pictureFit.label),
+                      ),
+                    ),
+                  ),
                   Text('音量 ${session.frame.volume.round()}%'),
                   Slider(
                     key: const ValueKey('settings-volume'),
@@ -916,7 +957,7 @@ class _PlaybackSurfaceState extends State<PlaybackSurface>
                     max: 100,
                     onChanged: (value) => session.setVolume(value),
                   ),
-                  if (_mobile)
+                  if (_touchGestures)
                     Text(
                       _brightness == null ? '亮度请使用系统控制' : '左侧上下滑动调亮度，右侧上下滑动调音量',
                       style: TextStyle(

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:orvex/features/player/application/playback_session.dart';
+import 'package:orvex/features/player/domain/playback_defaults.dart';
 import 'package:orvex/features/player/domain/playback_engine.dart';
 import 'package:orvex/features/player/infrastructure/player_brightness.dart';
 import 'package:orvex/features/player/presentation/playback_surface.dart';
@@ -206,6 +207,25 @@ void main() {
     expect(session.toggles, 0);
     expect(session.rates, isEmpty);
   });
+
+  testWidgets(
+    'mobile gesture preference leaves transport buttons using the chosen step',
+    (tester) async {
+      final session = await mount(tester, width: 640);
+      session.currentDefaults = const PlaybackDefaults(
+        skipSeconds: 5,
+        touchGestures: false,
+      );
+      session.update();
+      await tester.pump();
+      await doubleTap(tester, point(tester, 0.92, 0.32));
+      expect(session.seeks, isEmpty);
+      await tester.tap(find.byTooltip('快进 5 秒'));
+      await tester.pump();
+      expect(session.seeks, [const Duration(seconds: 35)]);
+    },
+    variant: TargetPlatformVariant.only(TargetPlatform.iOS),
+  );
 
   testWidgets('central long press restores chosen rate on release and cancel', (
     tester,

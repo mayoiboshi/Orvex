@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:orvex/features/player/application/playback_session.dart';
+import 'package:orvex/features/player/domain/playback_defaults.dart';
 import 'package:orvex/features/player/domain/playback_engine.dart';
 
 import 'support/fakes.dart';
@@ -39,6 +40,92 @@ void main() {
       await engine.cleanUp();
     }
   });
+
+  test(
+    'startup defaults are snapshotted and starting over still checkpoints',
+    () async {
+      await store.write(first.resumeKey, const Duration(seconds: 25));
+      session.defaults = const PlaybackDefaults(
+        rate: 1.25,
+        fit: PlaybackFit.cover,
+        skipSeconds: 30,
+        touchGestures: false,
+      );
+      await session.open(first, startAt: Duration.zero);
+      expect(engines.first.openedAt, Duration.zero);
+      expect(engines.first.rates, [1.25]);
+      expect(session.pictureFit, PlaybackFit.cover);
+      expect(session.currentDefaults.skipSeconds, 30);
+      expect(session.currentDefaults.touchGestures, isFalse);
+      await session.setRate(2);
+      session.setPictureFit(PlaybackFit.contain);
+      engines.first.frameController.add(
+        const PlaybackFrame(
+          position: Duration(seconds: 13),
+          duration: Duration(minutes: 1),
+        ),
+      );
+      await session.checkpoint();
+      expect(store.values[first.resumeKey], const Duration(seconds: 13));
+      await session.open(first);
+      expect(engines.last.openedAt, const Duration(seconds: 13));
+      expect(engines.last.rates, [1.25]);
+      expect(session.pictureFit, PlaybackFit.cover);
+    },
+  );
+
+  test(
+    'audio language selects actual tags once and preserves manual selection',
+    () async {
+      session.defaults = const PlaybackDefaults(
+        audioLanguage: TrackLanguage.japanese,
+      );
+      const tracks = [
+        MediaTrack('1', 'English', language: 'eng'),
+        MediaTrack('2', 'Original', language: 'ja-JP'),
+      ];
+      await session.open(first);
+      engines.first.frameController.add(
+        const PlaybackFrame(audioTracks: tracks, audioTrackId: '1'),
+      );
+      await Future<void>.delayed(Duration.zero);
+      expect(engines.first.audioSelections, ['2']);
+      await session.selectAudio('1');
+      engines.first.frameController.add(
+        const PlaybackFrame(audioTracks: tracks, audioTrackId: '1'),
+      );
+      await Future<void>.delayed(Duration.zero);
+      expect(engines.first.audioSelections, ['2', '1']);
+
+      await session.open(second);
+      engines.last.frameController.add(
+        const PlaybackFrame(
+          audioTracks: [MediaTrack('1', '日本語')],
+          audioTrackId: '1',
+        ),
+      );
+      await Future<void>.delayed(Duration.zero);
+      expect(engines.last.audioSelections, isEmpty);
+    },
+  );
+
+  test(
+    'manual audio selected before track discovery is not overridden',
+    () async {
+      session.defaults = const PlaybackDefaults(
+        audioLanguage: TrackLanguage.japanese,
+      );
+      await session.open(first);
+      await session.selectAudio('no');
+      engines.first.frameController.add(
+        const PlaybackFrame(
+          audioTracks: [MediaTrack('2', 'Original', language: 'jpn')],
+        ),
+      );
+      await Future<void>.delayed(Duration.zero);
+      expect(engines.first.audioSelections, ['no']);
+    },
+  );
 
   test(
     'audio interruptions only pause and preserve the current checkpoint',
