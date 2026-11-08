@@ -201,4 +201,28 @@ void main() {
       expect((await store.list()).last.updatedAt, isNull);
     },
   );
+
+  test(
+    'equal checkpoint times preserve stored order across the page boundary',
+    () async {
+      final preferences = SharedPreferencesAsync();
+      final paths = List.generate(34, (i) => 'file:///clip-${33 - i}.mp4');
+      await preferences.setStringList(PlaybackHistoryStore.key, [
+        for (final uri in [...paths, paths[30]])
+          jsonEncode({
+            'uri': uri,
+            'name': Uri.parse(uri).pathSegments.last,
+            'position': 10000,
+            'duration': 60000,
+            'completed': false,
+            'updatedAt': '2026-11-08T12:00:00Z',
+          }),
+      ]);
+      final store = PlaybackHistoryStore();
+      for (var repeat = 0; repeat < 2; repeat++) {
+        final list = await store.list(importedVideos: []);
+        expect(list.map((record) => record.media.resumeKey), paths);
+      }
+    },
+  );
 }

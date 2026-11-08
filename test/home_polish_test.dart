@@ -5,6 +5,7 @@ import 'package:orvex/design/orvex_theme.dart';
 import 'package:orvex/design/glass.dart';
 import 'package:orvex/features/anime_metadata/application/anime_metadata_controller.dart';
 import 'package:orvex/features/library/domain/playback_record.dart';
+import 'package:orvex/features/library/application/history_browser.dart';
 import 'package:orvex/features/library/presentation/library_browse_style.dart';
 import 'package:orvex/features/library/presentation/library_views.dart';
 import 'package:orvex/features/player/domain/playback_engine.dart';
@@ -15,6 +16,90 @@ import 'package:shared_preferences_platform_interface/shared_preferences_async_p
 import 'support/fake_metadata.dart';
 
 void main() {
+  testWidgets(
+    'history fills a short page without scrolling and retries at the footer',
+    (tester) async {
+      SharedPreferencesAsyncPlatform.instance =
+          InMemorySharedPreferencesAsync.empty();
+      final browser = HistoryBrowser();
+      final metadata = AnimeMetadataController(
+        client: FakeBangumiClient(),
+        store: MemoryMetadataStore(),
+      );
+      final appearance = AppearanceController();
+      addTearDown(browser.dispose);
+      addTearDown(metadata.dispose);
+      addTearDown(appearance.dispose);
+      tester.view.physicalSize = const Size(500, 5000);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final records = [
+        for (var i = 0; i < 48; i++)
+          PlaybackRecord(
+            media: LocalMedia(uri: Uri.file('/$i.mp4'), name: '$i.mp4'),
+            position: Duration.zero,
+            duration: Duration.zero,
+            updatedAt: null,
+          ),
+      ];
+      final calls = <int>[];
+      await browser.refresh(
+        () async => HistoryBrowseSnapshot(
+          total: records.length,
+          readPage: (offset, count) async {
+            calls.add(offset);
+            if (offset == 30 && calls.length == 2) {
+              throw StateError('read failed');
+            }
+            return records.sublist(offset, offset + count);
+          },
+        ),
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: OrvexTheme.create(Brightness.dark),
+          home: Scaffold(
+            body: LibraryViews(
+              tab: 2,
+              videos: const [],
+              history: const [],
+              historyBrowser: browser,
+              loading: false,
+              picking: false,
+              showContinue: true,
+              query: '',
+              onQuery: (_) {},
+              onImport: () {},
+              onOpen: (_) {},
+              onTab: (_) {},
+              onRefresh: () async {},
+              onShowContinue: (_) {},
+              metadata: metadata,
+              onMetadata: (_, {group}) {},
+              appearance: appearance,
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(calls, [0, 30]);
+      expect(browser.records.length, 30);
+      expect(find.text('48 条记录'), findsOneWidget);
+      expect(find.text('0.mp4'), findsOneWidget);
+      final retry = find.text('加载更多记录失败 · 重试');
+      expect(retry.hitTestable(), findsOneWidget);
+      await tester.tap(retry);
+      await tester.pumpAndSettle();
+      expect(calls, [0, 30, 30]);
+      expect(browser.records.length, 48);
+      expect(retry, findsNothing);
+      expect(find.text('47.mp4'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
+
   testWidgets(
     'history offers library navigation and one playback action per row',
     (tester) async {

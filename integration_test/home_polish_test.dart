@@ -973,6 +973,12 @@ void main() {
         tester.view.physicalSize = landscape * tester.view.devicePixelRatio;
         await tester.tap(find.byKey(const ValueKey('tab-2')));
         await tester.pump(const Duration(milliseconds: 500));
+        final refreshed = tester
+            .state<RefreshIndicatorState>(find.byType(RefreshIndicator))
+            .show();
+        await tester.pump(const Duration(milliseconds: 500));
+        await refreshed;
+        await tester.pump(const Duration(milliseconds: 450));
         final historyScroll = find
             .descendant(
               of: find.byKey(const PageStorageKey('library-tab-2')),

@@ -13,6 +13,7 @@ import '../../anime_metadata/domain/anime_subject.dart';
 import '../../folder_library/folder_models.dart';
 import '../../folder_library/thumbnail_cache.dart';
 import '../../player/presentation/playback_surface.dart';
+import '../application/history_browser.dart';
 import '../domain/playback_record.dart';
 import '../domain/recent_work.dart';
 import 'library_browse_style.dart';
@@ -23,6 +24,7 @@ class LibraryViews extends StatelessWidget {
     required this.tab,
     required this.videos,
     required this.history,
+    this.historyBrowser,
     required this.loading,
     required this.picking,
     required this.showContinue,
@@ -44,6 +46,7 @@ class LibraryViews extends StatelessWidget {
   final int tab;
   final List<LocalMedia> videos;
   final List<PlaybackRecord> history;
+  final HistoryBrowser? historyBrowser;
   final bool loading, picking, showContinue;
   final String query;
   final ValueChanged<String> onQuery;
@@ -846,12 +849,39 @@ class LibraryViews extends StatelessWidget {
   }
 
   Widget _history(BuildContext context, double inset, double bottom) {
-    final indices = {
-      for (var i = 0; i < history.length; i++) history[i].media.resumeKey: i,
+    final browser = historyBrowser;
+    final latest = {
+      for (final record in history) record.media.resumeKey: record,
     };
-    return CustomScrollView(
-      key: const PageStorageKey('library-tab-2'),
-      physics: const AlwaysScrollableScrollPhysics(),
+    return browser == null
+        ? _historyList(context, inset, bottom, null, latest)
+        : ListenableBuilder(
+            listenable: browser,
+            builder: (context, _) =>
+                _historyList(context, inset, bottom, browser, latest),
+          );
+  }
+
+  Widget _historyList(
+    BuildContext context,
+    double inset,
+    double bottom,
+    HistoryBrowser? browser,
+    Map<String, PlaybackRecord> latest,
+  ) {
+    final records = browser?.records ?? history;
+    final total = browser == null ? history.length : browser.total;
+    final waiting = browser == null
+        ? loading
+        : total == null && (loading || browser.refreshing);
+    final indices = {
+      for (var i = 0; i < records.length; i++) records[i].media.resumeKey: i,
+    };
+    final refreshFailed =
+        browser != null &&
+        (browser.refreshFailed || (total == null && !waiting));
+    return _HistoryScroll(
+      browser: browser,
       slivers: [
         SliverPadding(
           padding: EdgeInsets.fromLTRB(inset, OrvexMetrics.page, inset, 0),
@@ -861,9 +891,9 @@ class LibraryViews extends StatelessWidget {
               children: [
                 _header(context),
                 const SizedBox(height: OrvexMetrics.section),
-                if (loading)
+                if (waiting)
                   const LinearProgressIndicator(minHeight: 2)
-                else if (history.isEmpty)
+                else if (total == 0 && !refreshFailed)
                   _emptyState(
                     context,
                     Icons.history_rounded,
@@ -875,8 +905,8 @@ class LibraryViews extends StatelessWidget {
                       label: const Text('前往媒体库'),
                     ),
                   ),
-                if (history.isNotEmpty) ...[
-                  _section(context, '最近播放', detail: '${history.length} 条记录'),
+                if (total != null && total > 0) ...[
+                  _section(context, '最近播放', detail: '$total 条记录'),
                   const SizedBox(height: OrvexMetrics.gap),
                 ],
               ],
@@ -884,21 +914,51 @@ class LibraryViews extends StatelessWidget {
           ),
         ),
         SliverPadding(
-          padding: EdgeInsets.fromLTRB(inset, 0, inset, bottom),
+          padding: EdgeInsets.symmetric(horizontal: inset),
           sliver: SliverList.builder(
-            itemCount: history.length,
+            itemCount: records.length,
             findChildIndexCallback: (key) =>
                 indices[(key as ValueKey<String>).value],
             itemBuilder: (context, index) {
-              final record = history[index];
+              final record = records[index];
+              final current = latest[record.media.resumeKey];
+              final currentTime = current?.updatedAt;
+              final previousTime = record.updatedAt;
+              final updated =
+                  currentTime != null &&
+                  (previousTime == null || currentTime.isAfter(previousTime));
               return Padding(
                 key: ValueKey(record.media.resumeKey),
                 padding: const EdgeInsets.only(bottom: OrvexMetrics.small),
-                child: _recordTile(context, record),
+                child: _recordTile(context, updated ? current! : record),
               );
             },
           ),
         ),
+        if (browser != null &&
+            (refreshFailed || browser.appendFailed || browser.appending))
+          SliverToBoxAdapter(
+            child: Center(
+              child: browser.appending
+                  ? const Padding(
+                      padding: EdgeInsets.all(OrvexMetrics.gap),
+                      child: SizedBox.square(
+                        dimension: OrvexMetrics.iconSize,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                    )
+                  : TextButton.icon(
+                      onPressed: refreshFailed
+                          ? onRefresh
+                          : () => browser.loadMore(retry: true),
+                      icon: const Icon(Icons.refresh_rounded),
+                      label: Text(
+                        refreshFailed ? '读取记录失败 · 重试' : '加载更多记录失败 · 重试',
+                      ),
+                    ),
+            ),
+          ),
+        SliverToBoxAdapter(child: SizedBox(height: bottom)),
       ],
     );
   }
@@ -1372,6 +1432,75 @@ class LibraryViews extends StatelessWidget {
       ),
     ),
   );
+}
+
+class _HistoryScroll extends StatefulWidget {
+  const _HistoryScroll({required this.browser, required this.slivers});
+
+  final HistoryBrowser? browser;
+  final List<Widget> slivers;
+
+  @override
+  State<_HistoryScroll> createState() => _HistoryScrollState();
+}
+
+class _HistoryScrollState extends State<_HistoryScroll> {
+  final _scroll = ScrollController();
+  bool _scheduled = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _scroll.addListener(_schedulePrefetch);
+    _schedulePrefetch();
+  }
+
+  @override
+  void didUpdateWidget(_HistoryScroll oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _schedulePrefetch();
+  }
+
+  void _schedulePrefetch() {
+    if (_scheduled || widget.browser == null) return;
+    _scheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _scheduled = false;
+      if (!mounted ||
+          !_scroll.hasClients ||
+          ModalRoute.of(context)?.isCurrent == false) {
+        return;
+      }
+      final position = _scroll.position;
+      if (position.hasContentDimensions &&
+          position.extentAfter <=
+              position.viewportDimension * HistoryBrowser.prefetchViewports) {
+        unawaited(widget.browser?.loadMore());
+      }
+    });
+    WidgetsBinding.instance.ensureVisualUpdate();
+  }
+
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) =>
+      NotificationListener<ScrollMetricsNotification>(
+        onNotification: (event) {
+          if (event.depth == 0) _schedulePrefetch();
+          return false;
+        },
+        child: CustomScrollView(
+          key: const PageStorageKey('library-tab-2'),
+          controller: _scroll,
+          physics: const AlwaysScrollableScrollPhysics(),
+          slivers: widget.slivers,
+        ),
+      );
 }
 
 String mediaTitle(String name) {

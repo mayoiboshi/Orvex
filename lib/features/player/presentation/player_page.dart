@@ -17,6 +17,7 @@ import '../../media_sources/local_file_source.dart';
 import '../../media_sources/imported_file_store.dart';
 import '../../folder_library/folder_browser.dart';
 import '../../folder_library/folder_library.dart';
+import '../../library/application/history_browser.dart';
 import '../../library/domain/playback_record.dart';
 import '../../library/domain/library_overview.dart';
 import '../../library/domain/recent_work.dart';
@@ -49,6 +50,7 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
   String? _homeWorkKey;
   List<LocalMedia> _videos = [];
   List<PlaybackRecord> _history = [];
+  final _historyBrowser = HistoryBrowser();
   bool _loadingLibrary = true;
   bool _catalogReadFailed = false;
   bool _showContinue = true;
@@ -180,6 +182,7 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
     _folders.removeListener(_onFoldersChanged);
     _catalogTimer?.cancel();
     if (_fullscreen) unawaited(defaultExitNativeFullscreen());
+    _historyBrowser.dispose();
     super.dispose();
   }
 
@@ -407,6 +410,16 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
         _catalogReadFailed = false;
         _libraryError = null;
       });
+      if (_tab == 2 &&
+          _historyBrowser.total == null &&
+          !_historyBrowser.refreshing &&
+          !_historyBrowser.refreshFailed) {
+        unawaited(
+          _historyBrowser.refresh(
+            () async => HistoryBrowseSnapshot.fromRecords(history),
+          ),
+        );
+      }
       unawaited(_metadata.scan(_catalog));
       unawaited(_observeArrivals());
     } catch (_) {
@@ -418,6 +431,13 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
       });
     }
   }
+
+  Future<void> _refreshHistory() => _historyBrowser.refresh(() async {
+    final history = await ref
+        .read(historyStoreProvider)
+        .list(importedVideos: _videos);
+    return HistoryBrowseSnapshot.fromRecords(history);
+  });
 
   Future<void> _open(LocalMedia media, {RecentWork? work}) async {
     final generation = ++_openGeneration;
@@ -485,6 +505,12 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
       _tab = value;
       _homeWorkKey = null;
     });
+    if (value == 2 && _historyBrowser.total == null) {
+      if (!_loadingLibrary && !_historyBrowser.refreshing) {
+        unawaited(_refreshHistory());
+      }
+      return;
+    }
     unawaited(_reload());
   }
 
@@ -600,6 +626,9 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
                                 tab: _tab,
                                 videos: _catalog,
                                 history: _history,
+                                historyBrowser: _tab == 2
+                                    ? _historyBrowser
+                                    : null,
                                 loading: _loadingLibrary,
                                 picking:
                                     _picking || widget.startupError != null,
@@ -610,7 +639,9 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
                                 onImport: () => _pick(),
                                 onOpen: (media) => unawaited(_open(media)),
                                 onTab: _selectTab,
-                                onRefresh: _reload,
+                                onRefresh: _tab == 2
+                                    ? _refreshHistory
+                                    : _reload,
                                 onShowContinue: (value) =>
                                     unawaited(_setShowContinue(value)),
                                 metadata: _metadata,

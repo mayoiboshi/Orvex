@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -21,6 +22,7 @@ import 'package:orvex/features/media_sources/local_file_source.dart';
 import 'package:orvex/features/player/application/playback_session.dart';
 import 'package:orvex/features/player/domain/playback_engine.dart';
 import 'package:orvex/features/player/presentation/playback_surface.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
 import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
 
@@ -535,6 +537,126 @@ void main() {
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox.shrink());
   });
+
+  testWidgets(
+    'history appends without shifting position and applies sort on refresh',
+    (tester) async {
+      final media = List.generate(
+        67,
+        (i) =>
+            LocalMedia(uri: Uri.file('/history/$i.mp4'), name: '历史视频 $i.mp4'),
+      );
+      await SharedPreferencesAsync().setStringList(PlaybackHistoryStore.key, [
+        for (final video in media)
+          jsonEncode({
+            'uri': video.uri.toString(),
+            'name': video.name,
+            'position': 5000,
+            'duration': 600000,
+            'completed': false,
+            'updatedAt': '2026-01-01T00:00:00Z',
+          }),
+      ]);
+      await mount(tester, const Size(390, 844));
+      Future<void> tapTab(int tab) async {
+        await tester.tap(find.byKey(ValueKey('tab-$tab')));
+        await tester.pumpAndSettle();
+      }
+
+      await tapTab(2);
+      final page = find.byKey(const PageStorageKey('library-tab-2'));
+      final viewport = find
+          .descendant(of: page, matching: find.byType(Scrollable))
+          .first;
+      ScrollPosition position() =>
+          tester.state<ScrollableState>(viewport).position;
+      LibraryViews views() =>
+          tester.widget<LibraryViews>(find.byType(LibraryViews));
+      final browser = views().historyBrowser!;
+      expect(browser.records.length, 30);
+      expect(find.text('67 条记录'), findsOneWidget);
+      final nearBottom =
+          position().maxScrollExtent - position().viewportDimension / 4;
+      position().jumpTo(nearBottom);
+      await tester.pumpAndSettle();
+      expect(browser.records.length, 60);
+      expect(position().pixels, closeTo(nearBottom, 1));
+      final anchorIndex = List.generate(30, (index) => index).firstWhere(
+        (index) => find
+            .byKey(ValueKey(media[index].resumeKey))
+            .hitTestable()
+            .evaluate()
+            .isNotEmpty,
+      );
+      final anchor = find
+          .byKey(ValueKey(media[anchorIndex].resumeKey))
+          .hitTestable();
+      expect(anchor, findsOneWidget);
+      final anchorY = tester.getTopLeft(anchor).dy;
+      await history.record(
+        media[anchorIndex],
+        const PlaybackFrame(
+          position: Duration(minutes: 1, seconds: 12),
+          duration: Duration(minutes: 10),
+        ),
+      );
+      await tapTab(3);
+      await tapTab(2);
+      expect(views().historyBrowser, same(browser));
+      expect(browser.records.length, 60);
+      expect(
+        browser.records[anchorIndex].media.resumeKey,
+        media[anchorIndex].resumeKey,
+      );
+      expect(position().pixels, closeTo(nearBottom, 1));
+      expect(tester.getTopLeft(anchor).dy, closeTo(anchorY, 1));
+      expect(
+        find.descendant(of: anchor, matching: find.text('未看完 · 01:12 / 10:00')),
+        findsOneWidget,
+      );
+
+      position().jumpTo(position().maxScrollExtent);
+      await tester.pumpAndSettle();
+      expect(browser.records.length, 67);
+      expect(
+        browser.records.map((record) => record.media.resumeKey),
+        media.map((video) => video.resumeKey),
+      );
+      position().jumpTo(position().maxScrollExtent);
+      await tester.pumpAndSettle();
+      final beforePlay = position().pixels;
+      await session.resumeStore.write(
+        media.last.resumeKey,
+        const Duration(seconds: 5),
+      );
+      final last = find.byKey(ValueKey(media.last.resumeKey));
+      await tester.tap(
+        find
+            .descendant(of: last, matching: find.byTooltip('继续播放'))
+            .hitTestable(),
+      );
+      await tester.pumpAndSettle();
+      expect(session.media?.resumeKey, media.last.resumeKey);
+      expect(engine.openedAt, const Duration(seconds: 5));
+      await tester.tap(find.byTooltip('返回首页'));
+      await tester.pumpAndSettle();
+      expect(views().historyBrowser, same(browser));
+      expect(browser.records.length, 67);
+      expect(position().pixels, closeTo(beforePlay, 1));
+      position().jumpTo(0);
+      await tester.pumpAndSettle();
+      await views().onRefresh();
+      await tester.pumpAndSettle();
+      expect(
+        browser.records.first.media.resumeKey,
+        media[anchorIndex].resumeKey,
+      );
+      expect(browser.records.length, 30);
+      expect(find.text('67 条记录'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
 
   testWidgets('mini player keeps folder rows reachable and reuses playback', (
     tester,

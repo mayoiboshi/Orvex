@@ -56,14 +56,21 @@ class PlaybackHistoryStore {
   }
 
   List<PlaybackRecord> _deduplicate(List<PlaybackRecord> records) {
-    records.sort((a, b) {
-      final first = a.updatedAt;
-      final second = b.updatedAt;
-      if (first == null) return second == null ? 0 : 1;
-      return second == null ? -1 : second.compareTo(first);
-    });
+    final ordered = records.indexed.toList()
+      ..sort((a, b) {
+        final first = a.$2.updatedAt;
+        final second = b.$2.updatedAt;
+        final order = first == null
+            ? (second == null ? 0 : 1)
+            : second == null
+            ? -1
+            : second.compareTo(first);
+        // A checkpoint is prepended on write. Preserve that order on ties.
+        return order == 0 ? a.$1.compareTo(b.$1) : order;
+      });
     final seen = <String>{};
-    return records
+    return ordered
+        .map((item) => item.$2)
         .where((record) => seen.add(record.media.resumeKey))
         .take(100)
         .toList();

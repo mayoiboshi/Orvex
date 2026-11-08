@@ -137,6 +137,8 @@ Apple 适配器将目录操作与缩略图提取分到两个串行队列。目�
 | 字幕记忆 / 智能匹配 | `orvex.subtitles.choice.v1.<resumeKey>` / `orvex.subtitles.automatic.v1`；相对 Imports 或授权根 ID + 相对字幕路径，见 [字幕验证](verification/subtitle-memory/README.md) |
 | 字幕字体 | Application Support/subtitle-fonts-v2 |
 
+播放记录页每次开始浏览或主动刷新时使用一次现有存储读取，固定本轮排序和总数。相同时间戳沿用持久化顺序。界面预取的数据来自固定快照，每批最多 30 条，追加期间不再读取整项偏好，也不对变化中的全量列表重新截取。播放后可按稳定标识更新已浏览记录的进度，主动刷新才应用新顺序。首页和媒体库继续沿用原有历史读取以计算各自的展示状态。
+
 Bangumi 工作独立于播放等待链。按用户最新要求，默认采用返回候选的第一项；已有英文主线关系补充仍在客户端中保留。人工关联/忽略受版本和请求代次保护。HTTP 请求串行、限大小、有超时和 429 冷却。详情见 [Bangumi 接入](bangumi-metadata.md) 与 [本轮验证](verification/series-library/README.md)。
 
 ## 工程现状与风险
