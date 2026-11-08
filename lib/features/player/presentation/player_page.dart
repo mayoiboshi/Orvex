@@ -594,7 +594,7 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
                 collectionTitle: subject?.title,
                 onOpen: (media) => unawaited(_open(media, work: work)),
                 onImport: () => _pick(),
-                onMetadata: _showMetadata,
+                onMetadata: (media) => _showMetadata(media, group: work.files),
               ),
       ),
     );
@@ -631,8 +631,11 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
     header: header,
     onOpen: (media) => unawaited(_open(media, work: _playbackWorkFor(media))),
     onImport: () => _pick(),
-    onMetadata: _showMetadata,
+    onMetadata: _showPlaybackMetadata,
   );
+
+  void _showPlaybackMetadata(LocalMedia media) =>
+      _showMetadata(media, group: _playbackWorkFor(media)?.files);
 
   Widget _watchPage() {
     final media = _session.media!;
@@ -813,7 +816,7 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
                 ),
               ),
               linked: subject != null,
-              onMetadata: () => _showMetadata(media),
+              onMetadata: () => _showPlaybackMetadata(media),
               onPrevious: _session.hasPrevious
                   ? () => _session.previous()
                   : null,

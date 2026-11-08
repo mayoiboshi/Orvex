@@ -820,6 +820,50 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
+  testWidgets('home work metadata applies only to the chosen Bangumi work', (
+    tester,
+  ) async {
+    final first = datedVideo('示例番剧 S01E01', 3);
+    final nextSeason = datedVideo('示例番剧 S02E01', 1);
+    final differentWork = datedVideo('示例番剧 S01E02', 2);
+    imports.videos = [first, nextSeason, differentWork];
+    await mount(tester, const Size(1194, 834));
+    const original = AnimeSubject(
+      id: 55,
+      name: '示例番剧',
+      nameCn: '',
+      platform: 'TV',
+    );
+    const different = AnimeSubject(
+      id: 56,
+      name: '示例番剧',
+      nameCn: '',
+      platform: 'TV',
+    );
+    await metadata.selectMany([first, nextSeason], original);
+    await metadata.select(differentWork, different);
+    await tester.pumpAndSettle();
+    final card = find.byKey(const ValueKey('home-recent-bangumi:55'));
+    final info = find.descendant(of: card, matching: find.byTooltip('番剧资料'));
+    await tester.ensureVisible(info);
+    await tester.pumpAndSettle();
+    await tester.tap(info);
+    await tester.pumpAndSettle();
+    final sheet = tester.widget<AnimeMetadataSheet>(
+      find.byType(AnimeMetadataSheet),
+    );
+    expect(sheet.group, [first, nextSeason]);
+    final ignore = find.text('不关联此剧集');
+    await tester.ensureVisible(ignore);
+    await tester.tap(ignore);
+    await tester.pumpAndSettle();
+    for (final episode in [first, nextSeason]) {
+      expect(metadata.matchFor(episode)?.status, AnimeMatchStatus.ignored);
+    }
+    expect(metadata.subjectFor(differentWork)?.id, different.id);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
   testWidgets('home work detail opens a file and keeps the detail on return', (
     tester,
   ) async {

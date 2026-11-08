@@ -89,7 +89,7 @@ void main() {
                       onRefresh: () async {},
                       onShowContinue: (_) {},
                       metadata: metadata,
-                      onMetadata: (_) => details++,
+                      onMetadata: (_, {group}) => details++,
                       appearance: appearance,
                     ),
                   ),

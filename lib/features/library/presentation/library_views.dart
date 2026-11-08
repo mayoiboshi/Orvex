@@ -52,7 +52,7 @@ class LibraryViews extends StatelessWidget {
   final Future<void> Function() onRefresh;
   final ValueChanged<bool> onShowContinue;
   final AnimeMetadataController metadata;
-  final ValueChanged<LocalMedia> onMetadata;
+  final void Function(LocalMedia media, {List<LocalMedia>? group}) onMetadata;
   final AppearanceController appearance;
   final ThumbnailCache? thumbnails;
   final List<RecentWork>? recentWorks;
@@ -732,6 +732,7 @@ class LibraryViews extends StatelessWidget {
     final series = work?.subject;
     final movie = home && series == null ? _movieSubject(media) : null;
     final subject = series ?? movie;
+    void showMetadata() => onMetadata(media, group: work?.files);
     return SizedBox(
       width: width,
       child: InkWell(
@@ -746,7 +747,7 @@ class LibraryViews extends StatelessWidget {
             onOpen(media);
           }
         },
-        onLongPress: () => onMetadata(media),
+        onLongPress: showMetadata,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -771,7 +772,7 @@ class LibraryViews extends StatelessWidget {
                       child: home
                           ? IconButton(
                               tooltip: '番剧资料',
-                              onPressed: () => onMetadata(media),
+                              onPressed: showMetadata,
                               style: IconButton.styleFrom(
                                 minimumSize: const Size.square(
                                   OrvexMetrics.hitSize,
@@ -799,7 +800,7 @@ class LibraryViews extends StatelessWidget {
                               immersive: true,
                               icon: Icons.info_outline_rounded,
                               tooltip: '番剧资料',
-                              onPressed: () => onMetadata(media),
+                              onPressed: showMetadata,
                             ),
                     ),
                   ],
