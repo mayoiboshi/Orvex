@@ -170,6 +170,7 @@ class AnimeMatch {
     this.error,
     this.matcherVersion = animeMatcherVersion,
     this.usedLocalIndex = false,
+    this.localAliasRevision = 0,
   });
   final String query;
   final AnimeMatchStatus status;
@@ -180,6 +181,7 @@ class AnimeMatch {
   final String? error;
   final int matcherVersion;
   final bool usedLocalIndex;
+  final int localAliasRevision;
 
   Map<String, dynamic> toJson() => {
     'query': query,
@@ -190,6 +192,7 @@ class AnimeMatch {
     'manual': manual,
     if (error != null) 'error': error,
     if (usedLocalIndex) 'usedLocalIndex': true,
+    if (localAliasRevision != 0) 'localAliasRevision': localAliasRevision,
     'matcherVersion': matcherVersion,
   };
   factory AnimeMatch.fromJson(Map<String, dynamic> data) => AnimeMatch(
@@ -204,6 +207,7 @@ class AnimeMatch {
         .toList(),
     manual: data['manual'] as bool? ?? false,
     usedLocalIndex: data['usedLocalIndex'] as bool? ?? false,
+    localAliasRevision: data['localAliasRevision'] as int? ?? 0,
     error: data['error'] as String?,
     matcherVersion: (data['matcherVersion'] as num?)?.toInt() ?? 0,
   );

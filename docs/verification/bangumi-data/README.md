@@ -9,7 +9,13 @@ Orvex 随应用附带 bangumi-data 及其贡献者发布的 **0.3.235**，对应
 
 需要更新时，在仓库根目录运行 `python3 scripts/update-bangumi-data.py 0.3.235`，或传入经审查的其他固定版本。脚本验证 npm 发布包，保留原名、翻译/别名、原始类型、放送起始时间和带站点命名空间的资讯 ID，转成紧凑 JSON。常规构建直接使用提交的资产。
 
-应用在建立索引时按 Bangumi 作品 ID 补入少量已核对的罗马字别名。《葬送的芙莉莲》补入 `Sousou no Frieren` 和 `Sōsō no Furīren`，发布资产和校验值沿用上游快照。[AniList 条目](https://anilist.co/anime/154587/Sousou-no-Frieren/)
+## 拉丁字母标题补充
+
+从 `cedya77/anime-offline-database` 2026-44 固定发布版提取标准拉丁字母标题。生成时要求现有 AniList、MyAnimeList、AniDB ID 至少两项指向同一记录，且其他已有 ID 无冲突，作品类型和首播年份一致。重复 Bangumi ID、无法验证的类型或年份跳过。共补入 6,213 条，`249382` 字节，SHA-256 `fe8a687555e3e8c5b9b1791222786d91cecf4f4015dd0d8ab20b3cb25125d13f`。原 bangumi-data 资产和校验值沿用上游快照。`Sōsō no Furīren` 等已核对的个别拼写仍可直接查找。[补充数据发布版](https://github.com/cedya77/anime-offline-database/releases/tag/2026-44) · [AniList 条目](https://anilist.co/anime/154587/Sousou-no-Frieren/)
+
+补充资产作为独立派生表随应用分发，保留 ODbL 1.0 和 DbCL 1.0 许可及原署名。更新时运行 `python3 scripts/update-romanized-aliases.py`，需维护机安装 `zstd`。固定发布版与校验值在脚本内。更新资产后同步提高 `romanizedAliasRevision`，让旧版尚未命中或待确认的本地条目重查一次。已匹配、手动忽略和人工关联不参与这一轮重查。运行时索引不访问该发布网站。[派生表下载](https://raw.githubusercontent.com/mayoiboshi/Orvex/main/assets/metadata/romanized-aliases.json) · [完整许可](../../../assets/metadata/romanized-aliases-LICENSE.txt)
+
+本轮 192 项测试通过。真实资产验证多部番剧的新增拉丁字母标题和同名不同季，缓存测试验证旧版未命中只重查一次且保留已有人工关联。iPad 模拟器在空缓存且模拟离线时，导入 `[LPSub] Meitantei Conan [01][AVC AAC][1080p][JPSC].mp4`，成功关联并播放。调试进程测得两份资产合并初始化约 1,033 ms，2,000 次热查询约 45 ms，RSS 差值约 +54.4 MiB。RSS 为单次调试进程测量，包含 Dart 运行时开销。
 
 ## 行为
 

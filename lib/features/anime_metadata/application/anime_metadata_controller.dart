@@ -39,7 +39,7 @@ class AnimeMetadataController extends ChangeNotifier {
   final Map<String, int> _revisions = {};
   final Map<String, ({DateTime date, List<AnimeSubject> subjects})> _queries =
       {};
-  final Map<String, LocalMedia> _queue = {};
+  final _queue = <String, ({LocalMedia media, AnimeMatch? oldLocalResult})>{};
   final Map<int, AnimeSubject> _onlineDetails = {};
   final Map<int, String> _posters = {};
   final Map<int, Future<void>> _posterJobs = {};
@@ -210,6 +210,15 @@ class AnimeMetadataController extends ChangeNotifier {
             entry.status == AnimeMatchStatus.ignored) {
           continue;
         }
+        if (offlineFallback &&
+            localIndex != null &&
+            entry.usedLocalIndex &&
+            entry.localAliasRevision < romanizedAliasRevision &&
+            (entry.status == AnimeMatchStatus.notFound ||
+                entry.status == AnimeMatchStatus.needsReview)) {
+          _enqueue(video, oldLocalResult: entry);
+          continue;
+        }
         final age = DateTime.now().difference(entry.updatedAt);
         if (entry.status == AnimeMatchStatus.failed &&
             age < const Duration(minutes: 15)) {
@@ -227,7 +236,7 @@ class AnimeMetadataController extends ChangeNotifier {
     if (!_running) unawaited(_run());
   }
 
-  void _enqueue(LocalMedia media) {
+  void _enqueue(LocalMedia media, {AnimeMatch? oldLocalResult}) {
     final key = animeMediaKey(media);
     if (_queue.containsKey(key) ||
         _entries[key]?.status == AnimeMatchStatus.queued) {
@@ -240,7 +249,7 @@ class AnimeMetadataController extends ChangeNotifier {
       status: AnimeMatchStatus.queued,
       updatedAt: DateTime.now(),
     );
-    _queue[key] = media;
+    _queue[key] = (media: media, oldLocalResult: oldLocalResult);
   }
 
   Future<void> _run() async {
@@ -249,24 +258,36 @@ class AnimeMetadataController extends ChangeNotifier {
     _notify();
     try {
       while (_queue.isNotEmpty && !_disposed && automatic) {
-        final groups = <String, List<String>>{};
+        final groups = <(String, bool), List<String>>{};
         for (final item in _queue.entries) {
-          (groups[normalizedAnimeTitle(queryFor(item.value))] ??= []).add(
-            item.key,
+          final job = item.value;
+          final group = (
+            normalizedAnimeTitle(queryFor(job.media)),
+            job.oldLocalResult != null,
           );
+          (groups[group] ??= []).add(item.key);
         }
         for (final group in groups.entries) {
           if (_disposed || !automatic) break;
-          final queryKey = group.key;
-          final batch = <String, ({LocalMedia media, int revision})>{};
+          final (queryKey, localOnly) = group.key;
+          final batch =
+              <
+                String,
+                ({LocalMedia media, int revision, AnimeMatch? oldLocalResult})
+              >{};
           for (final key in group.value) {
-            final video = _queue[key];
-            if (video == null ||
-                normalizedAnimeTitle(queryFor(video)) != queryKey) {
+            final job = _queue[key];
+            if (job == null ||
+                (job.oldLocalResult != null) != localOnly ||
+                normalizedAnimeTitle(queryFor(job.media)) != queryKey) {
               continue;
             }
             _queue.remove(key);
-            batch[key] = (media: video, revision: _revisions[key] ?? 0);
+            batch[key] = (
+              media: job.media,
+              revision: _revisions[key] ?? 0,
+              oldLocalResult: job.oldLocalResult,
+            );
           }
           if (batch.isEmpty) continue;
           final key = batch.keys.first;
@@ -281,31 +302,39 @@ class AnimeMetadataController extends ChangeNotifier {
           List<AnimeSubject>? online;
           BangumiDataIndex? local;
           String? failure;
-          var usedLocal = false;
-          try {
-            online = await _online(query, queryKey, anyCurrent);
-          } catch (exception) {
-            if (!anyCurrent()) continue;
-            failure = exception is BangumiException
-                ? exception.message
-                : '番剧匹配暂未完成，可稍后重试';
-            if (localIndex != null &&
-                offlineFallback &&
-                fallbackRevision == _fallbackRevision &&
-                _unavailable(exception)) {
-              usedLocal = true;
-              try {
-                local = await localIndex!.index;
-              } catch (_) {
-                failure = '本地番剧索引加载失败（资源缺失、损坏或版本不兼容）';
-              }
+          var usedLocal = localOnly;
+          if (!localOnly) {
+            try {
+              online = await _online(query, queryKey, anyCurrent);
+            } catch (exception) {
+              if (!anyCurrent()) continue;
+              failure = exception is BangumiException
+                  ? exception.message
+                  : '番剧匹配暂未完成，可稍后重试';
+              usedLocal =
+                  localIndex != null &&
+                  offlineFallback &&
+                  fallbackRevision == _fallbackRevision &&
+                  _unavailable(exception);
+            }
+          }
+          if (usedLocal && offlineFallback && anyCurrent()) {
+            try {
+              local = await localIndex!.index;
+            } catch (_) {
+              failure = '本地番剧索引加载失败（资源缺失、损坏或版本不兼容）';
             }
           }
           for (final item in batch.entries) {
             if (!current(item.key)) continue;
             if (usedLocal &&
                 (fallbackRevision != _fallbackRevision || !offlineFallback)) {
-              _entries.remove(item.key);
+              final previous = item.value.oldLocalResult;
+              if (previous == null) {
+                _entries.remove(item.key);
+              } else {
+                _entries[item.key] = previous;
+              }
               continue;
             }
             final video = item.value.media;
@@ -333,6 +362,7 @@ class AnimeMetadataController extends ChangeNotifier {
               candidates: candidates,
               error: local == null ? failure : null,
               usedLocalIndex: usedLocal,
+              localAliasRevision: local == null ? 0 : romanizedAliasRevision,
             );
           }
           if (_disposed) break;
@@ -543,6 +573,7 @@ class AnimeMetadataController extends ChangeNotifier {
         candidates: saved.candidates,
         manual: saved.manual,
         usedLocalIndex: saved.usedLocalIndex,
+        localAliasRevision: saved.localAliasRevision,
         matcherVersion: saved.matcherVersion,
       );
     }

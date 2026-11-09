@@ -33,6 +33,8 @@ flutter:
     - assets/brand/orbit-mark.png
     - assets/metadata/bangumi-data.json
     - assets/metadata/bangumi-data-manifest.json
+    - assets/metadata/romanized-aliases.json
+    - assets/metadata/romanized-aliases-LICENSE.txt
     - assets/fonts/NotoSansCJKsc-Regular.otf
     - assets/fonts/NotoSansCJK-OFL.txt
     - test/fixtures/generated.mp4

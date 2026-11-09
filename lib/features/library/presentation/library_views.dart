@@ -1729,14 +1729,23 @@ class _SettingsAboutState extends State<_SettingsAbout> {
                       '在线资料与封面：Bangumi（bgm.tv）\n\n'
                       '内置番剧索引：bangumi-data 及其贡献者\n$bangumiDataSource\n\n'
                       '许可：CC BY 4.0\n$bangumiDataLicense\n\n'
-                      'Orvex 提取名称、译名、作品类型、首播时间和资讯站点 ID，转换为内置检索格式。',
+                      'Orvex 提取名称、译名、作品类型、首播时间和资讯站点 ID，转换为内置检索格式。\n\n'
+                      '拉丁字母标题补充：cedya77 与 manami-project 的 anime-offline-database\n'
+                      '$romanizedAliasSource\n'
+                      'Orvex 仅提取经过作品 ID、类型与首播年份核对的标题。\n'
+                      '数据库许可：ODbL 1.0\n$romanizedAliasDatabaseLicense\n'
+                      '内容许可：DbCL 1.0\n$romanizedAliasContentsLicense\n'
+                      '派生别名表（JSON）：\n$romanizedAliasDownload',
                     ),
                   ),
                   actions: [
                     TextButton(
                       onPressed: () => Clipboard.setData(
                         const ClipboardData(
-                          text: '$bangumiDataSource\n$bangumiDataLicense',
+                          text:
+                              '$bangumiDataSource\n$bangumiDataLicense\n'
+                              '$romanizedAliasSource\n$romanizedAliasDatabaseLicense\n'
+                              '$romanizedAliasContentsLicense\n$romanizedAliasDownload',
                         ),
                       ),
                       child: const Text('复制项目与许可链接'),

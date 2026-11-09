@@ -167,6 +167,28 @@ void main() {
     expect(conan.episodes, 0);
     expect(conan.toJson(), isNot(contains('score')));
     expect(index.search('葬送的芙莉莲').any((s) => s.bangumiId == 400602), isTrue);
+    for (final (title, id) in [
+      ('Shingeki no Kyojin', 55770),
+      ('Kimetsu no Yaiba', 245665),
+      ('Meitantei Conan', 899),
+      ('Kusuriya no Hitorigoto', 420628),
+      ('Kusuriya no Hitorigoto 2nd Season', 486347),
+    ]) {
+      expect(
+        index.search(title).map((subject) => subject.bangumiId),
+        contains(id),
+      );
+    }
+    expect(
+      index
+          .match(
+            'Shingeki no Kyojin',
+            '[LPSub] Shingeki no Kyojin [01][AVC AAC][1080p][JPSC].mp4',
+          )
+          .subject
+          ?.bangumiId,
+      55770,
+    );
     for (final title in ['Sousou no Frieren', 'Sōsō no Furīren']) {
       expect(index.search(title).single.bangumiId, 400602);
     }
@@ -193,6 +215,66 @@ void main() {
       'BANGUMI_DATA_BENCH entries=${index.length} cold_us=$coldMicros warm_2000_us=${start.elapsedMicroseconds} rss_delta_bytes=$rssDelta',
     );
   });
+
+  test(
+    'upgraded aliases retry old local misses once without requerying online',
+    () async {
+      final missing = video('Romanized Example - 01.mkv');
+      final unknown = video('No Such Alias - 01.mkv');
+      final saved = video('Example - 02.mkv');
+      final onlineMiss = video('Example Movie.mkv');
+      final oldDate = DateTime.now().subtract(const Duration(hours: 1));
+      const previous = AnimeSubject(id: 77, name: 'User selection', nameCn: '');
+      store.entries = {
+        for (final (media, query) in [
+          (missing, 'Romanized Example'),
+          (unknown, 'No Such Alias'),
+        ])
+          animeMediaKey(media): AnimeMatch(
+            query: query,
+            status: AnimeMatchStatus.notFound,
+            updatedAt: oldDate,
+            usedLocalIndex: true,
+          ),
+        animeMediaKey(saved): AnimeMatch(
+          query: 'Example',
+          status: AnimeMatchStatus.matched,
+          updatedAt: oldDate,
+          subject: previous,
+          manual: true,
+        ),
+        animeMediaKey(onlineMiss): AnimeMatch(
+          query: 'Example Movie',
+          status: AnimeMatchStatus.notFound,
+          updatedAt: oldDate,
+        ),
+      };
+      final asset = BangumiDataAsset(
+        loader: () async {
+          loads++;
+          return BangumiDataIndex.decode(
+            fixture,
+            extraAliases: {'1': 'Romanized Example'},
+          );
+        },
+      );
+      final controller = create(asset: asset);
+      await controller.scan([missing, unknown, saved, onlineMiss]);
+      await settled(controller);
+      expect(controller.subjectFor(missing)?.id, 1);
+      expect(controller.subjectFor(saved)?.id, 77);
+      expect(controller.matchFor(onlineMiss)?.updatedAt, oldDate);
+      final rechecked = controller.matchFor(unknown)!;
+      expect(rechecked.localAliasRevision, romanizedAliasRevision);
+      expect(rechecked.status, AnimeMatchStatus.notFound);
+      final reopened = create();
+      await reopened.scan([missing, unknown, saved, onlineMiss]);
+      await settled(reopened);
+      expect(reopened.matchFor(unknown)?.updatedAt, rechecked.updatedAt);
+      expect(online.queries, isEmpty);
+      expect(loads, 1);
+    },
+  );
 
   test('only exact evidence matches; seasons, editions, dates and numbers stay distinct', () {
     final index = BangumiDataIndex.decode(fixture);

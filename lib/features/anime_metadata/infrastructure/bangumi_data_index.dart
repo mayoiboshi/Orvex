@@ -10,6 +10,15 @@ import '../domain/anime_subject.dart';
 
 const bangumiDataSource = 'https://github.com/bangumi-data/bangumi-data';
 const bangumiDataLicense = 'https://creativecommons.org/licenses/by/4.0/';
+const romanizedAliasRevision = 1;
+const romanizedAliasSource =
+    'https://github.com/cedya77/anime-offline-database/releases/tag/2026-44';
+const romanizedAliasDatabaseLicense =
+    'https://opendatacommons.org/licenses/odbl/1-0/';
+const romanizedAliasContentsLicense =
+    'https://opendatacommons.org/licenses/dbcl/1-0/';
+const romanizedAliasDownload =
+    'https://raw.githubusercontent.com/mayoiboshi/Orvex/main/assets/metadata/romanized-aliases.json';
 
 // Reviewed Romanizations absent from the upstream snapshot. Match by the
 // Bangumi work ID so editions and sequels keep their own identities.
@@ -30,23 +39,48 @@ class BangumiDataAsset {
     final manifest = await rootBundle.loadString(
       'assets/metadata/bangumi-data-manifest.json',
     );
+    String? aliases;
+    try {
+      aliases = await rootBundle.loadString(
+        'assets/metadata/romanized-aliases.json',
+        cache: false,
+      );
+    } catch (_) {
+      // The supplemental table is optional. A missing table must not disable
+      // the original offline catalog.
+    }
     return compute(_verifyAndDecode, (
       bytes.buffer.asUint8List(bytes.offsetInBytes, bytes.lengthInBytes),
       manifest,
+      aliases,
     ));
   }
 
-  static BangumiDataIndex _verifyAndDecode((Uint8List, String) input) {
-    final (bytes, manifest) = input;
+  static BangumiDataIndex _verifyAndDecode((Uint8List, String, String?) input) {
+    final (bytes, manifest, aliasTable) = input;
     final expected = jsonDecode(manifest) as Map<String, dynamic>;
     if (sha256.convert(bytes).toString() != expected['assetSha256']) {
       throw const FormatException('本地索引校验失败');
     }
-    final index = BangumiDataIndex.decode(utf8.decode(bytes));
+    final index = BangumiDataIndex.decode(
+      utf8.decode(bytes),
+      extraAliases: _decodeAliases(aliasTable),
+    );
     if (index.length != expected['entries']) {
       throw const FormatException('本地索引条目数量不符');
     }
     return index;
+  }
+
+  static Map<String, String> _decodeAliases(String? source) {
+    if (source == null) return const {};
+    try {
+      final data = jsonDecode(source) as Map<String, dynamic>;
+      if (data['schema'] != 1) return const {};
+      return Map<String, String>.from(data['aliases'] as Map);
+    } catch (_) {
+      return const {};
+    }
   }
 }
 
@@ -67,7 +101,10 @@ class BangumiDataIndex {
   final Map<String, List<String>> _prefixes;
   final int length;
 
-  factory BangumiDataIndex.decode(String source) {
+  factory BangumiDataIndex.decode(
+    String source, {
+    Map<String, String> extraAliases = const {},
+  }) {
     final data = jsonDecode(source) as Map<String, dynamic>;
     final items = data['items'] as List;
     if (data['schema'] != 1 || items.isEmpty) {
@@ -115,6 +152,7 @@ class BangumiDataIndex {
         aliases: [
           for (final aliases in translations.values) ...aliases.cast<String>(),
           ...?_romanizedAliases[id],
+          if (extraAliases[ids['bangumi']] case final String alias) alias,
         ],
         date: date,
         platform: platform,

@@ -62,7 +62,7 @@ void main() {
           );
           timer.reset();
           for (var i = 0; i < 1000; i++) {
-            index.match('Detective Conan', 'Detective Conan 0644.mkv');
+            index.match('Meitantei Conan', 'Meitantei Conan 0644.mkv');
             index.search('葬送');
           }
           debugPrint(
@@ -101,8 +101,10 @@ void main() {
 
       try {
         final sample = await rootBundle.load('test/fixtures/generated.mp4');
-        final file = await File('${root.path}/Detective Conan 0644.mp4')
-            .writeAsBytes(
+        final file =
+            await File(
+              '${root.path}/[LPSub] Meitantei Conan [01][AVC AAC][1080p][JPSC].mp4',
+            ).writeAsBytes(
               sample.buffer.asUint8List(
                 sample.offsetInBytes,
                 sample.lengthInBytes,
