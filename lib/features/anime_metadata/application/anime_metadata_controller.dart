@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -9,6 +10,7 @@ import '../domain/anime_episode.dart';
 import '../domain/anime_filename.dart';
 import '../domain/anime_subject.dart';
 import '../infrastructure/bangumi_client.dart';
+import '../infrastructure/bangumi_data_index.dart';
 import '../infrastructure/metadata_store.dart';
 
 class AnimeMetadataController extends ChangeNotifier {
@@ -17,18 +19,28 @@ class AnimeMetadataController extends ChangeNotifier {
     MetadataStore? store,
     this.queryResolver,
     this.groupResolver,
+    this.localIndex,
+    this.isOffline = definitelyOffline,
   }) : client = client ?? BangumiClient(),
        store = store ?? MetadataStore();
   final String Function(LocalMedia)? queryResolver, groupResolver;
   String queryFor(LocalMedia media) =>
       queryResolver?.call(media) ?? AnimeFilename.parse(media.name).query;
   final BangumiClient client;
+  final BangumiDataAsset? localIndex;
+  final Future<bool> Function() isOffline;
+  static const offlineFallbackKey = 'orvex.metadata.offline-fallback.v1';
+  bool offlineFallback = true;
+  int _fallbackRevision = 0;
+  DateTime? _unavailableUntil;
+  String? _unavailableReason;
   final MetadataStore store;
   final Map<String, AnimeMatch> _entries = {};
   final Map<String, int> _revisions = {};
   final Map<String, ({DateTime date, List<AnimeSubject> subjects})> _queries =
       {};
   final Map<String, LocalMedia> _queue = {};
+  final Map<int, AnimeSubject> _onlineDetails = {};
   final Map<int, String> _posters = {};
   final Map<int, Future<void>> _posterJobs = {};
   final _episodes = <int, List<AnimeEpisode>>{};
@@ -110,8 +122,18 @@ class AnimeMetadataController extends ChangeNotifier {
         ),
       );
       _posters.addAll(await store.posters());
+      if (localIndex != null) {
+        try {
+          offlineFallback =
+              await _episodePreferences.getBool(offlineFallbackKey) ?? true;
+        } catch (_) {
+          // A preference read failure must not make existing metadata unusable.
+        }
+      }
       for (final entry in _entries.values) {
+        _rememberOnlineDetails(entry.subject);
         if (entry.manual ||
+            entry.usedLocalIndex ||
             entry.status == AnimeMatchStatus.failed ||
             entry.status == AnimeMatchStatus.queued ||
             entry.status == AnimeMatchStatus.ignored) {
@@ -173,11 +195,13 @@ class AnimeMetadataController extends ChangeNotifier {
           updatedAt: manual.updatedAt,
           subject: manual.subject,
           manual: true,
+          usedLocalIndex: manual.usedLocalIndex,
         );
         _entries[key] = entry;
         inherited = true;
       }
-      if (entry?.subject case final AnimeSubject subject) {
+      if (entry?.subject case final AnimeSubject subject
+          when entry?.usedLocalIndex != true) {
         unawaited(_ensurePoster(subject));
       }
       if (entry != null) {
@@ -220,75 +244,119 @@ class AnimeMetadataController extends ChangeNotifier {
   }
 
   Future<void> _run() async {
+    var unsavedLocal = 0;
     _running = true;
     _notify();
     try {
       while (_queue.isNotEmpty && !_disposed && automatic) {
-        final key = _queue.keys.first;
-        final media = _queue.remove(key)!;
-        final query = queryFor(media);
-        final queryKey = normalizedAnimeTitle(query);
-        final batch = <String, int>{key: _revisions[key] ?? 0};
-        for (final other in _queue.entries.toList()) {
-          if (normalizedAnimeTitle(queryFor(other.value)) == queryKey) {
-            batch[other.key] = _revisions[other.key] ?? 0;
-            _queue.remove(other.key);
-          }
-        }
-        AnimeMatch result;
-        try {
-          var cached = _queries[queryKey];
-          if (cached == null ||
-              DateTime.now().difference(cached.date) >
-                  const Duration(days: 7)) {
-            cached = (
-              date: DateTime.now(),
-              subjects: await client.search(query),
-            );
-            _queries[queryKey] = cached;
-          }
-          final subject = cached.subjects.firstOrNull;
-          result = AnimeMatch(
-            query: query,
-            status: subject == null
-                ? AnimeMatchStatus.notFound
-                : AnimeMatchStatus.matched,
-            updatedAt: DateTime.now(),
-            subject: subject,
-            candidates: cached.subjects,
+        final groups = <String, List<String>>{};
+        for (final item in _queue.entries) {
+          (groups[normalizedAnimeTitle(queryFor(item.value))] ??= []).add(
+            item.key,
           );
-        } catch (exception) {
-          result = AnimeMatch(
-            query: query,
-            status: AnimeMatchStatus.failed,
-            updatedAt: DateTime.now(),
-            error: exception is BangumiException
+        }
+        for (final group in groups.entries) {
+          if (_disposed || !automatic) break;
+          final queryKey = group.key;
+          final batch = <String, ({LocalMedia media, int revision})>{};
+          for (final key in group.value) {
+            final video = _queue[key];
+            if (video == null ||
+                normalizedAnimeTitle(queryFor(video)) != queryKey) {
+              continue;
+            }
+            _queue.remove(key);
+            batch[key] = (media: video, revision: _revisions[key] ?? 0);
+          }
+          if (batch.isEmpty) continue;
+          final key = batch.keys.first;
+          final query = queryFor(batch[key]!.media);
+          bool current(String key) =>
+              !_disposed &&
+              automatic &&
+              batch[key]?.revision == (_revisions[key] ?? 0) &&
+              _entries[key]?.status == AnimeMatchStatus.queued;
+          bool anyCurrent() => batch.keys.any(current);
+          final fallbackRevision = _fallbackRevision;
+          List<AnimeSubject>? online;
+          BangumiDataIndex? local;
+          String? failure;
+          var usedLocal = false;
+          try {
+            online = await _online(query, queryKey, anyCurrent);
+          } catch (exception) {
+            if (!anyCurrent()) continue;
+            failure = exception is BangumiException
                 ? exception.message
-                : '番剧匹配暂未完成，可稍后重试',
-          );
-        }
-        for (final item in batch.entries) {
-          if (_disposed ||
-              item.value != (_revisions[item.key] ?? 0) ||
-              (_entries[item.key]?.manual ?? false)) {
-            continue;
+                : '番剧匹配暂未完成，可稍后重试';
+            if (localIndex != null &&
+                offlineFallback &&
+                fallbackRevision == _fallbackRevision &&
+                _unavailable(exception)) {
+              usedLocal = true;
+              try {
+                local = await localIndex!.index;
+              } catch (_) {
+                failure = '本地番剧索引加载失败（资源缺失、损坏或版本不兼容）';
+              }
+            }
           }
-          if (!automatic) {
-            _entries.remove(item.key);
-            continue;
+          for (final item in batch.entries) {
+            if (!current(item.key)) continue;
+            if (usedLocal &&
+                (fallbackRevision != _fallbackRevision || !offlineFallback)) {
+              _entries.remove(item.key);
+              continue;
+            }
+            final video = item.value.media;
+            final found = local?.match(queryFor(video), video.name);
+            final candidates =
+                online ?? found?.candidates ?? const <AnimeSubject>[];
+            final foundSubject = online != null
+                ? online.firstOrNull
+                : found?.subject;
+            final subject = _preferSavedDetails(foundSubject);
+            _rememberOnlineDetails(subject);
+            _entries[item.key] = AnimeMatch(
+              query: queryFor(video),
+              status: subject != null
+                  ? AnimeMatchStatus.matched
+                  : online != null
+                  ? AnimeMatchStatus.notFound
+                  : found == null
+                  ? AnimeMatchStatus.failed
+                  : candidates.isEmpty
+                  ? AnimeMatchStatus.notFound
+                  : AnimeMatchStatus.needsReview,
+              updatedAt: DateTime.now(),
+              subject: subject,
+              candidates: candidates,
+              error: local == null ? failure : null,
+              usedLocalIndex: usedLocal,
+            );
           }
-          _entries[item.key] = result;
-        }
-        if (_disposed) break;
-        await _save();
-        _notify();
-        if (_entries[key]?.subject case final AnimeSubject subject) {
-          await _ensurePoster(subject);
+          if (_disposed) break;
+          if (usedLocal) {
+            // Commit local work in groups. The CPU and UI get a turn between groups.
+            if (++unsavedLocal < 20) {
+              await Future<void>.delayed(Duration.zero);
+              continue;
+            }
+          }
+          await _save();
+          unsavedLocal = 0;
+          _notify();
+          if (_entries[key]?.subject case final AnimeSubject subject
+              when !usedLocal) {
+            await _ensurePoster(subject);
+          }
         }
       }
     } finally {
+      if (!_disposed && unsavedLocal > 0) await _save();
       _running = false;
       _notify();
+      if (!_disposed && automatic && _queue.isNotEmpty) unawaited(_run());
     }
   }
 
@@ -320,7 +388,168 @@ class AnimeMetadataController extends ChangeNotifier {
     if (enabled) await scan(_media);
   }
 
-  Future<List<AnimeSubject>> search(String query) => client.search(query);
+  static bool _unavailable(Object error) =>
+      error is SocketException ||
+      error is TimeoutException ||
+      error is BangumiException && error.kind == BangumiFailure.unavailable;
+
+  Future<List<AnimeSubject>> _online(
+    String query,
+    String? cacheKey,
+    bool Function() isCurrent,
+  ) async {
+    final cached = _queries[cacheKey];
+    final fresh =
+        cached != null &&
+        DateTime.now().difference(cached.date) <= const Duration(days: 7);
+    if (fresh && (localIndex == null || cached.subjects.isNotEmpty)) {
+      return cached.subjects;
+    }
+    if (localIndex != null) {
+      if (_unavailableUntil?.isAfter(DateTime.now()) == true) {
+        throw BangumiException(
+          _unavailableReason!,
+          kind: BangumiFailure.unavailable,
+        );
+      }
+      if (await isOffline()) {
+        const reason = '设备没有可用网络接口';
+        if (isCurrent()) {
+          _unavailableUntil = DateTime.now().add(const Duration(seconds: 2));
+          _unavailableReason = reason;
+        }
+        throw const BangumiException(reason, kind: BangumiFailure.unavailable);
+      }
+    }
+    if (!isCurrent()) {
+      throw const BangumiException('搜索已取消', kind: BangumiFailure.cancelled);
+    }
+    if (fresh) return cached.subjects;
+    try {
+      final subjects = await client.search(query);
+      if (cacheKey != null && isCurrent()) {
+        _queries[cacheKey] = (date: DateTime.now(), subjects: subjects);
+      }
+      return subjects;
+    } catch (error) {
+      if (localIndex != null && isCurrent() && _unavailable(error)) {
+        _unavailableUntil = DateTime.now().add(const Duration(seconds: 60));
+        _unavailableReason = error is BangumiException
+            ? error.message
+            : 'Bangumi 无法访问';
+      }
+      rethrow;
+    }
+  }
+
+  void _rememberOnlineDetails(AnimeSubject? subject) {
+    final id = subject?.bangumiId;
+    if (id != null && !subject!.fromLocalIndex) _onlineDetails[id] = subject;
+  }
+
+  AnimeSubject? _preferSavedDetails(
+    AnimeSubject? subject, {
+    bool preserveNames = false,
+  }) {
+    final online = _onlineDetails[subject?.bangumiId];
+    return subject != null && subject.fromLocalIndex && online != null
+        ? subject.withBangumiDetails(online, preserveNames: preserveNames)
+        : subject;
+  }
+
+  Future<void> setOfflineFallback(bool enabled) async {
+    await initialize();
+    if (_disposed) return;
+    final revision = ++_fallbackRevision;
+    try {
+      await _episodePreferences.setBool(offlineFallbackKey, enabled);
+      if (_disposed || revision != _fallbackRevision) return;
+      offlineFallback = enabled;
+      _notify();
+    } catch (_) {
+      error = '离线备用偏好未能保存，请重试';
+      _notify();
+    }
+  }
+
+  Future<({List<AnimeSubject> subjects, bool local})> search(
+    String query, {
+    bool localOnly = false,
+    bool Function()? isCurrent,
+  }) async {
+    await initialize();
+    bool current() => !_disposed && (isCurrent?.call() ?? true);
+    if (!current()) return (subjects: const <AnimeSubject>[], local: false);
+    if (!localOnly) {
+      // An explicit search can try the online source again.
+      _unavailableUntil = null;
+      try {
+        final subjects = await _online(query, null, current);
+        return (subjects: subjects, local: false);
+      } catch (error) {
+        if (!current() ||
+            !_unavailable(error) ||
+            !offlineFallback ||
+            localIndex == null) {
+          rethrow;
+        }
+      }
+    }
+    if (!current()) return (subjects: const <AnimeSubject>[], local: true);
+    try {
+      final index = await localIndex!.index;
+      return (
+        subjects: current() ? index.search(query) : const <AnimeSubject>[],
+        local: true,
+      );
+    } catch (_) {
+      throw const FormatException('本地番剧索引加载失败（资源缺失、损坏或版本不兼容）');
+    }
+  }
+
+  Future<void> completeFromBangumi(
+    LocalMedia media, {
+    bool Function()? isCurrent,
+  }) async {
+    await initialize();
+    final target = matchFor(media);
+    final subject = target?.subject;
+    final id = subject?.bangumiId;
+    if (_disposed || id == null || subject?.fromLocalIndex != true) return;
+    final pending = Map.of(_entries)
+      ..removeWhere(
+        (_, match) =>
+            match.subject?.bangumiId != id ||
+            match.subject?.fromLocalIndex != true,
+      );
+    final online = await client.subject(id);
+    if (_disposed ||
+        (isCurrent?.call() == false) ||
+        !identical(matchFor(media), target)) {
+      return;
+    }
+    _rememberOnlineDetails(online);
+    for (final entry in pending.entries) {
+      if (!identical(_entries[entry.key], entry.value)) continue;
+      final saved = entry.value;
+      _entries[entry.key] = AnimeMatch(
+        query: saved.query,
+        status: saved.status,
+        updatedAt: saved.updatedAt,
+        subject: saved.subject!.withBangumiDetails(
+          online,
+          preserveNames: saved.manual,
+        ),
+        candidates: saved.candidates,
+        manual: saved.manual,
+        usedLocalIndex: saved.usedLocalIndex,
+        matcherVersion: saved.matcherVersion,
+      );
+    }
+    await _save();
+    _notify();
+    unawaited(_ensurePoster(online));
+  }
 
   Future<void> select(LocalMedia media, AnimeSubject? subject) =>
       selectMany([media], subject);
@@ -337,8 +566,9 @@ class AnimeMetadataController extends ChangeNotifier {
             ? AnimeMatchStatus.ignored
             : AnimeMatchStatus.matched,
         updatedAt: DateTime.now(),
-        subject: subject,
+        subject: _preferSavedDetails(subject, preserveNames: true),
         manual: true,
+        usedLocalIndex: subject?.fromLocalIndex ?? false,
       );
     }
     try {
@@ -349,13 +579,17 @@ class AnimeMetadataController extends ChangeNotifier {
       _notify();
       rethrow;
     }
+    _rememberOnlineDetails(subject);
     _notify();
-    if (subject != null) unawaited(_ensurePoster(subject));
+    if (subject != null && !subject.fromLocalIndex) {
+      unawaited(_ensurePoster(subject));
+    }
   }
 
   Future<void> _ensurePoster(AnimeSubject subject) async {
     if (_disposed ||
         subject.posterUrl == null ||
+        subject.bangumiId == null ||
         _posters.containsKey(subject.id)) {
       return;
     }
@@ -383,11 +617,17 @@ class AnimeMetadataController extends ChangeNotifier {
 
   Future<void> retry([LocalMedia? media]) async {
     error = null;
+    _unavailableUntil = null;
     if (!_loaded) {
       _initialization = null;
       await initialize();
     }
     if (!_loaded || _disposed || !automatic) return;
+    if (media != null && matchFor(media)?.subject?.fromLocalIndex == true) {
+      await completeFromBangumi(media);
+      return;
+    }
+    if (media != null && matchFor(media)?.manual == true) return;
     final items = media == null ? _media : [media];
     for (final item in items) {
       final key = animeMediaKey(item);

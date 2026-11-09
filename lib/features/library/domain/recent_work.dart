@@ -38,10 +38,10 @@ List<RecentWork> buildRecentWorks(
     final identity = identify(file);
     identities[file.resumeKey] = identity;
     final subject = _confirmedSeries(file, match, identity);
-    final key = subject == null
-        ? 'file:${file.resumeKey}'
-        : 'bangumi:${subject.id}';
-    if (subject != null) subjects[key] = subject;
+    final key = subject == null ? 'file:${file.resumeKey}' : subject.workKey;
+    if (subject != null && (subjects[key] == null || !subject.fromLocalIndex)) {
+      subjects[key] = subject;
+    }
     (groups[key] ??= []).add(file);
     final date = added[file.resumeKey] ?? file.modifiedAt ?? unknownDate;
     final previous = latest[key];
@@ -98,7 +98,7 @@ AnimeSubject? _confirmedSeries(
       (subject.platform != 'TV' && subject.episodes <= 1)) {
     return null;
   }
-  if (match!.manual) return subject;
+  if (match!.manual || match.usedLocalIndex) return subject;
   if (!identity.episodic) return null;
   final filename = AnimeFilename.parse(file.name);
   final candidates = match.candidates;

@@ -16,8 +16,18 @@ class AnimeSubject {
     this.platform = '',
     this.relatedSearchNames = const [],
     this.relatedSourceIds = const [],
+    this.localKey,
+    this.externalIds = const {},
   });
+
+  /// Positive IDs are exclusively Bangumi IDs. A local-only subject has ID 0.
   final int id;
+  final String? localKey;
+  final Map<String, String> externalIds;
+  int? get bangumiId => id > 0 ? id : null;
+  bool get fromLocalIndex => localKey != null;
+  String get workKey =>
+      bangumiId == null ? 'bangumi-data:$localKey' : 'bangumi:$id';
   final int type;
   final String platform;
   final List<String> relatedSearchNames;
@@ -47,10 +57,32 @@ class AnimeSubject {
         episodes: episodes,
         score: score,
         posterUrl: posterUrl,
+        localKey: localKey,
+        externalIds: externalIds,
         aliases: aliases,
         relatedSearchNames: {...relatedSearchNames, query}.toList(),
         relatedSourceIds: {...relatedSourceIds, ...sources}.toList(),
       );
+
+  AnimeSubject withBangumiDetails(
+    AnimeSubject online, {
+    bool preserveNames = false,
+  }) => AnimeSubject(
+    id: id,
+    type: online.type,
+    name: !preserveNames && online.name.isNotEmpty ? online.name : name,
+    nameCn: !preserveNames && online.nameCn.isNotEmpty ? online.nameCn : nameCn,
+    summary: online.summary.isNotEmpty ? online.summary : summary,
+    date: online.date.isNotEmpty ? online.date : date,
+    episodes: online.episodes > 0 ? online.episodes : episodes,
+    score: online.score > 0 ? online.score : score,
+    posterUrl: online.posterUrl ?? posterUrl,
+    platform: online.platform.isNotEmpty ? online.platform : platform,
+    aliases: {...aliases, ...online.aliases}.toList(),
+    externalIds: {...externalIds, ...online.externalIds},
+    relatedSearchNames: online.relatedSearchNames,
+    relatedSourceIds: online.relatedSourceIds,
+  );
 
   factory AnimeSubject.fromJson(Map<String, dynamic> data) {
     final images = data['images'] as Map<String, dynamic>? ?? {};
@@ -73,6 +105,9 @@ class AnimeSubject {
     final url = image == null ? null : Uri.tryParse(image);
     return AnimeSubject(
       id: data['id'] as int,
+      localKey: data['localKey'] as String?,
+      externalIds:
+          (data['externalIds'] as Map?)?.cast<String, String>() ?? const {},
       type: (data['type'] as num?)?.toInt() ?? 2,
       platform: data['platform'] as String? ?? '',
       relatedSearchNames: (data['relatedSearchNames'] as List? ?? [])
@@ -104,8 +139,10 @@ class AnimeSubject {
     'name_cn': nameCn,
     'summary': summary,
     'date': date,
-    'eps': episodes,
-    'score': score,
+    if (!fromLocalIndex || episodes > 0) 'eps': episodes,
+    if (!fromLocalIndex || score > 0) 'score': score,
+    if (localKey != null) 'localKey': localKey,
+    if (externalIds.isNotEmpty) 'externalIds': externalIds,
     'posterUrl': posterUrl,
     'aliases': aliases,
   };
@@ -132,6 +169,7 @@ class AnimeMatch {
     this.manual = false,
     this.error,
     this.matcherVersion = animeMatcherVersion,
+    this.usedLocalIndex = false,
   });
   final String query;
   final AnimeMatchStatus status;
@@ -141,6 +179,7 @@ class AnimeMatch {
   final bool manual;
   final String? error;
   final int matcherVersion;
+  final bool usedLocalIndex;
 
   Map<String, dynamic> toJson() => {
     'query': query,
@@ -149,6 +188,8 @@ class AnimeMatch {
     'subject': subject?.toJson(),
     'candidates': candidates.map((s) => s.toJson()).toList(),
     'manual': manual,
+    if (error != null) 'error': error,
+    if (usedLocalIndex) 'usedLocalIndex': true,
     'matcherVersion': matcherVersion,
   };
   factory AnimeMatch.fromJson(Map<String, dynamic> data) => AnimeMatch(
@@ -162,6 +203,8 @@ class AnimeMatch {
         .map((v) => AnimeSubject.fromJson(v as Map<String, dynamic>))
         .toList(),
     manual: data['manual'] as bool? ?? false,
+    usedLocalIndex: data['usedLocalIndex'] as bool? ?? false,
+    error: data['error'] as String?,
     matcherVersion: (data['matcherVersion'] as num?)?.toInt() ?? 0,
   );
 }

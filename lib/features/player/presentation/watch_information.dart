@@ -11,6 +11,7 @@ class WatchInformation extends StatelessWidget {
     this.episodeDetails,
     required this.progress,
     required this.linked,
+    this.localMetadata = false,
     required this.onMetadata,
     required this.onPrevious,
     required this.onNext,
@@ -21,7 +22,7 @@ class WatchInformation extends StatelessWidget {
   final String title, episode;
   final Widget? episodeDetails;
   final Widget progress;
-  final bool linked, autoNext;
+  final bool linked, autoNext, localMetadata;
   final VoidCallback onMetadata;
   final VoidCallback? onPrevious, onNext;
   final ValueChanged<bool> onAutoNext;
@@ -87,7 +88,11 @@ class WatchInformation extends StatelessWidget {
               const SizedBox(width: OrvexMetrics.small),
               Flexible(
                 child: Text(
-                  linked ? 'Bangumi · 查看作品资料' : 'Bangumi · 关联番剧资料',
+                  localMetadata
+                      ? '本地番剧索引 · 查看作品资料'
+                      : linked
+                      ? 'Bangumi · 查看作品资料'
+                      : 'Bangumi · 关联番剧资料',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: text.labelMedium,

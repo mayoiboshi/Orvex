@@ -48,7 +48,7 @@ class _AnimeMetadataSheetState extends State<AnimeMetadataSheet> {
     super.dispose();
   }
 
-  Future<void> _search() async {
+  Future<void> _search({bool localOnly = false}) async {
     final query = _query.text.trim();
     if (query.length < 2 || _busy) return;
     final generation = ++_generation;
@@ -57,11 +57,19 @@ class _AnimeMetadataSheetState extends State<AnimeMetadataSheet> {
       _error = null;
     });
     try {
-      final results = await widget.metadata.search(query);
+      final results = await widget.metadata.search(
+        query,
+        localOnly: localOnly,
+        isCurrent: () => mounted && generation == _generation,
+      );
       if (!mounted || generation != _generation) return;
       setState(() {
-        _results = results;
-        if (results.isEmpty) _error = '未找到条目，试试中文名、原名或其他别名。';
+        _results = results.subjects;
+        if (_results.isEmpty) {
+          _error = results.local
+              ? '本地索引未找到此作品，可试试其他别名。'
+              : '未找到条目，试试中文名、原名或其他别名。';
+        }
       });
     } catch (error) {
       if (mounted && generation == _generation) {
@@ -88,6 +96,27 @@ class _AnimeMetadataSheetState extends State<AnimeMetadataSheet> {
       if (mounted) setState(() => _error = '关联未能保存，请重试。');
     } finally {
       if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _complete() async {
+    if (_busy) return;
+    final generation = ++_generation;
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      await widget.metadata.completeFromBangumi(
+        widget.media,
+        isCurrent: () => mounted && generation == _generation,
+      );
+    } catch (error) {
+      if (mounted && generation == _generation) {
+        setState(() => _error = '在线补全失败，已保留本地资料。\n$error');
+      }
+    } finally {
+      if (mounted && generation == _generation) setState(() => _busy = false);
     }
   }
 
@@ -154,6 +183,21 @@ class _AnimeMetadataSheetState extends State<AnimeMetadataSheet> {
                         : '已自动匹配',
                     style: TextStyle(color: _colors.accent, fontSize: 12),
                   ),
+                  if (subject.fromLocalIndex || match.usedLocalIndex)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Text(
+                        !subject.fromLocalIndex
+                            ? '通过本地索引识别 · 已有 Bangumi 在线资料'
+                            : subject.bangumiId != null
+                            ? '已使用本地番剧索引（bangumi-data），部分资料待联网补全。'
+                            : '已使用本地番剧索引（bangumi-data），可手动搜索其他资料。',
+                        style: TextStyle(
+                          color: _colors.secondary,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
                   const SizedBox(height: 20),
                   if (subject.summary.isNotEmpty) ...[
                     const Text(
@@ -185,25 +229,38 @@ class _AnimeMetadataSheetState extends State<AnimeMetadataSheet> {
                       ),
                     const SizedBox(height: 18),
                   ],
-                  OutlinedButton.icon(
-                    onPressed: () async {
-                      await Clipboard.setData(
-                        ClipboardData(text: subject.sourceUrl),
-                      );
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('已复制 Bangumi 条目链接')),
+                  if (subject.bangumiId != null)
+                    OutlinedButton.icon(
+                      onPressed: () async {
+                        await Clipboard.setData(
+                          ClipboardData(text: subject.sourceUrl),
                         );
-                      }
-                    },
-                    icon: const Icon(Icons.link_rounded, size: 18),
-                    label: Text('Bangumi · #${subject.id} · 复制链接'),
-                  ),
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('已复制 Bangumi 条目链接')),
+                          );
+                        }
+                      },
+                      icon: const Icon(Icons.link_rounded, size: 18),
+                      label: Text('Bangumi · #${subject.id} · 复制链接'),
+                    ),
+                  if (subject.fromLocalIndex && subject.bangumiId != null)
+                    TextButton.icon(
+                      onPressed: _busy ? null : _complete,
+                      icon: const Icon(Icons.refresh_rounded),
+                      label: const Text('从 Bangumi 补全资料'),
+                    ),
                   const SizedBox(height: 22),
                 ] else ...[
                   Text(switch (match?.status) {
                     AnimeMatchStatus.queued => '正在从 Bangumi 匹配资料…',
-                    AnimeMatchStatus.needsReview => '发现多个或不够确定的结果，请选择正确条目。',
+                    AnimeMatchStatus.needsReview =>
+                      match?.usedLocalIndex == true
+                          ? '本地索引找到不够确定的候选，请确认作品。'
+                          : '发现多个或不够确定的结果，请选择正确条目。',
+                    AnimeMatchStatus.notFound
+                        when match?.usedLocalIndex == true =>
+                      '本地索引未找到此作品，视频仍可正常播放。',
                     AnimeMatchStatus.failed =>
                       match?.error ?? '自动匹配暂未完成，请搜索重试。',
                     AnimeMatchStatus.ignored => '此视频已设为不关联，可在下方重新搜索。',
@@ -251,6 +308,12 @@ class _AnimeMetadataSheetState extends State<AnimeMetadataSheet> {
                     height: 1.6,
                   ),
                 ),
+                if (widget.metadata.localIndex != null)
+                  TextButton.icon(
+                    onPressed: _busy ? null : () => _search(localOnly: true),
+                    icon: const Icon(Icons.storage_rounded, size: 18),
+                    label: const Text('搜索本地番剧索引'),
+                  ),
                 if (_busy)
                   const Padding(
                     padding: EdgeInsets.symmetric(vertical: 14),
@@ -288,7 +351,15 @@ class _AnimeMetadataSheetState extends State<AnimeMetadataSheet> {
                         ),
                       ),
                       subtitle: Text(
-                        '${result.date.isEmpty ? '日期未知' : result.date} · ${result.episodes > 0 ? '${result.episodes} 集' : '集数未知'}\n${result.name}',
+                        [
+                          [
+                            if (result.fromLocalIndex) '本地番剧索引',
+                            if (result.platform.isNotEmpty) result.platform,
+                            if (result.date.isNotEmpty) result.date,
+                            if (result.episodes > 0) '${result.episodes} 集',
+                          ].join(' · '),
+                          result.name,
+                        ].where((value) => value.isNotEmpty).join('\n'),
                         maxLines: 3,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
@@ -310,7 +381,7 @@ class _AnimeMetadataSheetState extends State<AnimeMetadataSheet> {
                 ),
                 const SizedBox(height: 12),
                 Text(
-                  '元数据与封面来源：Bangumi（bgm.tv）',
+                  '在线资料与封面：Bangumi（bgm.tv）',
                   style: TextStyle(color: _colors.secondary, fontSize: 11),
                 ),
               ],

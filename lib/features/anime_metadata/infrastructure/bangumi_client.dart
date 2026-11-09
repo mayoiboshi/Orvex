@@ -6,8 +6,17 @@ import '../domain/anime_episode.dart';
 import '../domain/anime_subject.dart';
 import '../domain/anime_filename.dart';
 
+enum BangumiFailure {
+  unavailable,
+  rateLimited,
+  authorization,
+  cancelled,
+  other,
+}
+
 class BangumiException implements Exception {
-  const BangumiException(this.message);
+  const BangumiException(this.message, {this.kind = BangumiFailure.other});
+  final BangumiFailure kind;
   final String message;
   @override
   String toString() => message;
@@ -52,6 +61,14 @@ class BangumiClient {
       throw const BangumiException('Bangumi 单集资料格式异常');
     }
     throw const BangumiException('Bangumi 单集列表未能完整读取');
+  }
+
+  Future<AnimeSubject> subject(int id) async {
+    final subject = AnimeSubject.fromJson(await _request('/v0/subjects/$id'));
+    if (subject.id != id || subject.type != 2) {
+      throw const BangumiException('Bangumi 返回了不同的作品');
+    }
+    return subject;
   }
 
   Future<List<AnimeSubject>> search(String keyword) async {
@@ -185,9 +202,17 @@ class BangumiClient {
     bool image = false,
   }) {
     final result = _requests.then((_) async {
-      if (_closed) throw const BangumiException('元数据连接已关闭');
+      if (_closed) {
+        throw const BangumiException(
+          '元数据连接已关闭',
+          kind: BangumiFailure.cancelled,
+        );
+      }
       if (_cooldown != null && DateTime.now().isBefore(_cooldown!)) {
-        throw const BangumiException('Bangumi 请求频繁，请稍后重试');
+        throw const BangumiException(
+          'Bangumi 请求频繁，请稍后重试',
+          kind: BangumiFailure.rateLimited,
+        );
       }
       final wait = minimumInterval - DateTime.now().difference(_lastRequest);
       if (wait > Duration.zero) await Future<void>.delayed(wait);
@@ -226,17 +251,40 @@ class BangumiClient {
           }
           _cooldown =
               deadline ?? DateTime.now().add(Duration(seconds: seconds ?? 60));
-          await response.drain<void>().timeout(const Duration(seconds: 5));
-          throw const BangumiException('Bangumi 请求频繁，请稍后重试');
+          await response
+              .drain<void>()
+              .timeout(const Duration(seconds: 5))
+              .catchError((Object _) {});
+          throw const BangumiException(
+            'Bangumi 请求频繁，请稍后重试',
+            kind: BangumiFailure.rateLimited,
+          );
         }
         if (response.statusCode != 200) {
-          await response.drain<void>().timeout(const Duration(seconds: 5));
-          throw BangumiException('Bangumi 暂不可用（${response.statusCode}），请稍后重试');
+          await response
+              .drain<void>()
+              .timeout(const Duration(seconds: 5))
+              .catchError((Object _) {});
+          final status = response.statusCode;
+          final kind = status == 401 || status == 403
+              ? BangumiFailure.authorization
+              : status >= 500 || status == 408
+              ? BangumiFailure.unavailable
+              : BangumiFailure.other;
+          throw BangumiException(
+            kind == BangumiFailure.authorization
+                ? 'Bangumi 拒绝访问（$status）'
+                : 'Bangumi 暂不可用（$status），请稍后重试',
+            kind: kind,
+          );
         }
         if (image &&
             !(response.headers.contentType?.mimeType.startsWith('image/') ??
                 false)) {
-          await response.drain<void>().timeout(const Duration(seconds: 5));
+          await response
+              .drain<void>()
+              .timeout(const Duration(seconds: 5))
+              .catchError((Object _) {});
           throw const BangumiException('Bangumi 封面格式无效');
         }
         var size = 0;
@@ -254,11 +302,20 @@ class BangumiClient {
       } on BangumiException {
         rethrow;
       } on TimeoutException {
-        throw const BangumiException('Bangumi 连接超时，可稍后重试');
+        throw const BangumiException(
+          'Bangumi 连接超时，可稍后重试',
+          kind: BangumiFailure.unavailable,
+        );
       } on SocketException {
-        throw const BangumiException('无法连接 Bangumi，请检查网络后重试');
+        throw const BangumiException(
+          '无法连接 Bangumi，请检查网络后重试',
+          kind: BangumiFailure.unavailable,
+        );
       } on HttpException {
-        throw const BangumiException('Bangumi 连接中断，可稍后重试');
+        throw const BangumiException(
+          'Bangumi 连接中断，可稍后重试',
+          kind: BangumiFailure.unavailable,
+        );
       } on FormatException {
         throw const BangumiException('Bangumi 数据格式异常，可稍后重试');
       } on TypeError {

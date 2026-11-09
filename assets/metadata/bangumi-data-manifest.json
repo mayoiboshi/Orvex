@@ -1,0 +1,12 @@
+{
+  "version": "0.3.235",
+  "commit": "d5f56180c0c71fbeb24bd1914eb04c75f2f358fa",
+  "source": "https://github.com/bangumi-data/bangumi-data",
+  "license": "https://creativecommons.org/licenses/by/4.0/",
+  "tarball": "https://registry.npmjs.org/bangumi-data/-/bangumi-data-0.3.235.tgz",
+  "tarballIntegrity": "sha512-34e5OWp2naCGyeGfEcPRl+FBz5wbESGN36qa8KMXQy0gz7caPUQAn2xH5LWGCqAsIUtLFb3bzb+8hO98NauCPQ==",
+  "upstreamSha256": "f8f02b81690d7545e4ef9a7f9ace7eb05407c8bbc0a4f32e2aa63d10217feb85",
+  "assetSha256": "8ea4b836d0feb83eebb7ec5527fe05375cbf04d8b13448616faffa201234d8a1",
+  "entries": 8928,
+  "bytes": 2135937
+}

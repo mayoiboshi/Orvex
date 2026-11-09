@@ -31,6 +31,8 @@ flutter:
   uses-material-design: true
   assets:
     - assets/brand/orbit-mark.png
+    - assets/metadata/bangumi-data.json
+    - assets/metadata/bangumi-data-manifest.json
     - assets/fonts/NotoSansCJKsc-Regular.otf
     - assets/fonts/NotoSansCJK-OFL.txt
     - test/fixtures/generated.mp4

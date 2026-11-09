@@ -573,8 +573,8 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
     final identity = _folders.identityFor(current);
     final episode = identity.episode;
     if (episode == null || episode <= 0) return false;
-    final currentSubject = _metadata.matchFor(current)?.subject?.id;
-    final workSubject = work?.subject?.id;
+    final currentSubject = _metadata.matchFor(current)?.subject?.workKey;
+    final workSubject = work?.subject?.workKey;
     final season = identity.season ?? 1;
     final nextSeason = _folders.identityFor(next).season ?? 1;
     final expected = nextSeason == season
@@ -587,7 +587,7 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
     int? episodeInSeries(LocalMedia media) {
       final other = _folders.identityFor(media);
       if ((other.season ?? 1) != nextSeason) return null;
-      final subject = _metadata.matchFor(media)?.subject?.id;
+      final subject = _metadata.matchFor(media)?.subject?.workKey;
       if (workSubject != null) {
         return subject == workSubject && currentSubject == workSubject
             ? other.episode
@@ -1086,7 +1086,10 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
             WatchInformation(
               title: title,
               episode: episodeNumber == null ? '' : '第 $episodeNumber 集',
-              episodeDetails: subject == null || episodeNumber == null
+              episodeDetails:
+                  subject?.bangumiId == null ||
+                      subject!.fromLocalIndex ||
+                      episodeNumber == null
                   ? null
                   : EpisodeDetails(
                       key: ValueKey((
@@ -1110,6 +1113,7 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
                 ),
               ),
               linked: subject != null,
+              localMetadata: subject?.fromLocalIndex ?? false,
               onMetadata: () => _showPlaybackMetadata(media),
               onPrevious: _session.hasPrevious
                   ? () => _session.previous()

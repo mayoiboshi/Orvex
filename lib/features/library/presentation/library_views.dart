@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
 import '../../../design/appearance_controller.dart';
@@ -13,6 +14,7 @@ import '../../player/infrastructure/playback_preferences.dart';
 import '../../anime_metadata/application/anime_metadata_controller.dart';
 import '../../anime_metadata/domain/anime_filename.dart';
 import '../../anime_metadata/domain/anime_subject.dart';
+import '../../anime_metadata/infrastructure/bangumi_data_index.dart';
 import '../../folder_library/folder_models.dart';
 import '../../folder_library/thumbnail_cache.dart';
 import '../../player/presentation/playback_surface.dart';
@@ -1202,7 +1204,9 @@ class LibraryViews extends StatelessWidget {
       if (subject.date.length >= 4) subject.date.substring(0, 4),
       if (subject.score > 0) '★ ${subject.score.toStringAsFixed(1)}',
     ];
-    if (includeSource) details.add('Bangumi');
+    if (includeSource) {
+      details.add(subject.fromLocalIndex ? '本地番剧索引' : 'Bangumi');
+    }
     return details.join(' · ');
   }
 
@@ -1333,13 +1337,24 @@ class LibraryViews extends StatelessWidget {
           value: metadata.automatic,
           onChanged: metadata.setAutomatic,
         ),
+        if (metadata.localIndex != null) ...[
+          _settingsDivider,
+          SwitchListTile.adaptive(
+            contentPadding: _settingsRowPadding,
+            key: const ValueKey('offline-bangumi-fallback'),
+            title: const Text('离线备用匹配'),
+            subtitle: const Text('无网络或在线资料源不可用时，使用内置番剧索引匹配基础资料。'),
+            value: metadata.offlineFallback,
+            onChanged: metadata.setOfflineFallback,
+          ),
+        ],
         _settingsDivider,
         Padding(
           padding: const EdgeInsets.all(OrvexMetrics.space),
           child: Align(
             alignment: AlignmentDirectional.centerStart,
             child: Text(
-              '来源为 Bangumi。查询使用整理后的片名，匹配资料缓存在此设备。可通过封面上的资料按钮更正匹配。',
+              '来源为 Bangumi。在线查询使用整理后的片名，匹配资料缓存在此设备。可通过封面上的资料按钮更正匹配。',
               style: Theme.of(context).textTheme.bodySmall,
             ),
           ),
@@ -1698,6 +1713,40 @@ class _SettingsAboutState extends State<_SettingsAbout> {
                     : snapshot.connectionState == ConnectionState.done
                     ? '版本暂不可用'
                     : '正在读取版本…',
+              ),
+            ),
+            _settingsDivider,
+            ListTile(
+              contentPadding: _settingsRowPadding,
+              title: const Text('数据来源'),
+              trailing: const Icon(Icons.chevron_right_rounded),
+              onTap: () => showDialog<void>(
+                context: context,
+                builder: (dialogContext) => AlertDialog(
+                  title: const Text('数据来源'),
+                  content: const SingleChildScrollView(
+                    child: SelectableText(
+                      '在线资料与封面：Bangumi（bgm.tv）\n\n'
+                      '内置番剧索引：bangumi-data 及其贡献者\n$bangumiDataSource\n\n'
+                      '许可：CC BY 4.0\n$bangumiDataLicense\n\n'
+                      'Orvex 提取名称、译名、作品类型、首播时间和资讯站点 ID，转换为内置检索格式。',
+                    ),
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Clipboard.setData(
+                        const ClipboardData(
+                          text: '$bangumiDataSource\n$bangumiDataLicense',
+                        ),
+                      ),
+                      child: const Text('复制项目与许可链接'),
+                    ),
+                    TextButton(
+                      onPressed: () => Navigator.pop(dialogContext),
+                      child: const Text('关闭'),
+                    ),
+                  ],
+                ),
               ),
             ),
             _settingsDivider,

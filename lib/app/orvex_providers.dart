@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../design/appearance_controller.dart';
 import '../features/anime_metadata/application/anime_metadata_controller.dart';
+import '../features/anime_metadata/infrastructure/bangumi_data_index.dart';
 import '../features/library/infrastructure/playback_history_store.dart';
 import '../features/media_sources/local_file_source.dart';
 import '../features/folder_library/folder_library.dart';
@@ -24,6 +25,7 @@ final historyStoreProvider = Provider<PlaybackHistoryStore>(
 final animeMetadataProvider = Provider<AnimeMetadataController>((ref) {
   final folders = ref.read(folderLibraryProvider);
   final metadata = AnimeMetadataController(
+    localIndex: BangumiDataAsset(),
     queryResolver: (media) => folders.identityFor(media).query,
     groupResolver: (media) => folders.identityFor(media).key,
   );

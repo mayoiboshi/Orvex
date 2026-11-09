@@ -6,6 +6,52 @@ import 'package:orvex/features/anime_metadata/infrastructure/bangumi_client.dart
 
 void main() {
   test(
+    'server failure and authorization carry distinct fallback policy',
+    () async {
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      final client = BangumiClient(
+        baseUrl: 'http://127.0.0.1:${server.port}',
+        minimumInterval: Duration.zero,
+      );
+      var status = 503;
+      final subscription = server.listen((request) async {
+        await request.drain<void>();
+        request.response.statusCode = status;
+        await request.response.close();
+      });
+      try {
+        await expectLater(
+          client.search('Example'),
+          throwsA(
+            isA<BangumiException>().having(
+              (error) => error.kind,
+              'kind',
+              BangumiFailure.unavailable,
+            ),
+          ),
+        );
+        status = 403;
+        await expectLater(
+          client.search('Example'),
+          throwsA(
+            isA<BangumiException>()
+                .having(
+                  (error) => error.kind,
+                  'kind',
+                  BangumiFailure.authorization,
+                )
+                .having((error) => error.message, 'message', contains('403')),
+          ),
+        );
+      } finally {
+        client.close();
+        await subscription.cancel();
+        await server.close(force: true);
+      }
+    },
+  );
+
+  test(
     'episode catalog follows pagination and validates subject and type',
     () async {
       final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);

@@ -57,8 +57,8 @@ LibraryEntry _entry(
   required AnimeMatch? Function(LocalMedia) matchFor,
   required SeriesIdentity Function(LocalMedia) identify,
 }) {
-  final subjects = <int, AnimeSubject>{};
-  final confirmed = <int>{};
+  final subjects = <String, AnimeSubject>{};
+  final confirmed = <String>{};
   DateTime? added;
   for (final media in group.media) {
     final date = arrivals[media.resumeKey] ?? media.modifiedAt;
@@ -71,9 +71,14 @@ LibraryEntry _entry(
         subject.type != 2) {
       continue;
     }
-    subjects.putIfAbsent(subject.id, () => subject);
-    if (match.manual) {
-      confirmed.add(subject.id);
+    subjects.update(
+      subject.workKey,
+      (saved) =>
+          saved.fromLocalIndex && !subject.fromLocalIndex ? subject : saved,
+      ifAbsent: () => subject,
+    );
+    if (match.manual || match.usedLocalIndex) {
+      confirmed.add(subject.workKey);
       continue;
     }
     final filename = AnimeFilename.parse(media.name);
@@ -85,12 +90,12 @@ LibraryEntry _entry(
       year: filename.year,
     );
     if (confidentAnimeMatch(query, match.candidates)?.id == subject.id) {
-      confirmed.add(subject.id);
+      confirmed.add(subject.workKey);
     }
   }
   final subject = subjects.length == 1 ? subjects.values.single : null;
   final platform = subject?.platform.trim() ?? '';
-  final kind = !confirmed.contains(subject?.id)
+  final kind = !confirmed.contains(subject?.workKey)
       ? LibraryKind.unknown
       : platform == '剧场版'
       ? LibraryKind.movie
