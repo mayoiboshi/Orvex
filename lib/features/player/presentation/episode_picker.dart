@@ -73,7 +73,7 @@ class _EpisodePickerState extends State<EpisodePicker> {
       return KeyEventResult.ignored;
     },
     child: Material(
-      color: Colors.black.withValues(alpha: 0.94),
+      color: Colors.black.withValues(alpha: 0.28),
       child: SafeArea(
         child: LayoutBuilder(
           builder: (context, constraints) {
@@ -121,6 +121,9 @@ class _EpisodePickerState extends State<EpisodePicker> {
                     tooltip: '关闭选集',
                     onPressed: widget.onClose,
                     color: Colors.white,
+                    style: IconButton.styleFrom(
+                      backgroundColor: Colors.black.withValues(alpha: 0.55),
+                    ),
                     icon: const Icon(Icons.close_rounded),
                   ),
                 ),
@@ -201,26 +204,34 @@ class _EpisodePickerState extends State<EpisodePicker> {
                                     ),
                                   ),
                                   Expanded(
-                                    child: ClipRect(
-                                      child: Text.rich(
-                                        TextSpan(
-                                          text: label,
-                                          children: [
-                                            if (identity.episode
-                                                case final int episode)
-                                              TextSpan(
-                                                text: '\n第 $episode 集',
-                                                style: const TextStyle(
-                                                  color: Colors.white70,
-                                                  fontSize: 12,
-                                                ),
-                                              ),
-                                          ],
+                                    child: DecoratedBox(
+                                      decoration: BoxDecoration(
+                                        color: Colors.black.withValues(
+                                          alpha: 0.66,
                                         ),
-                                        maxLines: 2,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: const TextStyle(
-                                          color: Colors.white,
+                                        borderRadius: BorderRadius.circular(4),
+                                      ),
+                                      child: ClipRect(
+                                        child: Text.rich(
+                                          TextSpan(
+                                            text: label,
+                                            children: [
+                                              if (identity.episode
+                                                  case final int episode)
+                                                TextSpan(
+                                                  text: '\n第 $episode 集',
+                                                  style: const TextStyle(
+                                                    color: Colors.white70,
+                                                    fontSize: 12,
+                                                  ),
+                                                ),
+                                            ],
+                                          ),
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                          ),
                                         ),
                                       ),
                                     ),
