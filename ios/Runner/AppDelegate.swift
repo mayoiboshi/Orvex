@@ -1,6 +1,7 @@
 import Flutter
 import UIKit
 import AVFAudio
+import MediaPlayer
 
 @main
 @objc class AppDelegate: FlutterAppDelegate, FlutterImplicitEngineDelegate {
@@ -8,6 +9,7 @@ import AVFAudio
   private var folderAccess: MediaFolderAccess?
   private var audioChannel: FlutterMethodChannel?
   private var audioObservers: [NSObjectProtocol] = []
+  private var playbackVolume: PlaybackVolumeBridge?
   private var displayChannel: FlutterMethodChannel?
   private var appearanceChannel: FlutterMethodChannel?
   private var brightnessScreen: UIScreen?
@@ -31,6 +33,9 @@ import AVFAudio
     folderAccess = MediaFolderAccess(messenger: registrar.messenger(), presenter: { registrar.viewController })
     let channel = FlutterMethodChannel(name: "dev.orvex/audio-session", binaryMessenger: registrar.messenger())
     audioChannel = channel
+    playbackVolume = PlaybackVolumeBridge(messenger: registrar.messenger()) {
+      registrar.viewController?.viewIfLoaded
+    }
     let appearance = FlutterMethodChannel(name: "dev.orvex/appearance", binaryMessenger: registrar.messenger())
     appearanceChannel = appearance
     appearance.setMethodCallHandler { call, result in
@@ -93,7 +98,10 @@ import AVFAudio
       NotificationCenter.default.addObserver(
         forName: UIApplication.willResignActiveNotification,
         object: nil, queue: .main
-      ) { [weak self] _ in self?.restoreBrightness() },
+      ) { [weak self] _ in
+        self?.restoreBrightness()
+        self?.playbackVolume?.suspend()
+      },
       NotificationCenter.default.addObserver(
         forName: AVAudioSession.interruptionNotification,
         object: AVAudioSession.sharedInstance(), queue: .main
@@ -141,5 +149,160 @@ import AVFAudio
         }
       }
     }
+  }
+}
+
+private final class PlaybackVolumeBridge: NSObject, FlutterStreamHandler {
+  private let host: () -> UIView?
+  private let session = AVAudioSession.sharedInstance()
+  private var observation: NSKeyValueObservation?
+  private var routeObserver: NSObjectProtocol?
+  private var emit: FlutterEventSink?
+  private var generation = 0
+  private var route = [String]()
+  private var playbackActive = false
+  private var ignoreSamplesUntil: TimeInterval = 0
+  private var detachWork: DispatchWorkItem?
+  private var volumeView: MPVolumeView?
+
+  private func makeVolumeView() -> MPVolumeView {
+    let view = MPVolumeView(frame: CGRect(x: 0, y: 0, width: 160, height: 44))
+    let clear = UIGraphicsImageRenderer(size: CGSize(width: 2, height: 2)).image { _ in }
+    view.setMinimumVolumeSliderImage(clear, for: .normal)
+    view.setMaximumVolumeSliderImage(clear, for: .normal)
+    view.setVolumeThumbImage(clear, for: .normal)
+    view.showsRouteButton = false
+    view.isUserInteractionEnabled = false
+    view.accessibilityElementsHidden = true
+    return view
+  }
+
+  init(messenger: FlutterBinaryMessenger, host: @escaping () -> UIView?) {
+    self.host = host
+    super.init()
+    let methods = FlutterMethodChannel(name: "dev.orvex/volume", binaryMessenger: messenger)
+    methods.setMethodCallHandler { [weak self] call, result in
+      guard let self else { result(false); return }
+      switch call.method {
+      case "isAvailable":
+        #if targetEnvironment(simulator)
+        result(false)
+        #else
+        result(true)
+        #endif
+      case "currentLevel":
+        result(Double(self.session.outputVolume))
+      case "present":
+        self.playbackActive = (call.arguments as? Bool == true) && self.emit != nil
+        if self.playbackActive {
+          self.detachWork?.cancel()
+          self.attach()
+        } else {
+          self.suspend()
+        }
+        result(nil)
+      case "set":
+        guard let level = call.arguments as? Double, level.isFinite,
+              self.emit != nil, UIApplication.shared.applicationState == .active else {
+          result(false)
+          return
+        }
+        result(self.setVolume(Float(min(1, max(0, level)))))
+      default:
+        result(FlutterMethodNotImplemented)
+      }
+    }
+    FlutterEventChannel(name: "dev.orvex/volume-events", binaryMessenger: messenger)
+      .setStreamHandler(self)
+  }
+
+  private func attach() {
+    guard let view = host(), view.window != nil else { return }
+    let control = volumeView ?? makeVolumeView()
+    guard control.superview !== view else { return }
+    volumeView = control
+    view.insertSubview(control, at: 0)
+    control.layoutIfNeeded()
+  }
+
+  func suspend() {
+    playbackActive = false
+    detachWork?.cancel()
+    volumeView?.removeFromSuperview()
+  }
+
+  private func setVolume(_ level: Float) -> Bool {
+    attach()
+    // MPVolumeView exposes appearance customization, but no public setter.
+    // Forward the user's on-screen gesture through its native slider.
+    guard let volumeView, volumeView.superview != nil,
+          let slider = volumeView.subviews.compactMap({ $0 as? UISlider }).first,
+          slider.isEnabled else {
+      if !playbackActive { suspend() }
+      return false
+    }
+    ignoreSamplesUntil = ProcessInfo.processInfo.systemUptime + 0.4
+    slider.setValue(level, animated: false)
+    slider.sendActions(for: .valueChanged)
+    slider.sendActions(for: .touchUpInside)
+    if !playbackActive {
+      detachWork?.cancel()
+      let work = DispatchWorkItem { [weak self] in self?.suspend() }
+      detachWork = work
+      DispatchQueue.main.asyncAfter(deadline: .now() + 0.45, execute: work)
+    }
+    return true
+  }
+
+  func onListen(withArguments arguments: Any?, eventSink events: @escaping FlutterEventSink) -> FlutterError? {
+    stopObserving()
+    emit = events
+    route = session.currentRoute.outputs.map(\.uid)
+    let token = generation
+    observation = session.observe(\.outputVolume, options: [.old, .new]) { [weak self] _, change in
+      guard let level = change.newValue else { return }
+      DispatchQueue.main.async { [weak self] in
+        guard let self, self.generation == token else { return }
+        let currentRoute = self.session.currentRoute.outputs.map(\.uid)
+        let routeChanged = self.route != currentRoute
+        self.route = currentRoute
+        let previous = change.oldValue ?? level
+        let sample = !routeChanged &&
+          ProcessInfo.processInfo.systemUptime >= self.ignoreSamplesUntil &&
+          previous > 0 && previous < 1 && level > 0 && level < 1
+        self.send(level, delta: sample ? abs(level - previous) : nil, reset: routeChanged)
+      }
+    }
+    routeObserver = NotificationCenter.default.addObserver(
+      forName: AVAudioSession.routeChangeNotification, object: session, queue: .main
+    ) { [weak self] _ in
+      guard let self, self.generation == token else { return }
+      self.route = self.session.currentRoute.outputs.map(\.uid)
+      self.ignoreSamplesUntil = ProcessInfo.processInfo.systemUptime + 0.4
+      self.send(self.session.outputVolume, reset: true)
+    }
+    send(session.outputVolume, reset: true)
+    return nil
+  }
+
+  func onCancel(withArguments arguments: Any?) -> FlutterError? {
+    stopObserving()
+    return nil
+  }
+
+  private func stopObserving() {
+    generation += 1
+    emit = nil
+    observation?.invalidate()
+    observation = nil
+    if let routeObserver { NotificationCenter.default.removeObserver(routeObserver) }
+    routeObserver = nil
+    suspend()
+  }
+
+  private func send(_ level: Float, delta: Float? = nil, reset: Bool) {
+    var value: [String: Any] = ["level": Double(level), "reset": reset]
+    if let delta { value["delta"] = Double(delta) }
+    emit?(value)
   }
 }

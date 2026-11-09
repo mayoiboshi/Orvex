@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -6,6 +8,8 @@ import 'package:orvex/features/player/application/playback_session.dart';
 import 'package:orvex/features/player/domain/playback_defaults.dart';
 import 'package:orvex/features/player/domain/playback_engine.dart';
 import 'package:orvex/features/player/infrastructure/player_brightness.dart';
+import 'package:orvex/features/player/infrastructure/player_system_volume.dart';
+import 'package:orvex/features/player/presentation/volume_indicator.dart';
 import 'package:orvex/features/player/presentation/playback_surface.dart';
 
 import 'support/fakes.dart';
@@ -101,6 +105,25 @@ class DisplayStub extends PlayerBrightness {
   Future<void> restore() async => restores++;
 }
 
+class VolumeStub extends PlayerSystemVolume {
+  final events = StreamController<SystemVolumeReading>.broadcast(sync: true);
+  final presentations = <bool>[];
+  final writes = <double>[];
+
+  @override
+  Future<bool> available() async => true;
+  @override
+  Stream<SystemVolumeReading> get changes => events.stream;
+  @override
+  Future<void> present(bool active) async => presentations.add(active);
+  @override
+  Future<bool> set(double level) async {
+    writes.add(level);
+    events.add(SystemVolumeReading(level));
+    return true;
+  }
+}
+
 void main() {
   Future<SurfaceSession> mount(
     WidgetTester tester, {
@@ -113,6 +136,7 @@ void main() {
     VoidCallback? onFullscreen,
     VoidCallback? onSubtitle,
     DisplayStub? display,
+    VolumeStub? volume,
     Widget? input,
   }) async {
     final engine = FakeEngine();
@@ -140,6 +164,7 @@ void main() {
                         onFullscreen: onFullscreen ?? () {},
                         onSubtitle: onSubtitle ?? () {},
                         brightness: display ?? DisplayStub(),
+                        systemVolume: volume,
                       ),
                     ),
                   ),
@@ -514,7 +539,7 @@ void main() {
     await tester.pump();
     expect(session.volumes, isNotEmpty);
     expect(session.volumes.last, greaterThan(40));
-    expect(find.textContaining('音量 '), findsOneWidget);
+    expect(find.byType(VolumeIndicator), findsOneWidget);
     await drag.up();
     drag = await tester.startGesture(point(tester, 0.15, 0.39));
     await drag.moveBy(const Offset(0, -20));
@@ -526,6 +551,95 @@ void main() {
     await tester.pump(const Duration(milliseconds: 400));
     expect(session.seeks, isEmpty);
     expect(session.rates, isEmpty);
+  });
+
+  testWidgets('system volume drives the HUD, drag, and settings', (
+    tester,
+  ) async {
+    final volume = VolumeStub();
+    addTearDown(volume.events.close);
+    final session = await mount(tester, height: 320, volume: volume);
+    final hud = find.byType(VolumeIndicator);
+    volume.events.add(const SystemVolumeReading(0.3, reset: true));
+    await tester.pump();
+    expect(volume.presentations, [true]);
+    expect(hud, findsNothing);
+
+    volume.events.add(const SystemVolumeReading(0.4, delta: 0.1));
+    await tester.pump();
+    expect(tester.widget<VolumeIndicator>(hud).volume, 40);
+    expect(tester.widget<VolumeIndicator>(hud).steps, isNull);
+    volume.events.add(const SystemVolumeReading(0.5, delta: 0.1));
+    await tester.pump();
+    expect(tester.widget<VolumeIndicator>(hud).steps, 10);
+    await tester.pump(const Duration(milliseconds: 1200));
+    expect(hud, findsNothing);
+
+    final drag = await tester.startGesture(point(tester, 0.85, 0.39));
+    await drag.moveBy(const Offset(0, -24));
+    await drag.moveBy(const Offset(0, -40));
+    await tester.pump();
+    await drag.up();
+    await tester.pump();
+    expect(volume.writes.last, greaterThan(0.5));
+    expect(session.volumes, isEmpty);
+    expect(
+      tester.widget<VolumeIndicator>(hud).volume,
+      closeTo(volume.writes.last * 100, 0.01),
+    );
+    expect(tester.widget<VolumeIndicator>(hud).steps, 10);
+
+    await tester.tap(find.byTooltip('播放设置'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('系统音量 '), findsOneWidget);
+    final slider = find.byKey(const ValueKey('settings-volume'));
+    await tester.ensureVisible(slider);
+    await tester.tapAt(tester.getRect(slider).centerLeft + const Offset(50, 0));
+    await tester.pumpAndSettle();
+    expect(volume.writes.last, lessThan(0.5));
+    final beforeMute = volume.writes.last;
+    final mute = find.byTooltip('静音');
+    await tester.ensureVisible(mute);
+    await tester.tap(mute);
+    await tester.pumpAndSettle();
+    expect(volume.writes.last, 0);
+    await tester.tap(find.byTooltip('取消静音'));
+    await tester.pumpAndSettle();
+    expect(volume.writes.last, closeTo(beforeMute, 0.0001));
+    expect(session.volumes, isEmpty);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump();
+    expect(volume.events.hasListener, isFalse);
+  });
+
+  testWidgets('paused system changes stay quiet and a new route clears ticks', (
+    tester,
+  ) async {
+    final volume = VolumeStub();
+    addTearDown(volume.events.close);
+    final session = await mount(tester, volume: volume, playing: false);
+    final hud = find.byType(VolumeIndicator);
+    volume.events.add(const SystemVolumeReading(0.4, reset: true));
+    volume.events.add(const SystemVolumeReading(0.4625, delta: 0.0625));
+    volume.events.add(const SystemVolumeReading(0.525, delta: 0.0625));
+    await tester.pump();
+    expect(volume.presentations, isEmpty);
+    expect(hud, findsNothing);
+
+    session.update();
+    volume.events.add(const SystemVolumeReading(0.5875, delta: 0.0625));
+    await tester.pump();
+    expect(volume.presentations, [true]);
+    expect(tester.widget<VolumeIndicator>(hud).steps, 16);
+    volume.events.add(const SystemVolumeReading(0.2, reset: true));
+    await tester.pump();
+    expect(tester.widget<VolumeIndicator>(hud).steps, isNull);
+    expect(tester.widget<VolumeIndicator>(hud).volume, 20);
+
+    session.update(playing: false);
+    await tester.pump();
+    expect(volume.presentations, [true, false]);
   });
 
   testWidgets(

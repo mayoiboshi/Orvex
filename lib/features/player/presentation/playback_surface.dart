@@ -8,7 +8,9 @@ import '../../../design/orvex_theme.dart';
 import '../application/playback_session.dart';
 import '../domain/playback_defaults.dart';
 import '../infrastructure/player_brightness.dart';
+import '../infrastructure/player_system_volume.dart';
 import '../../subtitles/domain/subtitle_models.dart';
+import 'volume_indicator.dart';
 
 String formatTime(Duration value) {
   final seconds = value.inSeconds.clamp(0, 1 << 32);
@@ -27,6 +29,7 @@ class PlaybackSurface extends StatefulWidget {
     required this.onFullscreen,
     required this.onSubtitle,
     this.brightness,
+    this.systemVolume,
     this.wide = false,
     this.title,
     this.onToggleWide,
@@ -36,6 +39,7 @@ class PlaybackSurface extends StatefulWidget {
   final VoidCallback onFullscreen;
   final VoidCallback onSubtitle;
   final PlayerBrightness? brightness;
+  final PlayerSystemVolume? systemVolume;
   final bool wide;
   final String? title;
   final VoidCallback? onToggleWide;
@@ -56,6 +60,17 @@ class _PlaybackSurfaceState extends State<PlaybackSurface>
   );
   late PlaybackSession session;
   late PlayerBrightness _display;
+  late final PlayerSystemVolume _volume;
+  final _systemLevel = ValueNotifier<double?>(null);
+  final _volumeSteps = VolumeSteps();
+  StreamSubscription<SystemVolumeReading>? _volumeSubscription;
+  Timer? _volumeTimer;
+  int _volumeRevision = 0;
+  bool _volumePresented = false;
+  bool _volumeVisible = false;
+  double? _beforeMute;
+
+  double get _outputVolume => _systemLevel.value ?? session.frame.volume;
   Timer? _hideTimer;
   Timer? _feedbackTimer;
   Timer? _seekTimer;
@@ -96,12 +111,14 @@ class _PlaybackSurfaceState extends State<PlaybackSurface>
     _foreground = lifecycle == null || lifecycle == AppLifecycleState.resumed;
     session = widget.session;
     _display = widget.brightness ?? PlayerBrightness();
+    _volume = widget.systemVolume ?? PlayerSystemVolume();
     _observedEngine = session.engine;
     WidgetsBinding.instance.addObserver(this);
     session.addListener(_playbackChanged);
     FocusManager.instance.addHighlightModeListener(_highlightModeChanged);
     _playbackChanged();
     unawaited(_readBrightness());
+    unawaited(_watchVolume());
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || !_foreground) return;
       final focusedContext = FocusManager.instance.primaryFocus?.context;
@@ -152,11 +169,13 @@ class _PlaybackSurfaceState extends State<PlaybackSurface>
     _foreground = state == AppLifecycleState.resumed;
     if (!_foreground) {
       _resetInteraction();
+      _stopWatchingVolume();
       _brightnessRevision++;
       unawaited(_display.restore());
       if (mounted) setState(() => _visible = true);
     } else {
       unawaited(_readBrightness());
+      unawaited(_watchVolume());
       _armHide();
     }
   }
@@ -193,7 +212,105 @@ class _PlaybackSurfaceState extends State<PlaybackSurface>
     }
     if (!session.frame.buffering) _wasPlaying = session.frame.playing;
     _wasBuffering = session.frame.buffering;
+    _syncVolumePresentation();
     if (mounted) setState(() {});
+  }
+
+  Future<void> _watchVolume() async {
+    if (!_foreground || _volumeSubscription != null) return;
+    final revision = ++_volumeRevision;
+    if (!await _volume.available() ||
+        !mounted ||
+        revision != _volumeRevision ||
+        !_foreground) {
+      return;
+    }
+    var receivedEvent = false;
+    void receive(SystemVolumeReading reading) {
+      if (!mounted || revision != _volumeRevision || !_foreground) return;
+      receivedEvent = true;
+      final previous = _systemLevel.value;
+      final level = (reading.level * 100).clamp(0.0, 100.0);
+      _volumeSteps.observe(reading);
+      _systemLevel.value = level;
+      if (reading.reset) _beforeMute = null;
+      if (previous == null && session.ready && session.frame.volume != 100) {
+        // Use one gain control once the system route becomes available.
+        unawaited(session.setVolume(100));
+      }
+      _syncVolumePresentation();
+      if (!reading.reset &&
+          previous != null &&
+          (previous - level).abs() > 0.01 &&
+          session.frame.playing) {
+        _showVolume(persistent: _level != null && !_adjustingBrightness);
+      } else {
+        setState(() {});
+      }
+    }
+
+    _volumeSubscription = _volume.changes.listen(receive);
+    // A second surface can overlap the old one during a route transition.
+    // In that case the shared event stream does not send another initial value.
+    final level = await _volume.currentLevel();
+    if (!receivedEvent && level != null) {
+      receive(SystemVolumeReading(level, reset: true));
+    }
+  }
+
+  void _stopWatchingVolume() {
+    _volumeRevision++;
+    final subscription = _volumeSubscription;
+    _volumeSubscription = null;
+    unawaited(subscription?.cancel());
+    _volumePresented = false;
+  }
+
+  void _syncVolumePresentation() {
+    final active =
+        _foreground &&
+        _volumeSubscription != null &&
+        _systemLevel.value != null &&
+        session.frame.playing;
+    if (_volumePresented == active) return;
+    _volumePresented = active;
+    unawaited(_volume.present(active));
+  }
+
+  void _showVolume({bool persistent = false}) {
+    _volumeTimer?.cancel();
+    setState(() => _volumeVisible = true);
+    if (!persistent) {
+      _volumeTimer = Timer(const Duration(milliseconds: 1100), () {
+        if (mounted) setState(() => _volumeVisible = false);
+      });
+    }
+  }
+
+  Future<void> _setOutputVolume(double level, {bool dragging = false}) async {
+    final engine = session.engine;
+    final revision = _volumeRevision;
+    if (_systemLevel.value != null) {
+      final accepted = await _volume.set(level / 100);
+      if (!mounted ||
+          !_foreground ||
+          revision != _volumeRevision ||
+          !identical(engine, session.engine)) {
+        return;
+      }
+      if (!accepted) {
+        _showFeedback('音量调节不可用，请使用系统控制');
+        return;
+      }
+    } else {
+      await session.setVolume(level);
+      if (!mounted || !_foreground || !identical(engine, session.engine)) {
+        return;
+      }
+    }
+    _showVolume(
+      persistent: dragging && _level != null && !_adjustingBrightness,
+    );
   }
 
   bool get _canAutoHide =>
@@ -331,6 +448,8 @@ class _PlaybackSurfaceState extends State<PlaybackSurface>
     _hideTimer?.cancel();
     _controlPointers.clear();
     _feedbackTimer?.cancel();
+    _volumeTimer?.cancel();
+    _volumeVisible = false;
     _cancelSeek();
     _restoreRate();
     _level = null;
@@ -343,11 +462,12 @@ class _PlaybackSurfaceState extends State<PlaybackSurface>
     }
     _hideTimer?.cancel();
     _adjustingBrightness = brightness;
-    _level = brightness ? _brightness! * 100 : session.frame.volume;
-    _showFeedback(
-      '${brightness ? '亮度' : '音量'} ${_level!.round()}%',
-      persistent: true,
-    );
+    _level = brightness ? _brightness! * 100 : _outputVolume;
+    if (brightness) {
+      _showFeedback('亮度 ${_level!.round()}%', persistent: true);
+    } else {
+      _showVolume(persistent: true);
+    }
   }
 
   void _updateLevel(double delta, double height) {
@@ -359,13 +479,10 @@ class _PlaybackSurfaceState extends State<PlaybackSurface>
     if (_adjustingBrightness) {
       _brightness = _level! / 100;
       unawaited(_writeBrightness(_brightness!));
+      _showFeedback('亮度 ${_level!.round()}%', persistent: true);
     } else {
-      unawaited(session.setVolume(_level!));
+      unawaited(_setOutputVolume(_level!, dragging: true));
     }
-    _showFeedback(
-      '${_adjustingBrightness ? '亮度' : '音量'} ${_level!.round()}%',
-      persistent: true,
-    );
   }
 
   Future<void> _writeBrightness(double value) async {
@@ -387,7 +504,11 @@ class _PlaybackSurfaceState extends State<PlaybackSurface>
   void _endLevel() {
     if (_level == null) return;
     setState(() => _level = null);
-    if (_feedback != null) _showFeedback(_feedback!);
+    if (_adjustingBrightness) {
+      if (_feedback != null) _showFeedback(_feedback!);
+    } else {
+      _showVolume();
+    }
     _armHide();
   }
 
@@ -429,6 +550,8 @@ class _PlaybackSurfaceState extends State<PlaybackSurface>
     FocusManager.instance.removeHighlightModeListener(_highlightModeChanged);
     session.removeListener(_playbackChanged);
     _resetInteraction();
+    _stopWatchingVolume();
+    _systemLevel.dispose();
     _brightnessRevision++;
     unawaited(_display.restore());
     _focus.dispose();
@@ -614,6 +737,32 @@ class _PlaybackSurfaceState extends State<PlaybackSurface>
                                 : _feedback!,
                             key: const ValueKey('gesture-feedback'),
                             style: TextStyle(color: OrvexColors.player.text),
+                          ),
+                        ),
+                      ),
+                    ),
+                  if (_volumeVisible)
+                    IgnorePointer(
+                      child: SafeArea(
+                        top: widget.fullscreen,
+                        bottom: false,
+                        child: Align(
+                          alignment: Alignment.topCenter,
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 8,
+                            ),
+                            child: ConstrainedBox(
+                              constraints: const BoxConstraints(maxWidth: 260),
+                              child: VolumeIndicator(
+                                key: const ValueKey(
+                                  'playback-volume-indicator',
+                                ),
+                                volume: _outputVolume,
+                                steps: _volumeSteps.count,
+                              ),
+                            ),
                           ),
                         ),
                       ),
@@ -951,11 +1100,14 @@ class _PlaybackSurfaceState extends State<PlaybackSurface>
   }
 
   Widget _muteButton() {
-    final muted = session.frame.volume == 0;
+    final muted = _outputVolume == 0;
     return IconButton(
       tooltip: muted ? '取消静音' : '静音',
       onPressed: () {
-        unawaited(session.setVolume(muted ? 100 : 0));
+        if (!muted) _beforeMute = _outputVolume;
+        final restored =
+            _beforeMute ?? (_systemLevel.value == null ? 100.0 : 25.0);
+        unawaited(_setOutputVolume(muted ? restored : 0));
         _showControls();
       },
       icon: Icon(
@@ -1049,7 +1201,7 @@ class _PlaybackSurfaceState extends State<PlaybackSurface>
         showDragHandle: true,
         backgroundColor: OrvexColors.of(context).surface,
         builder: (sheetContext) => ListenableBuilder(
-          listenable: session,
+          listenable: Listenable.merge([session, _systemLevel]),
           builder: (context, _) => SafeArea(
             top: false,
             child: SingleChildScrollView(
@@ -1103,12 +1255,14 @@ class _PlaybackSurfaceState extends State<PlaybackSurface>
                       ),
                     ),
                   ),
-                  Text('音量 ${session.frame.volume.round()}%'),
+                  Text(
+                    '${_systemLevel.value == null ? '音量' : '系统音量'} ${_outputVolume.round()}%',
+                  ),
                   Slider(
                     key: const ValueKey('settings-volume'),
-                    value: session.frame.volume.clamp(0, 100),
+                    value: _outputVolume.clamp(0, 100),
                     max: 100,
-                    onChanged: (value) => session.setVolume(value),
+                    onChanged: (value) => unawaited(_setOutputVolume(value)),
                   ),
                   if (_touchGestures)
                     Text(
