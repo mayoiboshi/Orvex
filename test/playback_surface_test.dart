@@ -136,6 +136,7 @@ void main() {
     EdgeInsets padding = EdgeInsets.zero,
     VoidCallback? onFullscreen,
     VoidCallback? onSubtitle,
+    VoidCallback? onEpisodes,
     DisplayStub? display,
     VolumeStub? volume,
     Widget? input,
@@ -165,6 +166,7 @@ void main() {
                         fullscreen: fullscreen,
                         onFullscreen: onFullscreen ?? () {},
                         onSubtitle: onSubtitle ?? () {},
+                        onEpisodes: onEpisodes,
                         brightness: display ?? DisplayStub(),
                         systemVolume: volume,
                       ),
@@ -189,6 +191,42 @@ void main() {
   }
 
   Finder getProgress() => find.byKey(const ValueKey('playback-progress'));
+  testWidgets('fullscreen episode entry follows speed', (tester) async {
+    var opened = false;
+    await mount(
+      tester,
+      width: 740,
+      height: 350,
+      fullscreen: true,
+      onEpisodes: () => opened = true,
+    );
+    final speed = find.byTooltip('播放速度');
+    final episodes = find.byTooltip('选择集数');
+    expect(
+      tester.getRect(episodes).left,
+      greaterThanOrEqualTo(tester.getRect(speed).right),
+    );
+    await tester.tap(episodes);
+    expect(opened, isTrue);
+  });
+  testWidgets('small fullscreen retains episode entry in settings', (
+    tester,
+  ) async {
+    var opened = false;
+    await mount(
+      tester,
+      width: 320,
+      height: 180,
+      fullscreen: true,
+      onEpisodes: () => opened = true,
+    );
+    expect(find.byTooltip('选择集数'), findsNothing);
+    await tester.tap(find.byTooltip('播放设置'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('选择集数'));
+    await tester.pumpAndSettle();
+    expect(opened, isTrue);
+  });
   double opacity(WidgetTester tester) => tester
       .widget<AnimatedOpacity>(find.byKey(const ValueKey('playback-controls')))
       .opacity;

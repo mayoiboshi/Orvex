@@ -42,6 +42,36 @@ void main() {
   });
 
   test(
+    'selecting a queue item keeps its auto-next boundary and resume point',
+    () async {
+      final third = LocalMedia(
+        uri: Uri.file('/videos/third.mp4'),
+        name: 'third.mp4',
+      );
+      await store.write(second.resumeKey, const Duration(seconds: 18));
+      session.autoNext = true;
+      await session.open(
+        first,
+        queue: [first, second, third],
+        canAutoAdvance: (_, _) => false,
+      );
+      await session.selectFromPlaylist(second);
+      expect(session.playlist.map((item) => item.resumeKey), [
+        first.resumeKey,
+        second.resumeKey,
+        third.resumeKey,
+      ]);
+      expect(engines.last.openedAt, const Duration(seconds: 18));
+      engines.last.frameController.add(
+        const PlaybackFrame(duration: Duration(minutes: 1), completed: true),
+      );
+      await Future<void>.delayed(Duration.zero);
+      expect(session.media?.resumeKey, second.resumeKey);
+      expect(engines.length, 2);
+    },
+  );
+
+  test(
     'startup defaults are snapshotted and starting over still checkpoints',
     () async {
       await store.write(first.resumeKey, const Duration(seconds: 25));

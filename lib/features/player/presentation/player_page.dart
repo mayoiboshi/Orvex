@@ -29,6 +29,7 @@ import '../domain/playback_defaults.dart';
 import '../domain/playback_engine.dart';
 import '../infrastructure/playback_preferences.dart';
 import 'mini_playback_card.dart';
+import 'episode_picker.dart';
 import 'playback_surface.dart';
 import 'watch_information.dart';
 
@@ -79,6 +80,7 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
   int _sortRevision = 0;
   bool _compactLibrary = false;
   bool _fullscreen = false;
+  bool _showEpisodes = false;
   bool _widePlayback = false;
   final _inlinePlayerKey = GlobalKey();
   final _watchBrowserKey = GlobalKey();
@@ -169,6 +171,7 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
             state == AppLifecycleState.hidden ||
             state == AppLifecycleState.detached)) {
       _foreground = false;
+      if (_showEpisodes && mounted) setState(() => _showEpisodes = false);
       ++_openGeneration;
       _session.allowAutoNext = false;
       unawaited(_session.pauseForInterruption());
@@ -451,6 +454,7 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
     LocalMedia media, {
     RecentWork? work,
     PlaybackOpenIntent intent = PlaybackOpenIntent.ordinary,
+    bool keepQueue = false,
   }) async {
     final generation = ++_openGeneration;
     LocalMedia resolved;
@@ -523,12 +527,16 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
           if (!catalog.any((m) => m.resumeKey == resolved.resumeKey)) resolved,
         ]),
       );
-      await _session.open(
-        resolved,
-        queue: queue,
-        startAt: startAt,
-        canAutoAdvance: (queue, index) => _canAutoAdvance(queue, index, work),
-      );
+      if (keepQueue) {
+        await _session.selectFromPlaylist(resolved, startAt: startAt);
+      } else {
+        await _session.open(
+          resolved,
+          queue: queue,
+          startAt: startAt,
+          canAutoAdvance: (queue, index) => _canAutoAdvance(queue, index, work),
+        );
+      }
     } else {
       if (work != null) {
         _session.replacePlaylist(
@@ -1178,7 +1186,10 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
         await defaultExitNativeFullscreen();
       }
       if (mounted) {
-        setState(() => _fullscreen = entering);
+        setState(() {
+          _fullscreen = entering;
+          _showEpisodes = false;
+        });
       } else if (entering) {
         await defaultExitNativeFullscreen();
       }
@@ -1195,6 +1206,9 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
     fullscreen: _fullscreen,
     onFullscreen: () => _toggleFullscreen(),
     onSubtitle: () => _pick(subtitle: true),
+    onEpisodes: _fullscreen && _session.playlist.isNotEmpty
+        ? () => setState(() => _showEpisodes = true)
+        : null,
     title: _session.media == null
         ? null
         : folderMediaTitle(_session.media!, _metadata),
@@ -1207,7 +1221,13 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
   Widget _fullscreenPlayer() => PopScope(
     canPop: false,
     onPopInvokedWithResult: (didPop, _) {
-      if (!didPop) unawaited(_toggleFullscreen());
+      if (!didPop) {
+        if (_showEpisodes) {
+          setState(() => _showEpisodes = false);
+        } else {
+          unawaited(_toggleFullscreen());
+        }
+      }
     },
     child: AnnotatedRegion<SystemUiOverlayStyle>(
       value: OrvexTheme.systemOverlay(Brightness.dark)
@@ -1217,6 +1237,29 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
         body: Stack(
           children: [
             Positioned.fill(child: _surface()),
+            if (_showEpisodes)
+              Positioned.fill(
+                child: EpisodePicker(
+                  items: _session.playlist,
+                  currentKey: _session.media?.resumeKey,
+                  library: _folders,
+                  thumbnails: ref.read(thumbnailCacheProvider),
+                  titleFor: (media) => folderMediaTitle(media, _metadata),
+                  onClose: () => setState(() => _showEpisodes = false),
+                  onSelect: (media) {
+                    setState(() => _showEpisodes = false);
+                    if (media.resumeKey != _session.media?.resumeKey) {
+                      unawaited(
+                        _open(
+                          media,
+                          work: _playbackWorkFor(media),
+                          keepQueue: true,
+                        ),
+                      );
+                    }
+                  },
+                ),
+              ),
             if (_session.error case final String message)
               Positioned(top: 70, left: 20, right: 20, child: _error(message)),
           ],

@@ -33,6 +33,7 @@ class PlaybackSurface extends StatefulWidget {
     this.wide = false,
     this.title,
     this.onToggleWide,
+    this.onEpisodes,
   });
   final PlaybackSession session;
   final bool fullscreen;
@@ -43,6 +44,7 @@ class PlaybackSurface extends StatefulWidget {
   final bool wide;
   final String? title;
   final VoidCallback? onToggleWide;
+  final VoidCallback? onEpisodes;
 
   @override
   State<PlaybackSurface> createState() => _PlaybackSurfaceState();
@@ -952,7 +954,17 @@ class _PlaybackSurfaceState extends State<PlaybackSurface>
             alignment: Alignment.center,
             children: [
               if (width >= 260)
-                Align(alignment: Alignment.centerLeft, child: _speedMenu()),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _speedMenu(),
+                      if (width >= 440 && widget.onEpisodes != null)
+                        _episodesButton(),
+                    ],
+                  ),
+                ),
               Align(
                 alignment: narrow ? Alignment.centerLeft : Alignment.center,
                 child: tiny ? transportButton(_playButton()) : transport,
@@ -1172,6 +1184,12 @@ class _PlaybackSurfaceState extends State<PlaybackSurface>
     selectedIcon: const Icon(Icons.width_normal_outlined, size: 21),
   );
 
+  Widget _episodesButton() => IconButton(
+    tooltip: '选择集数',
+    onPressed: widget.onEpisodes,
+    icon: const Icon(Icons.playlist_play_rounded, size: 24),
+  );
+
   Widget _fullscreenButton() => IconButton(
     tooltip: widget.fullscreen ? '退出全屏' : '全屏播放',
     onPressed: session.ready ? widget.onFullscreen : null,
@@ -1253,6 +1271,16 @@ class _PlaybackSurfaceState extends State<PlaybackSurface>
                 children: [
                   const Text('播放设置', style: TextStyle(fontSize: 18)),
                   const SizedBox(height: 12),
+                  if (widget.fullscreen && widget.onEpisodes != null)
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: const Icon(Icons.playlist_play_rounded),
+                      title: const Text('选择集数'),
+                      onTap: () {
+                        Navigator.of(sheetContext).pop();
+                        widget.onEpisodes?.call();
+                      },
+                    ),
                   Wrap(
                     crossAxisAlignment: WrapCrossAlignment.center,
                     children: [

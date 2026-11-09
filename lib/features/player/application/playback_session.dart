@@ -59,6 +59,19 @@ class PlaybackSession extends ChangeNotifier {
         )
       : Future.value();
 
+  /// Select from the active queue without changing its auto-advance boundary.
+  Future<void> selectFromPlaylist(LocalMedia item, {Duration? startAt}) {
+    if (!playlist.any((media) => media.resumeKey == item.resumeKey)) {
+      return Future.value();
+    }
+    return open(
+      item,
+      queue: playlist,
+      startAt: startAt,
+      canAutoAdvance: _canAutoAdvance,
+    );
+  }
+
   void replacePlaylist(
     List<LocalMedia> queue, {
     bool Function(List<LocalMedia>, int)? canAutoAdvance,

@@ -354,6 +354,52 @@ void main() {
         await appearance.setReduceTransparency(false);
         observations['reducedTransparency'] = true;
       }
+      // Exercise the real PlayerPage full-screen queue and back handling.
+      await tester.pump(const Duration(milliseconds: 450));
+      await tester.tap(find.byTooltip('全屏播放'));
+      await until(
+        () => tester
+            .widget<PlaybackSurface>(find.byType(PlaybackSurface))
+            .fullscreen,
+        'episode picker fullscreen entered',
+      );
+      await tester.tap(find.byTooltip('选择集数'));
+      await tester.pump(const Duration(milliseconds: 450));
+      expect(find.byTooltip('关闭选集'), findsOneWidget);
+      await binding.handlePopRoute();
+      await tester.pump(const Duration(milliseconds: 450));
+      expect(find.byTooltip('关闭选集'), findsNothing);
+      expect(
+        tester.widget<PlaybackSurface>(find.byType(PlaybackSurface)).fullscreen,
+        isTrue,
+      );
+      await tester.tap(find.byTooltip('选择集数'));
+      await tester.pump(const Duration(milliseconds: 450));
+      final target = session.media?.resumeKey == first.resumeKey
+          ? second
+          : first;
+      final queueBefore = session.playlist
+          .map((item) => item.resumeKey)
+          .toList();
+      final targetCard = find.byKey(ValueKey('episode-${target.resumeKey}'));
+      await tester.drag(find.byType(ListView).last, const Offset(600, 0));
+      await tester.pump(const Duration(milliseconds: 450));
+      await tester.ensureVisible(targetCard);
+      await tester.tap(targetCard);
+      await until(
+        () => session.ready && session.media?.resumeKey == target.resumeKey,
+        'fullscreen episode selected',
+      );
+      expect(
+        session.playlist.map((item) => item.resumeKey).toList(),
+        queueBefore,
+      );
+      expect(find.byTooltip('关闭选集'), findsNothing);
+      expect(
+        tester.widget<PlaybackSurface>(find.byType(PlaybackSurface)).fullscreen,
+        isTrue,
+      );
+      observations['fullscreenEpisodePickerAndBack'] = true;
       expect(session.error, isNull);
       passed = true;
     } finally {
