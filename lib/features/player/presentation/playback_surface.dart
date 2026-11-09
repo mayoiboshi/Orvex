@@ -76,7 +76,6 @@ class _PlaybackSurfaceState extends State<PlaybackSurface>
   double? _level;
   bool _adjustingBrightness = false;
   double? _brightness;
-  double _doubleTapX = 0;
   double? _previousRate;
   Object? _rateEngine;
   String? _feedback;
@@ -301,6 +300,26 @@ class _PlaybackSurfaceState extends State<PlaybackSurface>
     }
   }
 
+  void _togglePlayback() {
+    if (!_foreground || !session.ready) return;
+    unawaited(session.togglePause());
+    _showControls();
+  }
+
+  void _startLongPress() {
+    if (!_foreground ||
+        !session.ready ||
+        !session.frame.playing ||
+        _previousRate != null) {
+      return;
+    }
+    _hideTimer?.cancel();
+    _previousRate = session.frame.rate;
+    _rateEngine = session.engine;
+    unawaited(session.setRate(2));
+    _showFeedback('临时 2 倍速', persistent: true);
+  }
+
   void _endLongPress() {
     if (_previousRate == null) return;
     _restoreRate();
@@ -393,8 +412,7 @@ class _PlaybackSurfaceState extends State<PlaybackSurface>
     } else if (key == LogicalKeyboardKey.arrowRight) {
       _skip(_step);
     } else if (event is KeyDownEvent && key == LogicalKeyboardKey.space) {
-      unawaited(session.togglePause());
-      _showControls();
+      _togglePlayback();
     } else if (event is KeyDownEvent &&
         (key == LogicalKeyboardKey.keyF ||
             (key == LogicalKeyboardKey.escape && widget.fullscreen))) {
@@ -443,21 +461,14 @@ class _PlaybackSurfaceState extends State<PlaybackSurface>
                       if (!_locked) setState(() => _visible = !_visible);
                       _armHide();
                     },
-                    onDoubleTapDown: _locked || !_touchGestures
-                        ? null
-                        : (details) => _doubleTapX = details.localPosition.dx,
                     onDoubleTap: _locked || (_mobile && !_touchGestures)
                         ? null
                         : () {
                             _focus.requestFocus();
-                            if (!_mobile) {
+                            if (_mobile) {
+                              _togglePlayback();
+                            } else {
                               widget.onFullscreen();
-                            } else if (_doubleTapX <
-                                constraints.maxWidth * 0.35) {
-                              _skip(-_step);
-                            } else if (_doubleTapX >
-                                constraints.maxWidth * 0.65) {
-                              _skip(_step);
                             }
                           },
                     onHorizontalDragStart: !_touchGestures || _locked
@@ -491,21 +502,7 @@ class _PlaybackSurfaceState extends State<PlaybackSurface>
                           },
                     onLongPressStart: !_touchGestures || _locked
                         ? null
-                        : (details) {
-                            final x = details.localPosition.dx;
-                            if (!_foreground ||
-                                !session.ready ||
-                                !session.frame.playing ||
-                                x < constraints.maxWidth * 0.35 ||
-                                x > constraints.maxWidth * 0.65) {
-                              return;
-                            }
-                            _hideTimer?.cancel();
-                            _previousRate = session.frame.rate;
-                            _rateEngine = session.engine;
-                            unawaited(session.setRate(2));
-                            _showFeedback('临时 2 倍速', persistent: true);
-                          },
+                        : (_) => _startLongPress(),
                     onLongPressEnd: !_touchGestures || _locked
                         ? null
                         : (_) => _endLongPress(),
@@ -859,12 +856,7 @@ class _PlaybackSurfaceState extends State<PlaybackSurface>
     final playing = session.frame.playing;
     return IconButton(
       tooltip: playing ? '暂停' : '播放',
-      onPressed: session.ready
-          ? () {
-              unawaited(session.togglePause());
-              _showControls();
-            }
-          : null,
+      onPressed: session.ready ? _togglePlayback : null,
       icon: Icon(
         playing ? Icons.pause_rounded : Icons.play_arrow_rounded,
         size: 27,

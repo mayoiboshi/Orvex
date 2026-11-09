@@ -285,17 +285,42 @@ void main() {
     expect(opacity(tester), 0);
   });
 
-  testWidgets('mobile double tap seeks once without single tap or speed', (
+  testWidgets('mobile double tap toggles once at the left, center and right', (
     tester,
   ) async {
     final session = await mount(tester);
-    await doubleTap(tester, point(tester, 0.08, 0.39));
-    expect(session.seeks, [const Duration(seconds: 20)]);
-    expect(opacity(tester), 1);
-    await doubleTap(tester, point(tester, 0.92, 0.39));
-    expect(session.seeks.last, const Duration(seconds: 30));
-    expect(session.toggles, 0);
+    for (final x in [0.08, 0.5, 0.92]) {
+      final previous = session.toggles;
+      final target = point(tester, x, 0.39);
+      await doubleTap(tester, target);
+      expect(session.frame.playing, isFalse);
+      expect(session.toggles, previous + 1);
+      expect(opacity(tester), 1);
+      await doubleTap(tester, target);
+      expect(session.frame.playing, isTrue);
+      expect(session.toggles, previous + 2);
+      expect(opacity(tester), 1);
+    }
+    expect(session.seeks, isEmpty);
     expect(session.rates, isEmpty);
+  });
+
+  testWidgets('horizontal drag wins over tap and hold on either side', (
+    tester,
+  ) async {
+    final session = await mount(tester, width: 600);
+    for (final x in [0.08, 0.92]) {
+      final drag = await tester.startGesture(point(tester, x, 0.39));
+      final offset = Offset(x < 0.5 ? 22 : -22, 0);
+      await drag.moveBy(offset);
+      await drag.moveBy(offset);
+      await tester.pump(kLongPressTimeout + const Duration(milliseconds: 50));
+      await drag.up();
+      await tester.pump();
+    }
+    expect(session.seeks, hasLength(2));
+    expect(session.rates, isEmpty);
+    expect(session.toggles, 0);
   });
 
   testWidgets(
@@ -321,29 +346,33 @@ void main() {
     variant: TargetPlatformVariant.only(TargetPlatform.iOS),
   );
 
-  testWidgets('central long press restores chosen rate on release and cancel', (
-    tester,
-  ) async {
-    final session = await mount(tester);
-    session.update(rate: 1.5);
-    final center = point(tester, 0.5, 0.39);
-    var press = await tester.startGesture(center);
-    await tester.pump(kLongPressTimeout + const Duration(milliseconds: 50));
-    expect(session.rates, [2]);
-    await tester.pump(const Duration(seconds: 4));
-    expect(find.text('临时 2 倍速'), findsOneWidget);
-    expect(opacity(tester), 1);
-    await press.up();
-    await tester.pump();
-    expect(session.rates, [2, 1.5]);
-    press = await tester.startGesture(center);
-    await tester.pump(kLongPressTimeout + const Duration(milliseconds: 50));
-    await press.cancel();
-    await tester.pump();
-    expect(session.rates, [2, 1.5, 2, 1.5]);
-    expect(session.seeks, isEmpty);
-    expect(session.toggles, 0);
-  });
+  testWidgets(
+    'hold across the video restores chosen rate on release and cancel',
+    (tester) async {
+      final session = await mount(tester);
+      session.update(rate: 1.5);
+      final delay = kLongPressTimeout + const Duration(milliseconds: 50);
+      for (final x in [0.08, 0.5, 0.92]) {
+        final press = await tester.startGesture(point(tester, x, 0.39));
+        await tester.pump(delay);
+        expect(session.frame.rate, 2);
+        expect(find.text('临时 2 倍速'), findsOneWidget);
+        if (x == 0.5) {
+          await tester.pump(const Duration(seconds: 4));
+          expect(opacity(tester), 1);
+          await press.cancel();
+        } else {
+          await press.up();
+        }
+        await tester.pump();
+        expect(session.frame.rate, 1.5);
+      }
+      expect(session.rates, [2, 1.5, 2, 1.5, 2, 1.5]);
+      expect(session.volumes, isEmpty);
+      expect(session.seeks, isEmpty);
+      expect(session.toggles, 0);
+    },
+  );
 
   testWidgets('long press resets on pause, lifecycle and view disposal', (
     tester,
@@ -610,6 +639,11 @@ void main() {
       expect(find.byTooltip('播放设置').hitTestable(), findsNothing);
       await doubleTap(tester, point(tester, 0.9, 0.39));
       expect(session.seeks, isEmpty);
+      expect(session.toggles, 0);
+      final hold = await tester.startGesture(point(tester, 0.1, 0.39));
+      await tester.pump(kLongPressTimeout + const Duration(milliseconds: 50));
+      await hold.up();
+      expect(session.rates, isEmpty);
       await tester.tap(find.byTooltip('解除锁定'));
       await tester.pump();
       expect(find.byTooltip('播放设置').hitTestable(), findsOneWidget);

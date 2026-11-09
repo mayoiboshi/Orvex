@@ -1046,7 +1046,7 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
                         content: Text(
                           Platform.isIOS || Platform.isAndroid
                               ? (_session.currentDefaults.touchGestures
-                                    ? '单击显示或隐藏控制栏。左右双击快退或快进 ${_session.currentDefaults.skipSeconds} 秒；中央长按临时 2 倍速。左侧上下滑动调亮度（设备支持时），右侧调音量。'
+                                    ? '单击显示或隐藏控制栏。双击画面播放或暂停。播放时长按画面临时 2 倍速，松手恢复。横向滑动调整进度，左侧上下滑动调亮度（设备支持时），右侧调音量。'
                                     : '单击显示或隐藏控制栏。触屏播放手势已在设置中关闭。')
                               : '单击显示或隐藏控制栏；双击全屏。空格播放或暂停，左右方向键快退或快进。',
                         ),

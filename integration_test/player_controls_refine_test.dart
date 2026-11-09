@@ -145,6 +145,24 @@ Dialogue: 0,0:00:00.00,0:00:17.00,Main,,0,0,0,,{\an8\pos(320,48)\fs19}上方定�
         () => session.ready && session.frame.position.inSeconds >= 2,
       );
       final engine = session.engine! as MediaKitEngine;
+      final bounds = tester.getRect(videoArea);
+      final left = Offset(bounds.left + 48, bounds.center.dy);
+      final right = Offset(bounds.right - 80, bounds.center.dy);
+      Future<void> doubleTap(Offset position) async {
+        await tester.tapAt(position);
+        await tester.pump(const Duration(milliseconds: 80));
+        await tester.tapAt(position);
+      }
+
+      await doubleTap(left);
+      await waitFor(() => !session.frame.playing);
+      await doubleTap(right);
+      await waitFor(() => session.frame.playing);
+      final hold = await tester.startGesture(right);
+      await tester.pump(const Duration(milliseconds: 700));
+      await waitFor(() => session.frame.rate == 2);
+      await hold.up();
+      await waitFor(() => session.frame.rate == 1);
       await session.togglePause();
       await waitFor(() => !session.frame.playing && !session.frame.buffering);
       await session.selectSubtitle('no');

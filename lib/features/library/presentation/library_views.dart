@@ -1498,14 +1498,16 @@ class LibraryViews extends StatelessWidget {
                     (value) => preferences.update(
                       (old) => old.copyWith(skipSeconds: value),
                     ),
-                    note: mobile ? '用于跳转按钮、方向键和双击跳转。' : '用于跳转按钮和方向键。',
+                    note: '用于跳转按钮和方向键。',
                   ),
                   if (mobile) ...[
                     _settingsDivider,
                     SwitchListTile.adaptive(
                       contentPadding: _settingsRowPadding,
                       title: const Text('触屏播放手势'),
-                      subtitle: const Text('控制双击跳转、滑动和中央长按临时倍速。亮度手势仅在设备支持时生效。'),
+                      subtitle: const Text(
+                        '控制双击播放或暂停、滑动和长按临时倍速。亮度手势仅在设备支持时生效。',
+                      ),
                       value: preferences.defaults.touchGestures,
                       onChanged: (value) => preferences.update(
                         (old) => old.copyWith(touchGestures: value),
