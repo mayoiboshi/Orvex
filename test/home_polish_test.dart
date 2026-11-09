@@ -228,6 +228,7 @@ void main() {
       final opened = <LocalMedia>[];
       final tabs = <int>[];
       for (final width in [360.0, 438.0, 834.0, 1210.0]) {
+        final bottomInset = width < 600 ? 34.0 : 20.0;
         tester.view.physicalSize = Size(width, 900);
         tester.view.devicePixelRatio = 1;
         for (final brightness in Brightness.values) {
@@ -236,13 +237,14 @@ void main() {
             await tester.pumpWidget(
               MaterialApp(
                 key: ValueKey('$width-$brightness-$scale'),
-                theme: OrvexTheme.create(brightness),
+                theme: OrvexTheme.create(brightness)
+                    .copyWith(platform: TargetPlatform.iOS),
                 home: MediaQuery(
                   data: MediaQueryData(
                     size: Size(width, 900),
                     textScaler: TextScaler.linear(scale),
-                    padding: const EdgeInsets.only(bottom: 34),
-                    viewPadding: const EdgeInsets.only(bottom: 34),
+                    padding: EdgeInsets.only(bottom: bottomInset),
+                    viewPadding: EdgeInsets.only(bottom: bottomInset),
                   ),
                   child: Scaffold(
                     extendBody: true,
@@ -278,6 +280,11 @@ void main() {
               ),
             );
             await tester.pumpAndSettle();
+            expect(
+              tester.getBottomLeft(find.byKey(const ValueKey('tab-0'))).dy,
+              closeTo(880, 0.1),
+              reason: 'the capsule ends 18 points above the screen edge',
+            );
             await tester.tap(find.byTooltip('搜索媒体库'));
             expect(tabs.last, 1);
             await tester.tap(find.byTooltip('打开本地视频'));

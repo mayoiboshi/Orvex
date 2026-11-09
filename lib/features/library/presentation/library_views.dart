@@ -2108,13 +2108,19 @@ class LibraryTabBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = OrvexColors.of(context);
+    final appleMobile = Theme.of(context).platform == TargetPlatform.iOS;
+    // A floating bar can sit closer to the Home indicator than page content.
+    final bottomGap = appleMobile
+        ? MediaQuery.paddingOf(context).bottom.clamp(OrvexMetrics.small, 18.0)
+        : OrvexMetrics.small;
     return SafeArea(
       top: false,
-      minimum: const EdgeInsets.fromLTRB(
+      bottom: !appleMobile,
+      minimum: EdgeInsets.fromLTRB(
         OrvexMetrics.gap,
         4,
         OrvexMetrics.gap,
-        OrvexMetrics.small,
+        bottomGap,
       ),
       child: Center(
         heightFactor: 1,
