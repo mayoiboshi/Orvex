@@ -926,11 +926,9 @@ class _PlaybackSurfaceState extends State<PlaybackSurface>
     double width,
     Duration position,
   ) {
-    final normalText = MediaQuery.textScalerOf(context).scale(12) <= 16;
     // Leave a clear center for transport even when the device is narrow.
     // The settings sheet retains the track controls when they do not fit.
     final directTracks = width >= 600;
-    final labeledTracks = width >= 700 && normalText;
     final narrow = width < 240;
     final tiny = width < 176;
     Widget transportButton(Widget child) => narrow
@@ -965,8 +963,8 @@ class _PlaybackSurfaceState extends State<PlaybackSurface>
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     if (directTracks) ...[
-                      _tracks(audio: true, labeled: labeledTracks),
-                      _tracks(audio: false, labeled: labeledTracks),
+                      _tracks(audio: true),
+                      _tracks(audio: false),
                       _muteButton(),
                     ],
                     if (narrow)
@@ -1333,11 +1331,7 @@ class _PlaybackSurfaceState extends State<PlaybackSurface>
     }
   }
 
-  Widget _tracks({
-    required bool audio,
-    bool inSettings = false,
-    bool labeled = false,
-  }) {
+  Widget _tracks({required bool audio, bool inSettings = false}) {
     final frame = session.frame;
     final tracks = audio ? frame.audioTracks : frame.subtitleTracks;
     final selected = audio ? frame.audioTrackId : frame.subtitleTrackId;
@@ -1348,7 +1342,7 @@ class _PlaybackSurfaceState extends State<PlaybackSurface>
     );
     return PopupMenuButton<String>(
       tooltip: label,
-      icon: labeled ? null : icon,
+      icon: icon,
       onOpened: _openedMenu,
       onCanceled: inSettings ? null : _closedMenu,
       onSelected: (id) {
@@ -1383,22 +1377,6 @@ class _PlaybackSurfaceState extends State<PlaybackSurface>
           const PopupMenuItem(value: 'external', child: Text('打开外挂字幕…')),
         ],
       ],
-      child: labeled
-          ? ConstrainedBox(
-              constraints: const BoxConstraints(minHeight: _targetSize),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    icon,
-                    const SizedBox(width: 4),
-                    Text(label, style: _playerTheme.textTheme.labelMedium),
-                  ],
-                ),
-              ),
-            )
-          : null,
     );
   }
 

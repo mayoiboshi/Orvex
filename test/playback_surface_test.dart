@@ -132,6 +132,7 @@ void main() {
     bool playing = true,
     bool fullscreen = false,
     bool accessibleNavigation = false,
+    TextScaler textScaler = TextScaler.noScaling,
     EdgeInsets padding = EdgeInsets.zero,
     VoidCallback? onFullscreen,
     VoidCallback? onSubtitle,
@@ -151,6 +152,7 @@ void main() {
               data: MediaQueryData(
                 padding: padding,
                 accessibleNavigation: accessibleNavigation,
+                textScaler: textScaler,
               ),
               child: Column(
                 children: [
@@ -245,8 +247,15 @@ void main() {
       greaterThan(rect.center.dy),
     );
     expect(tester.getSize(getProgress()).height, greaterThanOrEqualTo(44));
-    expect(find.text('字幕'), findsOneWidget);
-    expect(find.text('音轨'), findsOneWidget);
+    expect(find.text('字幕'), findsNothing);
+    expect(find.text('音轨'), findsNothing);
+    expect(find.byTooltip('字幕'), findsOneWidget);
+    expect(find.byTooltip('音轨'), findsOneWidget);
+    await tester.tap(find.byTooltip('字幕'));
+    await tester.pumpAndSettle();
+    expect(find.text('关闭字幕'), findsOneWidget);
+    await tester.tap(find.text('关闭字幕'));
+    await tester.pumpAndSettle();
     await tester.pump(const Duration(milliseconds: 3400));
     expect(opacity(tester), 0);
     expect(tester.getRect(video), rect);
@@ -256,6 +265,32 @@ void main() {
     expect(opacity(tester), 1);
     expect(tester.getRect(video), rect);
   });
+
+  // Fullscreen controls reserve eight pixels on each side.
+  for (final width in [615.0, 616.0, 715.0, 716.0]) {
+    testWidgets('track controls use icons at width $width with large text', (
+      tester,
+    ) async {
+      await mount(
+        tester,
+        width: width,
+        height: 400,
+        fullscreen: true,
+        textScaler: const TextScaler.linear(1.5),
+      );
+      expect(find.text('音轨'), findsNothing);
+      expect(find.text('字幕'), findsNothing);
+      for (final label in ['音轨', '字幕']) {
+        final button = find.byTooltip(label);
+        expect(button, width >= 616 ? findsOneWidget : findsNothing);
+        if (width >= 616) {
+          final size = tester.getSize(button);
+          expect(size.width, greaterThanOrEqualTo(44));
+          expect(size.height, greaterThanOrEqualTo(44));
+        }
+      }
+    });
+  }
 
   for (final width in [320.0, 740.0]) {
     testWidgets(
