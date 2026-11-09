@@ -4,7 +4,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../../../design/glass.dart';
 import '../../../design/orvex_theme.dart';
 import '../application/playback_session.dart';
 import '../domain/playback_defaults.dart';
@@ -27,7 +26,6 @@ class PlaybackSurface extends StatefulWidget {
     required this.fullscreen,
     required this.onFullscreen,
     required this.onSubtitle,
-    this.onBack,
     this.brightness,
     this.wide = false,
     this.title,
@@ -37,7 +35,6 @@ class PlaybackSurface extends StatefulWidget {
   final bool fullscreen;
   final VoidCallback onFullscreen;
   final VoidCallback onSubtitle;
-  final VoidCallback? onBack;
   final PlayerBrightness? brightness;
   final bool wide;
   final String? title;
@@ -589,22 +586,7 @@ class _PlaybackSurfaceState extends State<PlaybackSurface>
                               },
                               onPointerUp: _releaseControlPointer,
                               onPointerCancel: _releaseControlPointer,
-                              child: SafeArea(
-                                top: widget.fullscreen,
-                                bottom: widget.fullscreen,
-                                left: widget.fullscreen,
-                                right: widget.fullscreen,
-                                minimum: const EdgeInsets.fromLTRB(
-                                  12,
-                                  8,
-                                  12,
-                                  0,
-                                ),
-                                child: LayoutBuilder(
-                                  builder: (context, constraints) =>
-                                      _controls(context, constraints),
-                                ),
-                              ),
+                              child: LayoutBuilder(builder: _controls),
                             ),
                           ),
                         ),
@@ -614,7 +596,7 @@ class _PlaybackSurfaceState extends State<PlaybackSurface>
                   if (_dragSeconds != null || _feedback != null)
                     IgnorePointer(
                       child: Align(
-                        alignment: const Alignment(0, 0.28),
+                        alignment: Alignment.center,
                         child: Container(
                           margin: const EdgeInsets.symmetric(horizontal: 16),
                           padding: const EdgeInsets.symmetric(
@@ -639,23 +621,7 @@ class _PlaybackSurfaceState extends State<PlaybackSurface>
                         ),
                       ),
                     ),
-                  if (_locked)
-                    SafeArea(
-                      child: Align(
-                        alignment: Alignment.topLeft,
-                        child: Padding(
-                          padding: const EdgeInsets.all(8),
-                          child: IconButton.filledTonal(
-                            tooltip: '解除锁定',
-                            onPressed: () {
-                              setState(() => _locked = false);
-                              _showControls();
-                            },
-                            icon: const Icon(Icons.lock_rounded),
-                          ),
-                        ),
-                      ),
-                    ),
+                  if (_locked) _screenLock(),
                 ],
               ),
             ),
@@ -666,193 +632,259 @@ class _PlaybackSurfaceState extends State<PlaybackSurface>
   );
 
   Widget _controls(BuildContext context, BoxConstraints constraints) {
-    final width = constraints.maxWidth;
-    final inDock = constraints.maxHeight < 320;
-    final compact = width < 510;
-    final labeled =
-        width >= 680 && MediaQuery.textScalerOf(context).scale(12) <= 16;
-    final position = _dragSeconds == null
-        ? session.frame.position
-        : Duration(milliseconds: (_dragSeconds! * 1000).round());
-    final actions = [
-      if (inDock) _transport(compact: true, inDock: true),
-      _speedMenu(),
-      if (!compact && (!inDock || width >= 610)) ...[
-        _tracks(audio: true, labeled: labeled),
-        _tracks(audio: false, labeled: labeled),
-      ],
-      if (!inDock || width >= 350) _muteButton(),
-      if (!widget.fullscreen && widget.onToggleWide != null) _wideButton(),
-      _fullscreenButton(),
-    ];
+    final insets = widget.fullscreen
+        ? MediaQuery.paddingOf(context)
+        : EdgeInsets.zero;
+    final padding = EdgeInsets.fromLTRB(
+      insets.left + 8,
+      insets.top,
+      insets.right + 8,
+      insets.bottom,
+    );
+    final width = constraints.maxWidth - padding.horizontal;
+    final position = _progressPosition;
     return Stack(
       fit: StackFit.expand,
       children: [
         Align(
           alignment: Alignment.topCenter,
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 920),
-            // libmpv composites subtitles into the video texture. Keep the
-            // dock above the usual dialogue area without moving that texture.
-            child: GlassSurface(
-              key: const ValueKey('playback-upper-dock'),
-              immersive: true,
-              blur: true,
-              subtle: true,
-              radius: OrvexMetrics.controlRadius,
-              padding: const EdgeInsets.symmetric(horizontal: 6),
-              child: SingleChildScrollView(
-                primary: false,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    _header(),
-                    if (compact)
-                      Row(
-                        children: [
-                          ConstrainedBox(
-                            constraints: BoxConstraints(maxWidth: width * 0.5),
-                            child: _timeButton(position),
-                          ),
-                          Expanded(child: _progressSlider(position)),
-                        ],
-                      )
-                    else
-                      _progressSlider(position),
-                    if (compact)
-                      Wrap(
-                        alignment: WrapAlignment.center,
-                        crossAxisAlignment: WrapCrossAlignment.center,
-                        children: actions,
-                      )
-                    else
-                      Row(
-                        children: [
-                          _timeButton(position),
-                          Expanded(
-                            child: Wrap(
-                              alignment: WrapAlignment.end,
-                              crossAxisAlignment: WrapCrossAlignment.center,
-                              children: actions,
-                            ),
-                          ),
-                        ],
-                      ),
-                  ],
-                ),
-              ),
-            ),
+          child: _edge(
+            top: true,
+            padding: padding.copyWith(bottom: 10),
+            child: _header(),
           ),
         ),
-        if (!inDock)
-          Align(
-            alignment: const Alignment(0, 0.06),
-            child: _transport(compact: compact, inDock: false),
+        Align(
+          alignment: Alignment.bottomCenter,
+          child: _edge(
+            key: const ValueKey('playback-bottom-controls'),
+            top: false,
+            padding: padding.copyWith(top: 12),
+            child: widget.fullscreen
+                ? _fullscreenControls(context, width, position)
+                : _inlineControls(
+                    context,
+                    width,
+                    constraints.maxHeight,
+                    position,
+                  ),
           ),
+        ),
+        if (widget.fullscreen && _mobile && !_locked) _screenLock(),
       ],
     );
   }
 
-  Widget _header() => Row(
+  Widget _edge({
+    Key? key,
+    required bool top,
+    required EdgeInsets padding,
+    required Widget child,
+  }) => Stack(
+    key: key,
     children: [
-      if (widget.onBack != null || widget.fullscreen)
-        IconButton(
-          tooltip: widget.fullscreen ? '退出全屏' : '返回媒体库',
-          onPressed: widget.fullscreen ? widget.onFullscreen : widget.onBack,
-          icon: const Icon(Icons.arrow_back_rounded, size: 20),
-        ),
-      const SizedBox(width: 8),
-      Expanded(
-        child: Text(
-          widget.title ?? session.media?.name ?? '正在播放',
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: _playerTheme.textTheme.titleSmall,
+      Positioned.fill(
+        child: IgnorePointer(
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: top ? Alignment.topCenter : Alignment.bottomCenter,
+                end: top ? Alignment.bottomCenter : Alignment.topCenter,
+                colors: [
+                  OrvexColors.player.background.withValues(
+                    alpha: top ? 0.86 : 0.92,
+                  ),
+                  OrvexColors.player.background.withValues(
+                    alpha: top ? 0.53 : 0.62,
+                  ),
+                  OrvexColors.player.background.withValues(alpha: 0),
+                ],
+                stops: const [0, 0.60, 1],
+              ),
+            ),
+          ),
         ),
       ),
-      const SizedBox(width: 8),
-      if (widget.fullscreen && _mobile)
+      Padding(padding: padding, child: child),
+    ],
+  );
+
+  Widget _header() => Row(
+    children: [
+      if (widget.fullscreen)
         IconButton(
-          tooltip: '锁定屏幕',
-          onPressed: () {
-            _resetInteraction();
-            setState(() => _locked = true);
-          },
-          icon: const Icon(Icons.lock_open_rounded, size: 20),
+          tooltip: '退出全屏',
+          onPressed: widget.onFullscreen,
+          icon: const Icon(Icons.arrow_back_rounded, size: 21),
+        )
+      else
+        const SizedBox(width: 4),
+      Expanded(
+        child: IgnorePointer(
+          child: Text(
+            widget.title ?? session.media?.name ?? '正在播放',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: _playerTheme.textTheme.titleSmall,
+          ),
         ),
+      ),
       IconButton(
         tooltip: '播放设置',
         onPressed: session.ready ? _showSettings : null,
-        icon: const Icon(Icons.tune_rounded, size: 20),
+        icon: const Icon(Icons.tune_rounded, size: 21),
       ),
     ],
   );
 
-  Widget _transport({required bool compact, required bool inDock}) {
-    Widget action({
-      required String label,
-      required IconData icon,
-      required VoidCallback? onPressed,
-      bool primary = false,
-    }) {
-      final size = primary && !inDock ? (compact ? 52.0 : 58.0) : _targetSize;
-      final button = IconButton(
-        style: IconButton.styleFrom(
-          foregroundColor: OrvexColors.player.text,
-          fixedSize: Size.square(size),
-          padding: EdgeInsets.zero,
+  Widget _screenLock() => SafeArea(
+    child: Align(
+      alignment: Alignment.centerRight,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        child: IconButton(
+          tooltip: _locked ? '解除锁定' : '锁定屏幕',
+          style: IconButton.styleFrom(
+            backgroundColor: OrvexColors.player.overlay,
+            foregroundColor: OrvexColors.player.text,
+            minimumSize: const Size.square(_targetSize),
+          ),
+          onPressed: () {
+            if (_locked) {
+              setState(() => _locked = false);
+              _showControls();
+            } else {
+              _resetInteraction();
+              setState(() => _locked = true);
+            }
+          },
+          icon: Icon(
+            _locked ? Icons.lock_rounded : Icons.lock_open_rounded,
+            size: 20,
+          ),
         ),
-        tooltip: label,
-        onPressed: onPressed,
-        icon: Icon(icon, size: primary ? (inDock ? 28 : 34) : 23),
-      );
-      return inDock
-          ? button
-          : GlassSurface(
-              immersive: true,
-              translucent: true,
-              subtle: !primary,
-              radius: OrvexMetrics.pillRadius,
-              child: button,
-            );
-    }
+      ),
+    ),
+  );
 
-    final frame = session.frame;
-    return Row(
+  Widget _fullscreenControls(
+    BuildContext context,
+    double width,
+    Duration position,
+  ) {
+    final normalText = MediaQuery.textScalerOf(context).scale(12) <= 16;
+    final directTracks = width >= 490;
+    final labeledTracks = width >= 650 && normalText;
+    return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        action(
-          label: '后退 $_step 秒',
-          onPressed: session.ready ? () => _skip(-_step) : null,
-          icon: switch (_step) {
-            5 => Icons.replay_5_rounded,
-            30 => Icons.replay_30_rounded,
-            _ => Icons.replay_10_rounded,
-          },
-        ),
-        if (!inDock) const SizedBox(width: OrvexMetrics.small),
-        action(
-          label: frame.playing ? '暂停' : '播放',
-          onPressed: session.ready
-              ? () {
-                  unawaited(session.togglePause());
-                  _showControls();
-                }
-              : null,
-          icon: frame.playing ? Icons.pause_rounded : Icons.play_arrow_rounded,
-          primary: true,
-        ),
-        if (!inDock) const SizedBox(width: OrvexMetrics.small),
-        action(
-          label: '快进 $_step 秒',
-          onPressed: session.ready ? () => _skip(_step) : null,
-          icon: switch (_step) {
-            5 => Icons.forward_5_rounded,
-            30 => Icons.forward_30_rounded,
-            _ => Icons.forward_10_rounded,
-          },
+        _progressWithTimes(position, width),
+        Row(
+          children: [
+            _playButton(),
+            _skipButton(forward: false),
+            _skipButton(forward: true),
+            const Spacer(),
+            if (width >= (normalText ? 260 : 320)) _speedMenu(),
+            if (directTracks) ...[
+              _tracks(audio: true, labeled: labeledTracks),
+              _tracks(audio: false, labeled: labeledTracks),
+              _muteButton(),
+            ],
+            _fullscreenButton(),
+          ],
         ),
       ],
+    );
+  }
+
+  Widget _inlineControls(
+    BuildContext context,
+    double width,
+    double height,
+    Duration position,
+  ) {
+    final split =
+        height >= 146 &&
+        (width < 290 || MediaQuery.textScalerOf(context).scale(11) > 16);
+    final tail = [
+      if (widget.onToggleWide != null) _wideButton(),
+      _fullscreenButton(),
+    ];
+    if (split) {
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _progressWithTimes(position, width),
+          Row(children: [_playButton(), const Spacer(), ...tail]),
+        ],
+      );
+    }
+    return Row(
+      children: [
+        _playButton(),
+        Expanded(child: _progressSlider(position)),
+        ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: width * 0.38),
+          child: _timeButton('${formatTime(position)} / $_durationLabel'),
+        ),
+        ...tail,
+      ],
+    );
+  }
+
+  Widget _progressWithTimes(Duration position, double width) => Row(
+    children: [
+      ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: width * 0.27),
+        child: Padding(
+          padding: const EdgeInsets.only(left: 4),
+          child: Text(
+            formatTime(position),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(fontSize: 11, color: OrvexColors.player.text),
+          ),
+        ),
+      ),
+      Expanded(child: _progressSlider(position)),
+      ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: width * 0.27),
+        child: _timeButton(_durationLabel),
+      ),
+    ],
+  );
+
+  Widget _playButton() {
+    final playing = session.frame.playing;
+    return IconButton(
+      tooltip: playing ? '暂停' : '播放',
+      onPressed: session.ready
+          ? () {
+              unawaited(session.togglePause());
+              _showControls();
+            }
+          : null,
+      icon: Icon(
+        playing ? Icons.pause_rounded : Icons.play_arrow_rounded,
+        size: 27,
+      ),
+    );
+  }
+
+  Widget _skipButton({required bool forward}) {
+    final seconds = forward ? _step : -_step;
+    return IconButton(
+      tooltip: forward ? '快进 $_step 秒' : '后退 $_step 秒',
+      onPressed: session.ready ? () => _skip(seconds) : null,
+      icon: Icon(switch ((forward, _step)) {
+        (true, 5) => Icons.forward_5_rounded,
+        (true, 30) => Icons.forward_30_rounded,
+        (true, _) => Icons.forward_10_rounded,
+        (false, 5) => Icons.replay_5_rounded,
+        (false, 30) => Icons.replay_30_rounded,
+        (false, _) => Icons.replay_10_rounded,
+      }, size: 22),
     );
   }
 
@@ -895,11 +927,18 @@ class _PlaybackSurfaceState extends State<PlaybackSurface>
     );
   }
 
-  Widget _timeButton(Duration position) {
+  Duration get _progressPosition => _dragSeconds == null
+      ? session.frame.position
+      : Duration(milliseconds: (_dragSeconds! * 1000).round());
+
+  String get _durationLabel {
     final duration = session.frame.duration;
-    final total = _remaining
-        ? '-${formatTime(duration - position)}'
-        : formatTime(duration);
+    if (duration <= Duration.zero) return '—';
+    if (!_remaining) return formatTime(duration);
+    return '-${formatTime(duration - _progressPosition)}';
+  }
+
+  Widget _timeButton(String label) {
     return TextButton(
       style: TextButton.styleFrom(
         foregroundColor: OrvexColors.player.text,
@@ -911,7 +950,7 @@ class _PlaybackSurfaceState extends State<PlaybackSurface>
         _armHide();
       },
       child: Text(
-        '${formatTime(position)} / ${duration > Duration.zero ? total : '—'}',
+        label,
         style: const TextStyle(fontSize: 11),
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
@@ -969,13 +1008,13 @@ class _PlaybackSurfaceState extends State<PlaybackSurface>
     if (mounted) _showControls();
   }
 
-  Widget _speedMenu() => PopupMenuButton<double>(
+  Widget _speedMenu({bool inSettings = false}) => PopupMenuButton<double>(
     tooltip: '播放速度',
-    onOpened: _openedMenu,
-    onCanceled: _closedMenu,
+    onOpened: inSettings ? null : _openedMenu,
+    onCanceled: inSettings ? null : _closedMenu,
     onSelected: (rate) {
       unawaited(session.setRate(rate));
-      _closedMenu();
+      if (!inSettings) _closedMenu();
     },
     itemBuilder: (_) => [
       for (final rate in playbackRates)
@@ -994,7 +1033,10 @@ class _PlaybackSurfaceState extends State<PlaybackSurface>
           heightFactor: 1,
           child: Text(
             '${session.frame.rate}×',
-            style: TextStyle(fontSize: 12, color: OrvexColors.player.text),
+            style: TextStyle(
+              fontSize: 12,
+              color: inSettings ? null : OrvexColors.player.text,
+            ),
           ),
         ),
       ),
@@ -1026,6 +1068,18 @@ class _PlaybackSurfaceState extends State<PlaybackSurface>
                 children: [
                   const Text('播放设置', style: TextStyle(fontSize: 18)),
                   const SizedBox(height: 12),
+                  Wrap(
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      const Text('播放速度'),
+                      _speedMenu(inSettings: true),
+                      if (!widget.fullscreen) ...[
+                        _skipButton(forward: false),
+                        _skipButton(forward: true),
+                      ],
+                      _muteButton(),
+                    ],
+                  ),
                   Row(
                     children: [
                       const Expanded(child: Text('音轨')),

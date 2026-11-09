@@ -239,6 +239,8 @@ void main() {
         expect(session.frame.subtitleTrackId, selectedSubtitle);
         checks.add('reselecting the same subtitle does not duplicate tracks');
 
+        await tester.tap(find.byTooltip('播放设置'));
+        await tester.pumpAndSettle();
         await tester.tap(find.byTooltip('播放速度'));
         await tester.pumpAndSettle();
         await tester.tap(
@@ -249,6 +251,8 @@ void main() {
         );
         await until(() => session.frame.rate == 1.5, 'speed menu sets 1.5x');
         await session.setRate(1);
+        await tester.tapAt(const Offset(4, 4));
+        await tester.pumpAndSettle();
 
         await tester.tap(find.byTooltip('全屏播放'));
         await tester.pumpAndSettle();
@@ -261,6 +265,7 @@ void main() {
             .writeAsBytes(fullscreenPng!.buffer.asUint8List());
         fullscreenImage.dispose();
         checks.add('full-screen controls rendered');
+        expect(tester.takeException(), isNull, reason: 'enter fullscreen');
         final surface = find.byType(PlaybackSurface);
         final rect = tester.getRect(surface);
         if (Platform.isIOS || Platform.isAndroid) {
@@ -307,6 +312,7 @@ void main() {
         expect(find.byTooltip('退出全屏'), findsNothing);
         expect(find.byTooltip('全屏播放'), findsOneWidget);
         checks.add('full-screen exit returns to the player');
+        expect(tester.takeException(), isNull, reason: 'leave fullscreen');
 
         await session.checkpoint();
         final checkpoint = await store.read(source.resumeKey);
@@ -331,6 +337,11 @@ void main() {
           reason: 'repeated interruptions must not resume playback',
         );
         checks.add('repeated interruptions remain paused');
+        expect(
+          tester.takeException(),
+          isNull,
+          reason: 'close and reopen media',
+        );
         await tester.tap(find.byTooltip('返回首页'));
         await tester.pumpAndSettle();
         await tester.tap(find.byKey(const ValueKey('tab-2')));

@@ -188,7 +188,7 @@ void main() {
     expect(opacity(tester), 1);
     await tester.pump(const Duration(seconds: 5));
     expect(opacity(tester), 1);
-    final blank = point(tester, 0.08, 0.85);
+    final blank = point(tester, 0.08, 0.39);
     await tester.tapAt(blank);
     await tester.pump(const Duration(milliseconds: 400));
     expect(
@@ -206,14 +206,19 @@ void main() {
     expect(opacity(tester), 0);
   });
 
-  testWidgets('upper dock clears lower dialogue without moving the video', (
+  testWidgets('edge controls leave the center open without moving video', (
     tester,
   ) async {
     await mount(tester, width: 740, height: 480, fullscreen: true);
     final video = find.byKey(const ValueKey('video-gestures'));
-    final dock = find.byKey(const ValueKey('playback-upper-dock'));
+    final dock = find.byKey(const ValueKey('playback-bottom-controls'));
     final rect = tester.getRect(video);
-    expect(tester.getRect(dock).bottom, lessThan(rect.center.dy));
+    expect(tester.getRect(dock).top, greaterThan(rect.center.dy));
+    expect(tester.getRect(dock).bottom, rect.bottom);
+    expect(
+      tester.getCenter(find.byTooltip('暂停')).dy,
+      greaterThan(rect.center.dy),
+    );
     expect(tester.getSize(getProgress()).height, greaterThanOrEqualTo(44));
     expect(find.text('字幕'), findsOneWidget);
     expect(find.text('音轨'), findsOneWidget);
@@ -221,7 +226,7 @@ void main() {
     expect(opacity(tester), 0);
     expect(tester.getRect(video), rect);
     expect(find.byTooltip('暂停').hitTestable(), findsNothing);
-    await tester.tapAt(point(tester, 0.5, 0.85));
+    await tester.tapAt(point(tester, 0.5, 0.39));
     await tester.pump(const Duration(milliseconds: 400));
     expect(opacity(tester), 1);
     expect(tester.getRect(video), rect);
@@ -238,7 +243,7 @@ void main() {
     expect(opacity(tester), 0);
     session.update();
     await tester.pump();
-    await tester.tapAt(point(tester, 0.5, 0.85));
+    await tester.tapAt(point(tester, 0.5, 0.39));
     await tester.pump(const Duration(milliseconds: 400));
     final drag = await tester.startGesture(tester.getCenter(getProgress()));
     await drag.moveBy(const Offset(32, 0));
@@ -259,7 +264,7 @@ void main() {
     await mount(tester, accessibleNavigation: true);
     await tester.pump(const Duration(seconds: 5));
     expect(opacity(tester), 1);
-    await tester.tapAt(point(tester, 0.5, 0.85));
+    await tester.tapAt(point(tester, 0.5, 0.39));
     await tester.pump(const Duration(milliseconds: 400));
     expect(opacity(tester), 0);
   });
@@ -275,7 +280,7 @@ void main() {
     expect(manager.primaryFocus?.debugLabel, isNot('Video controls'));
     await tester.pump(const Duration(seconds: 5));
     expect(opacity(tester), 1);
-    await tester.tapAt(point(tester, 0.5, 0.85));
+    await tester.tapAt(point(tester, 0.5, 0.39));
     await tester.pump(const Duration(milliseconds: 400));
     expect(opacity(tester), 0);
   });
@@ -284,10 +289,10 @@ void main() {
     tester,
   ) async {
     final session = await mount(tester);
-    await doubleTap(tester, point(tester, 0.08, 0.85));
+    await doubleTap(tester, point(tester, 0.08, 0.39));
     expect(session.seeks, [const Duration(seconds: 20)]);
     expect(opacity(tester), 1);
-    await doubleTap(tester, point(tester, 0.92, 0.85));
+    await doubleTap(tester, point(tester, 0.92, 0.39));
     expect(session.seeks.last, const Duration(seconds: 30));
     expect(session.toggles, 0);
     expect(session.rates, isEmpty);
@@ -303,11 +308,15 @@ void main() {
       );
       session.update();
       await tester.pump();
-      await doubleTap(tester, point(tester, 0.92, 0.85));
+      await doubleTap(tester, point(tester, 0.92, 0.39));
       expect(session.seeks, isEmpty);
+      expect(find.byTooltip('快进 5 秒'), findsNothing);
+      await tester.tap(find.byTooltip('播放设置'));
+      await tester.pumpAndSettle();
       await tester.tap(find.byTooltip('快进 5 秒'));
       await tester.pump();
       expect(session.seeks, [const Duration(seconds: 35)]);
+      expect(session.toggles, 0);
     },
     variant: TargetPlatformVariant.only(TargetPlatform.iOS),
   );
@@ -317,7 +326,7 @@ void main() {
   ) async {
     final session = await mount(tester);
     session.update(rate: 1.5);
-    final center = point(tester, 0.5, 0.85);
+    final center = point(tester, 0.5, 0.39);
     var press = await tester.startGesture(center);
     await tester.pump(kLongPressTimeout + const Duration(milliseconds: 50));
     expect(session.rates, [2]);
@@ -342,14 +351,14 @@ void main() {
     final display = DisplayStub();
     final session = await mount(tester, display: display);
     session.update(rate: 1.25);
-    var press = await tester.startGesture(point(tester, 0.5, 0.85));
+    var press = await tester.startGesture(point(tester, 0.5, 0.39));
     await tester.pump(kLongPressTimeout + const Duration(milliseconds: 50));
     session.update(playing: false);
     await tester.pump();
     expect(session.rates, [2, 1.25]);
     await press.up();
     session.update();
-    press = await tester.startGesture(point(tester, 0.5, 0.85));
+    press = await tester.startGesture(point(tester, 0.5, 0.39));
     await tester.pump(kLongPressTimeout + const Duration(milliseconds: 50));
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
     await tester.pump();
@@ -358,7 +367,7 @@ void main() {
     await press.cancel();
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
     await tester.pump();
-    press = await tester.startGesture(point(tester, 0.5, 0.85));
+    press = await tester.startGesture(point(tester, 0.5, 0.39));
     await tester.pump(kLongPressTimeout + const Duration(milliseconds: 50));
     await tester.pumpWidget(const SizedBox.shrink());
     expect(session.rates, [2, 1.25, 2, 1.25, 2, 1.25]);
@@ -369,7 +378,7 @@ void main() {
     tester,
   ) async {
     final session = await mount(tester);
-    final press = await tester.startGesture(point(tester, 0.5, 0.85));
+    final press = await tester.startGesture(point(tester, 0.5, 0.39));
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
     await tester.pump(kLongPressTimeout + const Duration(milliseconds: 100));
     expect(session.rates, isEmpty);
@@ -429,7 +438,7 @@ void main() {
     'switching engine clears preview and does not restore into new video',
     (tester) async {
       final session = await mount(tester);
-      final press = await tester.startGesture(point(tester, 0.5, 0.85));
+      final press = await tester.startGesture(point(tester, 0.5, 0.39));
       await tester.pump(kLongPressTimeout + const Duration(milliseconds: 50));
       final nextEngine = FakeEngine();
       session.player = nextEngine;
@@ -470,7 +479,7 @@ void main() {
     );
     session.update(volume: 40);
     await tester.pump();
-    var drag = await tester.startGesture(point(tester, 0.85, 0.85));
+    var drag = await tester.startGesture(point(tester, 0.85, 0.39));
     await drag.moveBy(const Offset(0, -20));
     await drag.moveBy(const Offset(0, -50));
     await tester.pump();
@@ -478,7 +487,7 @@ void main() {
     expect(session.volumes.last, greaterThan(40));
     expect(find.textContaining('音量 '), findsOneWidget);
     await drag.up();
-    drag = await tester.startGesture(point(tester, 0.15, 0.85));
+    drag = await tester.startGesture(point(tester, 0.15, 0.39));
     await drag.moveBy(const Offset(0, -20));
     await drag.moveBy(const Offset(0, -50));
     await tester.pump();
@@ -500,7 +509,7 @@ void main() {
         display: display,
         onSubtitle: () => subtitles++,
       );
-      await tester.dragFrom(point(tester, 0.15, 0.85), const Offset(0, -40));
+      await tester.dragFrom(point(tester, 0.15, 0.39), const Offset(0, -40));
       expect(display.writes, isEmpty);
       await tester.tap(find.byTooltip('播放设置'));
       await tester.pumpAndSettle();
@@ -529,7 +538,7 @@ void main() {
   ) async {
     final display = DisplayStub()..fail = true;
     await mount(tester, width: 600, height: 340, display: display);
-    final drag = await tester.startGesture(point(tester, 0.15, 0.85));
+    final drag = await tester.startGesture(point(tester, 0.15, 0.39));
     await drag.moveBy(const Offset(0, -20));
     await drag.moveBy(const Offset(0, -30));
     await tester.pump();
@@ -555,7 +564,7 @@ void main() {
     await tester.sendKeyEvent(LogicalKeyboardKey.space);
     expect(session.toggles, 1, reason: 'opening video must focus it');
     await tester.sendKeyEvent(LogicalKeyboardKey.space);
-    await doubleTap(tester, point(tester, 0.15, 0.85));
+    await doubleTap(tester, point(tester, 0.15, 0.39));
     expect(fullscreens, 1);
     expect(session.seeks, isEmpty);
     await tester.sendKeyEvent(LogicalKeyboardKey.space);
@@ -574,7 +583,7 @@ void main() {
     expect(opacity(tester), 0);
     final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
     await mouse.addPointer(location: Offset.zero);
-    await mouse.moveTo(point(tester, 0.1, 0.85));
+    await mouse.moveTo(point(tester, 0.1, 0.39));
     await tester.pump();
     expect(opacity(tester), 1);
     expect(inputFocus.hasFocus, isTrue, reason: 'hover must not steal focus');
@@ -599,7 +608,7 @@ void main() {
       await tester.tap(find.byTooltip('锁定屏幕'));
       await tester.pump();
       expect(find.byTooltip('播放设置').hitTestable(), findsNothing);
-      await doubleTap(tester, point(tester, 0.9, 0.85));
+      await doubleTap(tester, point(tester, 0.9, 0.39));
       expect(session.seeks, isEmpty);
       await tester.tap(find.byTooltip('解除锁定'));
       await tester.pump();

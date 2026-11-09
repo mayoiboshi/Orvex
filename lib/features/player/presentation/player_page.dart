@@ -1195,7 +1195,6 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
     fullscreen: _fullscreen,
     onFullscreen: () => _toggleFullscreen(),
     onSubtitle: () => _pick(subtitle: true),
-    onBack: () => _returnToLibrary(),
     title: _session.media == null
         ? null
         : folderMediaTitle(_session.media!, _metadata),

@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'dart:ui' as ui;
 
@@ -18,7 +19,7 @@ void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized().framePolicy =
       LiveTestWidgetsFlutterBindingFramePolicy.fullyLive;
 
-  testWidgets('upper controls preserve native video and bilingual subtitles', (
+  testWidgets('edge controls preserve native video and bilingual subtitles', (
     tester,
   ) async {
     expect(Platform.isIOS, isTrue);
@@ -33,11 +34,10 @@ void main() {
     final video = await File('${root.path}/sample.mp4').writeAsBytes(
       data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes),
     );
-    final srt = await File('${root.path}/bilingual.srt').writeAsString('''
+    final srt = await File('${root.path}/single-line.srt').writeAsString('''
 1
 00:00:00,000 --> 00:00:17,000
-这是第一行字幕。
-二行目の字幕です。
+这是一行普通字幕。
 ''');
     final ass = await File('${root.path}/positioned.ass').writeAsString(r'''
 [Script Info]
@@ -50,16 +50,16 @@ Style: Main,Noto Sans CJK SC,25,&H00FFFFFF,&H000000FF,&H00723C18,&H80000000,-1,0
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 Dialogue: 0,0:00:00.00,0:00:17.00,Main,,0,0,0,,{\an2\pos(320,352)}这是定位的第一行字幕。\N{\fs19}二行目の字幕です。
+Dialogue: 0,0:00:00.00,0:00:17.00,Main,,0,0,0,,{\an8\pos(320,48)\fs19}上方定位字幕。
 ''');
-    final engine = MediaKitEngine(silentAudioForTesting: true);
     final session = PlaybackSession(
-      createEngine: () => engine,
+      createEngine: () => MediaKitEngine(silentAudioForTesting: true),
       resumeStore: PreferencesResumeStore(),
     );
     final screen = GlobalKey();
-    final narrow = ValueNotifier(false);
+    final layout = ValueNotifier((fullscreen: true, narrow: false));
     final controls = find.byKey(const ValueKey('playback-controls'));
-    final dock = find.byKey(const ValueKey('playback-upper-dock'));
+    final dock = find.byKey(const ValueKey('playback-bottom-controls'));
     final videoArea = find.byKey(const ValueKey('video-gestures'));
     final progress = find.byKey(const ValueKey('playback-progress'));
     final media = LocalMedia(uri: video.uri, name: 'Orvex 字幕验证 · 第 1 集');
@@ -105,17 +105,28 @@ Dialogue: 0,0:00:00.00,0:00:17.00,Main,,0,0,0,,{\an2\pos(320,352)}这是定位�
             backgroundColor: const Color(0xff000000),
             body: Center(
               child: ValueListenableBuilder(
-                valueListenable: narrow,
-                builder: (context, compact, _) => SizedBox(
-                  width: compact ? 390 : double.infinity,
-                  height: compact ? 680 : double.infinity,
+                valueListenable: layout,
+                builder: (context, mode, _) => SizedBox(
+                  width: mode.narrow
+                      ? 390
+                      : mode.fullscreen
+                      ? double.infinity
+                      : 760,
+                  height: mode.narrow
+                      ? 680
+                      : mode.fullscreen
+                      ? double.infinity
+                      : 428,
                   child: RepaintBoundary(
                     key: screen,
                     child: PlaybackSurface(
                       session: session,
-                      fullscreen: true,
+                      fullscreen: mode.fullscreen,
                       title: media.name,
-                      onFullscreen: () {},
+                      onFullscreen: () => layout.value = (
+                        fullscreen: !mode.fullscreen,
+                        narrow: false,
+                      ),
                       onSubtitle: () {},
                     ),
                   ),
@@ -133,6 +144,7 @@ Dialogue: 0,0:00:00.00,0:00:17.00,Main,,0,0,0,,{\an2\pos(320,352)}这是定位�
       await waitFor(
         () => session.ready && session.frame.position.inSeconds >= 2,
       );
+      final engine = session.engine! as MediaKitEngine;
       await session.togglePause();
       await waitFor(() => !session.frame.playing && !session.frame.buffering);
       await session.selectSubtitle('no');
@@ -157,28 +169,50 @@ Dialogue: 0,0:00:00.00,0:00:17.00,Main,,0,0,0,,{\an2\pos(320,352)}这是定位�
       final audio = session.frame.audioTracks.last.id;
       await session.selectAudio(audio);
       await waitFor(() => session.frame.audioTrackId == audio);
-      expect(tester.getRect(dock).bottom, lessThan(original.center.dy));
+      expect(tester.getRect(dock).top, greaterThan(original.center.dy));
+      expect(tester.getRect(dock).bottom, original.bottom);
       await capture('ass-shown-paused');
 
-      narrow.value = true;
+      layout.value = (fullscreen: true, narrow: true);
       await tester.pump(const Duration(milliseconds: 500));
       expect(tester.getSize(videoArea).width, 390);
       await capture('narrow-paused');
-      narrow.value = false;
+      layout.value = (fullscreen: true, narrow: false);
       await tester.pump(const Duration(milliseconds: 500));
       expect(tester.getRect(videoArea), original);
       final shownFrame = await engine.captureFrame();
       expect(shownFrame, isNotNull);
-      final blank = Offset(original.left + 32, original.bottom - 64);
+      final blank = original.center;
       await tester.tapAt(blank);
       await tester.pump(const Duration(milliseconds: 450));
       expect(tester.widget<AnimatedOpacity>(controls).opacity, 0);
       expect(tester.getRect(videoArea), original);
       expect(listEquals(shownFrame, await engine.captureFrame()), isTrue);
       await capture('ass-hidden');
+      expect(session.frame.playing, isFalse);
 
       await tester.tapAt(blank);
       await tester.pump(const Duration(milliseconds: 450));
+      await tester.tap(find.byTooltip('退出全屏').first);
+      await tester.pump(const Duration(milliseconds: 450));
+      final embedded = tester.getRect(videoArea);
+      expect(embedded.size, const Size(760, 428));
+      expect(tester.getRect(dock).height, lessThan(70));
+      expect(find.byTooltip('退出全屏'), findsNothing);
+      await capture('inline-shown');
+      await tester.tapAt(embedded.center);
+      await tester.pump(const Duration(milliseconds: 450));
+      expect(tester.widget<AnimatedOpacity>(controls).opacity, 0);
+      await capture('inline-hidden');
+      expect(tester.getRect(videoArea), embedded);
+      expect(session.frame.playing, isFalse);
+      expect(listEquals(shownFrame, await engine.captureFrame()), isTrue);
+      await tester.tapAt(embedded.center);
+      await tester.pump(const Duration(milliseconds: 450));
+      await tester.tap(find.byTooltip('全屏播放'));
+      await tester.pump(const Duration(milliseconds: 450));
+      expect(tester.getRect(videoArea), original);
+
       final bar = tester.getRect(progress);
       final gesture = await tester.startGesture(
         bar.centerLeft + Offset(bar.width * 0.26, 0),
@@ -205,13 +239,77 @@ Dialogue: 0,0:00:00.00,0:00:17.00,Main,,0,0,0,,{\an2\pos(320,352)}这是定位�
       expect(session.frame.subtitleTrackId, track);
       expect(session.frame.audioTrackId, audio);
       expect(session.media?.uri, media.uri);
+      for (final (label, width, height) in [
+        ('4-by-3', 160, 120),
+        ('wide', 240, 102),
+      ]) {
+        final fixture = await File('${root.path}/$label.mp4')
+            .writeAsBytes(zlib.decode(base64Decode(_ratioFixtures[label]!)));
+        await session.open(LocalMedia(uri: fixture.uri, name: label));
+        await waitFor(
+          () => session.ready && session.frame.position.inMilliseconds >= 500,
+        );
+        await session.togglePause();
+        await waitFor(() => !session.frame.playing && !session.frame.buffering);
+        final ratioEngine = session.engine! as MediaKitEngine;
+        final png = (await ratioEngine.captureFrame())!;
+        final header = ByteData.sublistView(png);
+        expect(header.getUint32(16), width);
+        expect(header.getUint32(20), height);
+        final rect = tester.getRect(videoArea);
+        expect(tester.widget<AnimatedOpacity>(controls).opacity, 1);
+        await capture('ratio-$label');
+        await tester.tapAt(rect.center);
+        await tester.pump(const Duration(milliseconds: 450));
+        expect(tester.widget<AnimatedOpacity>(controls).opacity, 0);
+        expect(tester.getRect(videoArea), rect);
+        expect(listEquals(png, await ratioEngine.captureFrame()), isTrue);
+      }
     } finally {
       await tester.pumpWidget(const SizedBox.shrink());
       await session.close();
       session.dispose();
-      narrow.dispose();
+      layout.dispose();
       tester.view.resetPhysicalSize();
       await SystemChrome.setPreferredOrientations([]);
     }
   });
 }
+
+// Simulator-only H.264 fixtures. Generate at each listed size with FFmpeg:
+// -f lavfi -i 'color=0x1e1e1e:s=160x120:r=2:d=4'
+// -vf 'drawbox=x=iw/2:y=0:w=iw/2:h=ih:color=0xdcdcdc:t=fill'
+// -c:v libx264 -preset veryslow -tune stillimage -pix_fmt yuv420p -bf 0
+// -bsf:v filter_units=remove_types=6 -map_metadata -1 sample.mp4
+// Encode the resulting file as zlib-compressed base64. These files are never
+// included in the shipping app's asset bundle.
+const _ratioFixtures = {
+  '4-by-3':
+      'eNpjYGBQSCupLMgszs9lYGBiANFAbJRYlmyYW2BiyMDAwJFWlJoKpG/npiSWAGnz1I4m'
+      'pp/n/32/sv3MplfJx7Zxr/i+aJ5azLNFX5+YrRee77rcavsKP0/Pa5c67tZtqFjMwMTH'
+      '9ihtpiJQK6/jLNkO/Tn//91aFsHEBhQQdJyl/cFxsmaL+Ll6sCA7UFDIcZaljUCl0QyB'
+      'eEuEUqCoZ41Anc8yRtbP8+FqhR1nRe4RqJ+s2QBXDBXO/CNQ/+RUAopqEcdZFf0s8v98'
+      'ljGwiAJtvLY0ACTO7JObn18GlM/JLctIYUABzC8YGPgXMDAygBACMKKqQuc7MOAFTEBU'
+      'XlKUmA1kx5Rkg+1kxjQNaC8Dfnuw2gvSVQHmqqSmlBQDaZnUnOIShA6ouWC9jO9zUzIT'
+      'gQyF3BR0vzuA1YQeAXN0M1JyimAyZZkpqcgqw4D8fI/EvJScVJAaxlm5mXlpoAAvywUb'
+      'iuxMlRSInExKUWoakjd4SotyFCBsxqjikqQcIPtQcUlxCpKaTaB0iSMoQB6vYPAA0h4w'
+      'FSI+QPVmxnqGeoYGRgo5mUkVRmYmyDok/v8HkhZAVc6MKQw8/x8ySKUD6TU+SiLKnx4o'
+      'gWKFCURwyGmEKDMysGe8cOYXVjT4++MHSLdAQWJxAdQlICySVFIEDWbGZTAbikvAUQBz'
+      'MQcwpEFsEaDPkMVBWAYolowmxgGlTYByVUguB4lbg3IQEIsCsRgUi0OxBMSO5Hwk8wyA'
+      'OLE0pQQU3ZG5qWAaBBSRoxaYHIoSCwpykINJJxOSflRWluTng6MuEawZHAXAME6DhTEA'
+      'BjTJdA==',
+  'wide':
+      'eNpjYGBQSCupLMgszs9lYGBiANFAbJRYlmyYW2BiyMDAwJFWlJoKpB/mpiSWAGnb1I4m'
+      'pp/n/32/sv3MplfJx7Zxr/i+aJ5avHNpHIP9tl07+acpRU4yruH4d6yt1L1/1re5b6JO'
+      'FBUwMLxnaFxwcTHQAF7HWbId+nP+/7u1LIJRGCgg6DhL+4PjZM0W8XP1cEEhx1mWNgKV'
+      'RjME4i3/I4t61gjU+SxjZP08Hy4q7Dgrco9A/WTNBhTFQOHMPwL1T04loKgWcZxV0c8i'
+      '/89nGQOLKNDGa0sDQOLMPrn5+WVA+ZzcsowUBhTA/IKBgX8BAyMDCCEAI6oqdL4DA17A'
+      'BETlJUWJ2UB2TEk22E5mTNOA9jLgtwervR+AOA3MVUlNKSkG0jKpOcUlCB1Qc8F6Gd/n'
+      'pmQmAhkKuSnofncAqwk9AuboZqTkFMFkyjJTUpFVhgH5+R6JeSk5qSA1jLNyM/NAThAp'
+      'ywUbiuxMlRSInExKUWoakjd4SotyFCBsxqjikqQcIPtQcUlxCpKaTaDUiSMoQB5PY/AA'
+      '0h4wFSI+QPVmxnqGeoYGRgo5mUkVRmYmyDok/v8HkhZAVc6MKQw8/x8ySKUD6TU+SnL1'
+      'Zxs6QLHCASIUKhYG9DAysGe8cOYXVjT4++MHSLdAQWJxAdQlICySVFIEDWbGTTAbikvA'
+      'UQBzMdA4kCcZRIA+QxYHYRmgWDKaGAeUNgHKVSG5HCTuCMpBQCwKxGJQLA7FEhA7kvOR'
+      'zDMA4sTSlBJQdEfmpoJpEFBEjlpgcihKLCjIQQ4mnUxI+lFZWZKfD466RLBmcBQAwzgN'
+      'FsYAHdvOTw==',
+};
