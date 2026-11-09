@@ -11,6 +11,13 @@ import '../domain/anime_subject.dart';
 const bangumiDataSource = 'https://github.com/bangumi-data/bangumi-data';
 const bangumiDataLicense = 'https://creativecommons.org/licenses/by/4.0/';
 
+// Reviewed Romanizations absent from the upstream snapshot. Match by the
+// Bangumi work ID so editions and sequels keep their own identities.
+const _romanizedAliases = <int, List<String>>{
+  // https://anilist.co/anime/154587/Sousou-no-Frieren/
+  400602: ['Sousou no Frieren', 'Sōsō no Furīren'],
+};
+
 class BangumiDataAsset {
   BangumiDataAsset({Future<BangumiDataIndex> Function()? loader})
     : _loader = loader ?? _loadBundle;
@@ -107,6 +114,7 @@ class BangumiDataIndex {
         nameCn: translations['zh-Hans']?.whereType<String>().firstOrNull ?? '',
         aliases: [
           for (final aliases in translations.values) ...aliases.cast<String>(),
+          ...?_romanizedAliases[id],
         ],
         date: date,
         platform: platform,

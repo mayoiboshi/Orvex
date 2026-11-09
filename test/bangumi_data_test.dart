@@ -167,6 +167,23 @@ void main() {
     expect(conan.episodes, 0);
     expect(conan.toJson(), isNot(contains('score')));
     expect(index.search('葬送的芙莉莲').any((s) => s.bangumiId == 400602), isTrue);
+    for (final title in ['Sousou no Frieren', 'Sōsō no Furīren']) {
+      expect(index.search(title).single.bangumiId, 400602);
+    }
+    expect(
+      index
+          .match('Sousou no Frieren', 'Sousou no Frieren - 01.mkv')
+          .subject
+          ?.bangumiId,
+      400602,
+    );
+    expect(
+      index
+          .match('Sousou no Frieren 第2季', 'Sousou no Frieren S02E01.mkv')
+          .subject
+          ?.bangumiId,
+      isNot(400602),
+    );
     start.reset();
     for (var i = 0; i < 1000; i++) {
       index.match('Detective Conan', 'Detective Conan 0644.mkv');

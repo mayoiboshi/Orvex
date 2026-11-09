@@ -9,6 +9,8 @@ Orvex 随应用附带 bangumi-data 及其贡献者发布的 **0.3.235**，对应
 
 需要更新时，在仓库根目录运行 `python3 scripts/update-bangumi-data.py 0.3.235`，或传入经审查的其他固定版本。脚本验证 npm 发布包，保留原名、翻译/别名、原始类型、放送起始时间和带站点命名空间的资讯 ID，转成紧凑 JSON。常规构建直接使用提交的资产。
 
+应用在建立索引时按 Bangumi 作品 ID 补入少量已核对的罗马字别名。《葬送的芙莉莲》补入 `Sousou no Frieren` 和 `Sōsō no Furīren`，发布资产和校验值沿用上游快照。[AniList 条目](https://anilist.co/anime/154587/Sousou-no-Frieren/)
+
 ## 行为
 
 - 成功的在线搜索仍沿用现有匹配顺序。已存关联、缓存和人工更正继续使用同一份资料文件。新字段读旧记录时有兼容默认值。
