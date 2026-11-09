@@ -126,6 +126,80 @@ void main() {
     );
   });
   test(
+    'number and Chinese title subtitle headings match the actual Conan release',
+    () {
+      const video = '[Fabre-RAW] Detective Conan 0647 [NetflixJP] [1080p].mkv';
+      final candidates = [
+        for (final name in [
+          '642 相邻的房间.ass',
+          '646 幽灵饭店的推理对决上集.ass',
+          '647 幽灵饭店的推理对决下集.ass',
+        ])
+          SubtitleCandidate(
+            SubtitleReference(kind: 'file', path: name, name: name),
+            matchSubtitleName(video, name),
+          ),
+      ];
+      expect(
+        uniqueSubtitleMatch(candidates)?.reference.name,
+        '647 幽灵饭店的推理对决下集.ass',
+      );
+      expect(
+        matchSubtitleName(video, '647 幽灵饭店第2场推理.ass'),
+        SubtitleMatch.episode,
+      );
+      final ambiguous = [
+        for (final name in ['647 简体.ass', '647 繁体.ass'])
+          SubtitleCandidate(
+            SubtitleReference(kind: 'file', path: name, name: name),
+            matchSubtitleName(video, name),
+          ),
+      ];
+      expect(uniqueSubtitleMatch(ambiguous), isNull);
+      expect(
+        matchSubtitleName('Show - 0647.mkv', '1647 其他字幕.ass'),
+        SubtitleMatch.none,
+      );
+      expect(
+        matchSubtitleName('Show - 0647.mkv', '10647 其他字幕.ass'),
+        SubtitleMatch.none,
+      );
+      expect(
+        matchSubtitleName('Show - 2024.mkv', '2024 新年特辑.ass'),
+        SubtitleMatch.none,
+      );
+      expect(
+        matchSubtitleName('Show - 1080.mkv', '1080p 画质.ass'),
+        SubtitleMatch.none,
+      );
+      expect(
+        matchSubtitleName('Show S02E647.mkv', 'Show S01E647.srt'),
+        SubtitleMatch.none,
+      );
+      expect(matchSubtitleName(video, '647 标题 S01E02.ass'), SubtitleMatch.none);
+      expect(
+        matchSubtitleName('Show S01E02.mkv', '647 标题 S01E02.ass'),
+        SubtitleMatch.none,
+      );
+      for (final conflicting in [
+        '647 标题 第2集.ass',
+        '647 标题 EP02.ass',
+        '647 标题 [02].ass',
+      ]) {
+        expect(matchSubtitleName(video, conflicting), SubtitleMatch.none);
+        expect(
+          matchSubtitleName('Show - 02.mkv', conflicting),
+          SubtitleMatch.none,
+        );
+      }
+      expect(
+        matchSubtitleName(video, '647 标题 EP647.ass'),
+        SubtitleMatch.episode,
+      );
+      expect(matchSubtitleName(video, '647 标题 2.ass'), SubtitleMatch.episode);
+    },
+  );
+  test(
     'bare labels do not truncate longer numbers or mix neighbouring episodes',
     () {
       expect(
@@ -269,6 +343,60 @@ void main() {
     library.dispose();
     await base.delete(recursive: true);
   });
+  test(
+    'rescanning after replacing videos finds subtitles in the new directory',
+    () async {
+      final base = await Directory.systemTemp.createTemp(
+        'orvex-subtitle-rescan-',
+      );
+      addTearDown(() => base.delete(recursive: true));
+      final source = Directory('${base.path}/source');
+      final old = Directory('${source.path}/old');
+      await old.create(recursive: true);
+      await File('${old.path}/Old - 01.mkv').writeAsString('video');
+      await File('${old.path}/Old - 01.srt').writeAsString('subtitle');
+      final library = FolderLibrary(
+        access: _FileAccess(),
+        directory: () async => Directory('${base.path}/index'),
+      );
+      addTearDown(library.dispose);
+      await library.initialize();
+      final root = FolderRoot(
+        id: 'root',
+        name: 'source',
+        grant: source.path,
+        location: source.uri.toString(),
+      );
+      library.roots.add(root);
+      final service = LocalSubtitles(
+        folders: library,
+        imports: ImportedFileStore(directoryProvider: () async => base),
+      );
+      await library.scan(root);
+      final oldVideo = library.entries.singleWhere((e) => !e.directory).media;
+      expect(uniqueSubtitleMatch(await service.discover(oldVideo)), isNotNull);
+      await old.delete(recursive: true);
+      final replacement = Directory('${source.path}/new');
+      await replacement.create();
+      const videoName =
+          '[Fabre-RAW] Detective Conan 0647 [NetflixJP] [1080p].mkv';
+      const subtitleName = '647 幽灵饭店的推理对决下集.ass';
+      await File('${replacement.path}/$videoName').writeAsString('video');
+      await File('${replacement.path}/$subtitleName').writeAsString('subtitle');
+      await File('${replacement.path}/646 幽灵饭店的推理对决上集.ass')
+          .writeAsString('other subtitle');
+      await library.scan(root);
+      final video = library.entries
+          .singleWhere((e) => e.path == 'new/$videoName' && e.available)
+          .media;
+      expect(video.resumeKey, isNot(oldVideo.resumeKey));
+      final match = uniqueSubtitleMatch(await service.discover(video));
+      expect(match?.reference.path, 'new/$subtitleName');
+      final prepared = await service.prepare(match!.reference);
+      expect(await File.fromUri(prepared.media.uri).readAsString(), 'subtitle');
+      await prepared.release!();
+    },
+  );
   test('global automatic matching persists and late reads cannot overwrite a user change', () async {
     final library = FolderLibrary(access: _FileAccess());
     final imports = ImportedFileStore();
