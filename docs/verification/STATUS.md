@@ -2,6 +2,20 @@
 
 更新日期：2026-11-09。当前交付优先 iPadOS。iPhone 核心播放、Bangumi 柯南个案和历史路径修复已有用户反馈；其余平台与场景按下文区分。本文件保留验证历史，当前能力清单统一见 [ROADMAP](../ROADMAP.md)。
 
+## iPhone / iPad 底栏贴近 Home 指示条（2026-11-09）
+
+- 共享底栏在 iOS/iPadOS 最多预留 18 点底部间距。格式、静态分析和 199 项测试通过，覆盖手机、平板窗口及列表末尾可访问性。
+- 正式版已覆盖安装并启动于 iPad Pro 2022 与 iPhone 17 Pro Max。真机视觉确认待验收。
+
+## 第四批十次交付独立审查（2026-11-09）
+
+范围为 `9826f27..dac8bb3` 的十个已推送修复或功能，排除纯文档。子智能体只读审查，本轮未操作真机。
+
+- **P2 · 本批新增**：离线索引把同一 Bangumi ID 的重复数据行算成多个候选。实际资源中《命运石之门 0》（#129807）和《魔法少女 俺》（#109956）都有重复行，精确查询可能被判为待确认。见 [建立索引](../../lib/features/anime_metadata/infrastructure/bangumi_data_index.dart#L146) 和 [唯一命中判定](../../lib/features/anime_metadata/infrastructure/bangumi_data_index.dart#L239)。
+- **P2 · 本批新增**：若视频在右侧音量拖动期间结束，播放状态会清除拖动值，松手后提前返回，持续显示的音量条可能留在画面上。见 [停播处理](../../lib/features/player/presentation/playback_surface.dart#L193) 和 [松手处理](../../lib/features/player/presentation/playback_surface.dart#L504)。
+- **P3 · 本批新增**：旧版离线候选排队升级后，如果用户关闭自动匹配，清理队列会移除原候选。见 [候选进入队列](../../lib/features/anime_metadata/application/anime_metadata_controller.dart#L239) 和 [关闭自动匹配](../../lib/features/anime_metadata/application/anime_metadata_controller.dart#L402)。
+- **待真机确认**：首次读取系统音量与建立事件监听走不同通道。若原生先收到显示请求，可能不挂载音量控件，随后首个快照也不会重试。见 [Flutter 监听](../../lib/features/player/presentation/playback_surface.dart#L252) 和 [原生处理](../../ios/Runner/AppDelegate.swift#L193)。其余播放偏好、手势和底栏的只读抽查未证实新的阻塞问题。
+
 ## iOS 播放器系统音量（2026-11-09）
 
 - 播放页用系统读值绘制顶部音量胶囊。音量手势、设置滑块及静音转给 iOS 原生音量控件。播放时收到系统音量变化才弹出反馈，重复匹配的变化用于推断刻度。系统没有提供每次实体键按下的公开事件，也没有提供保证隐藏原生音量提示的开关。
