@@ -789,6 +789,8 @@ class _PlaybackSurfaceState extends State<PlaybackSurface>
     );
     final width = constraints.maxWidth - padding.horizontal;
     final position = _progressPosition;
+    final compactHeight =
+        widget.fullscreen && constraints.maxHeight - insets.vertical < 200;
     return Stack(
       fit: StackFit.expand,
       children: [
@@ -796,8 +798,8 @@ class _PlaybackSurfaceState extends State<PlaybackSurface>
           alignment: Alignment.topCenter,
           child: _edge(
             top: true,
-            padding: padding.copyWith(bottom: 10),
-            child: _header(),
+            padding: padding.copyWith(bottom: compactHeight ? 0 : 10),
+            child: _header(compactHeight: compactHeight),
           ),
         ),
         Align(
@@ -805,7 +807,7 @@ class _PlaybackSurfaceState extends State<PlaybackSurface>
           child: _edge(
             key: const ValueKey('playback-bottom-controls'),
             top: false,
-            padding: padding.copyWith(top: 12),
+            padding: padding.copyWith(top: compactHeight ? 0 : 12),
             child: widget.fullscreen
                 ? _fullscreenControls(context, width, position)
                 : _inlineControls(
@@ -816,7 +818,8 @@ class _PlaybackSurfaceState extends State<PlaybackSurface>
                   ),
           ),
         ),
-        if (widget.fullscreen && _mobile && !_locked) _screenLock(),
+        if (widget.fullscreen && _mobile && !_locked && !compactHeight)
+          _screenLock(),
       ],
     );
   }
@@ -855,7 +858,7 @@ class _PlaybackSurfaceState extends State<PlaybackSurface>
     ],
   );
 
-  Widget _header() => Row(
+  Widget _header({required bool compactHeight}) => Row(
     children: [
       if (widget.fullscreen)
         IconButton(
@@ -865,12 +868,15 @@ class _PlaybackSurfaceState extends State<PlaybackSurface>
         )
       else
         const SizedBox(width: 4),
+      if (widget.fullscreen && _mobile && compactHeight && !_locked)
+        _lockButton(),
       Expanded(
         child: IgnorePointer(
           child: Text(
             widget.title ?? session.media?.name ?? '正在播放',
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
+            textAlign: widget.fullscreen ? TextAlign.center : TextAlign.start,
             style: _playerTheme.textTheme.titleSmall,
           ),
         ),
@@ -885,31 +891,33 @@ class _PlaybackSurfaceState extends State<PlaybackSurface>
 
   Widget _screenLock() => SafeArea(
     child: Align(
-      alignment: Alignment.centerRight,
+      alignment: Alignment.centerLeft,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 8),
-        child: IconButton(
-          tooltip: _locked ? '解除锁定' : '锁定屏幕',
-          style: IconButton.styleFrom(
-            backgroundColor: OrvexColors.player.overlay,
-            foregroundColor: OrvexColors.player.text,
-            minimumSize: const Size.square(_targetSize),
-          ),
-          onPressed: () {
-            if (_locked) {
-              setState(() => _locked = false);
-              _showControls();
-            } else {
-              _resetInteraction();
-              setState(() => _locked = true);
-            }
-          },
-          icon: Icon(
-            _locked ? Icons.lock_rounded : Icons.lock_open_rounded,
-            size: 20,
-          ),
-        ),
+        child: _lockButton(),
       ),
+    ),
+  );
+
+  Widget _lockButton() => IconButton(
+    tooltip: _locked ? '解除锁定' : '锁定屏幕',
+    style: IconButton.styleFrom(
+      backgroundColor: OrvexColors.player.overlay,
+      foregroundColor: OrvexColors.player.text,
+      minimumSize: const Size.square(_targetSize),
+    ),
+    onPressed: () {
+      if (_locked) {
+        setState(() => _locked = false);
+        _showControls();
+      } else {
+        _resetInteraction();
+        setState(() => _locked = true);
+      }
+    },
+    icon: Icon(
+      _locked ? Icons.lock_rounded : Icons.lock_open_rounded,
+      size: 20,
     ),
   );
 
@@ -919,26 +927,61 @@ class _PlaybackSurfaceState extends State<PlaybackSurface>
     Duration position,
   ) {
     final normalText = MediaQuery.textScalerOf(context).scale(12) <= 16;
-    final directTracks = width >= 490;
-    final labeledTracks = width >= 650 && normalText;
+    // Leave a clear center for transport even when the device is narrow.
+    // The settings sheet retains the track controls when they do not fit.
+    final directTracks = width >= 600;
+    final labeledTracks = width >= 700 && normalText;
+    final narrow = width < 240;
+    final tiny = width < 176;
+    Widget transportButton(Widget child) => narrow
+        ? SizedBox(width: _targetSize, height: _targetSize, child: child)
+        : child;
+    final transport = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        transportButton(_skipButton(forward: false)),
+        transportButton(_playButton()),
+        transportButton(_skipButton(forward: true)),
+      ],
+    );
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
         _progressWithTimes(position, width),
-        Row(
-          children: [
-            _playButton(),
-            _skipButton(forward: false),
-            _skipButton(forward: true),
-            const Spacer(),
-            if (width >= (normalText ? 260 : 320)) _speedMenu(),
-            if (directTracks) ...[
-              _tracks(audio: true, labeled: labeledTracks),
-              _tracks(audio: false, labeled: labeledTracks),
-              _muteButton(),
+        SizedBox(
+          height: _targetSize + 4,
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              if (width >= 260)
+                Align(alignment: Alignment.centerLeft, child: _speedMenu()),
+              Align(
+                alignment: narrow ? Alignment.centerLeft : Alignment.center,
+                child: tiny ? transportButton(_playButton()) : transport,
+              ),
+              Align(
+                alignment: Alignment.centerRight,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (directTracks) ...[
+                      _tracks(audio: true, labeled: labeledTracks),
+                      _tracks(audio: false, labeled: labeledTracks),
+                      _muteButton(),
+                    ],
+                    if (narrow)
+                      SizedBox(
+                        width: _targetSize,
+                        height: _targetSize,
+                        child: _fullscreenButton(),
+                      )
+                    else
+                      _fullscreenButton(),
+                  ],
+                ),
+              ),
             ],
-            _fullscreenButton(),
-          ],
+          ),
         ),
       ],
     );
@@ -1217,10 +1260,8 @@ class _PlaybackSurfaceState extends State<PlaybackSurface>
                     children: [
                       const Text('播放速度'),
                       _speedMenu(inSettings: true),
-                      if (!widget.fullscreen) ...[
-                        _skipButton(forward: false),
-                        _skipButton(forward: true),
-                      ],
+                      _skipButton(forward: false),
+                      _skipButton(forward: true),
                       _muteButton(),
                     ],
                   ),

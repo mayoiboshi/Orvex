@@ -146,7 +146,7 @@ Dialogue: 0,0:00:00.00,0:00:17.00,Main,,0,0,0,,{\an8\pos(320,48)\fs19}上方定�
       );
       final engine = session.engine! as MediaKitEngine;
       final bounds = tester.getRect(videoArea);
-      final left = Offset(bounds.left + 48, bounds.center.dy);
+      final left = Offset(bounds.left + 100, bounds.center.dy);
       final right = Offset(bounds.right - 80, bounds.center.dy);
       Future<void> doubleTap(Offset position) async {
         await tester.tapAt(position);

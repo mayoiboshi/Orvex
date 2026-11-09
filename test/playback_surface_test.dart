@@ -257,6 +257,113 @@ void main() {
     expect(tester.getRect(video), rect);
   });
 
+  for (final width in [320.0, 740.0]) {
+    testWidgets(
+      'full screen transport is centered and corners remain accessible at $width',
+      (tester) async {
+        var fullscreens = 0;
+        final session = await mount(
+          tester,
+          width: width,
+          height: 300,
+          fullscreen: true,
+          padding: const EdgeInsets.fromLTRB(12, 16, 12, 20),
+          onFullscreen: () => fullscreens++,
+        );
+        final surface = tester.getRect(find.byType(PlaybackSurface));
+        final settings = tester.getRect(find.byTooltip('播放设置'));
+        final fullscreen = tester.getRect(find.byTooltip('退出全屏').last);
+        final previous = tester.getRect(find.byTooltip('后退 10 秒'));
+        final play = tester.getRect(find.byTooltip('暂停'));
+        final next = tester.getRect(find.byTooltip('快进 10 秒'));
+        final progress = tester.getRect(getProgress());
+        expect(settings.top, greaterThanOrEqualTo(surface.top + 16));
+        expect(settings.right, lessThanOrEqualTo(surface.right - 12));
+        expect(fullscreen.right, lessThanOrEqualTo(surface.right - 12));
+        expect(fullscreen.bottom, lessThanOrEqualTo(surface.bottom - 20));
+        expect(settings.center.dx, fullscreen.center.dx);
+        expect(play.center.dx, closeTo(surface.center.dx, 0.1));
+        expect(previous.right, lessThanOrEqualTo(play.left));
+        expect(play.right, lessThanOrEqualTo(next.left));
+        expect(next.right, lessThanOrEqualTo(fullscreen.left));
+        expect(progress.bottom, lessThanOrEqualTo(play.top));
+        await tester.tap(find.byTooltip('后退 10 秒'));
+        await tester.pump();
+        expect(session.seeks, [const Duration(seconds: 20)]);
+        await tester.tap(find.byTooltip('退出全屏').last);
+        expect(fullscreens, 1);
+        await tester.tap(find.byTooltip('播放设置'));
+        await tester.pumpAndSettle();
+        expect(find.text('播放设置'), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
+  testWidgets(
+    'narrow short full screen keeps corner and transport targets separate',
+    (tester) async {
+      var fullscreens = 0;
+      final session = await mount(
+        tester,
+        width: 220,
+        height: 200,
+        fullscreen: true,
+        padding: const EdgeInsets.fromLTRB(12, 16, 12, 20),
+        onFullscreen: () => fullscreens++,
+      );
+      final settings = tester.getRect(find.byTooltip('播放设置'));
+      final lock = tester.getRect(find.byTooltip('锁定屏幕'));
+      final progress = tester.getRect(getProgress());
+      final back = tester.getRect(find.byTooltip('后退 10 秒'));
+      final next = tester.getRect(find.byTooltip('快进 10 秒'));
+      final fullscreen = tester.getRect(find.byTooltip('退出全屏').last);
+      expect(settings.bottom, lessThanOrEqualTo(progress.top));
+      expect(lock.bottom, lessThanOrEqualTo(progress.top));
+      expect(next.right, lessThanOrEqualTo(fullscreen.left));
+      expect(back.width, greaterThanOrEqualTo(44));
+      expect(fullscreen.width, greaterThanOrEqualTo(44));
+      await tester.tap(find.byTooltip('快进 10 秒'));
+      await tester.pump();
+      expect(session.seeks, [const Duration(seconds: 40)]);
+      await tester.tap(find.byTooltip('退出全屏').last);
+      expect(fullscreens, 1);
+      await tester.tap(find.byTooltip('锁定屏幕'));
+      await tester.pump();
+      expect(find.byTooltip('解除锁定'), findsOneWidget);
+      await tester.tap(find.byTooltip('解除锁定'));
+      await tester.pump();
+      expect(tester.takeException(), isNull);
+    },
+    variant: TargetPlatformVariant.only(TargetPlatform.iOS),
+  );
+
+  testWidgets(
+    'very narrow screen keeps playback and settings transport available',
+    (tester) async {
+      final session = await mount(
+        tester,
+        width: 190,
+        height: 200,
+        fullscreen: true,
+        padding: const EdgeInsets.fromLTRB(12, 16, 12, 20),
+      );
+      final progress = tester.getRect(getProgress());
+      expect(
+        tester.getRect(find.byTooltip('锁定屏幕')).bottom,
+        lessThanOrEqualTo(progress.top),
+      );
+      expect(find.byTooltip('快进 10 秒'), findsNothing);
+      await tester.tap(find.byTooltip('播放设置'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('快进 10 秒'));
+      await tester.pump();
+      expect(session.seeks, [const Duration(seconds: 40)]);
+      expect(tester.takeException(), isNull);
+    },
+    variant: TargetPlatformVariant.only(TargetPlatform.iOS),
+  );
+
   testWidgets('buffering preserves a hidden overlay and a seek preview', (
     tester,
   ) async {
