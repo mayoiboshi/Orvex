@@ -113,6 +113,7 @@ Apple 适配器将目录操作与缩略图提取分到两个串行队列。目�
 
 - 唯一已接入引擎为 MediaKitEngine。使用 `NativePlayer.setProperty` 配置字体和核对外挂字幕轨道，依赖 libmpv 的具体属性；还不能声称可直接替换任意播放器。
 - 原生 libass 渲染外挂字幕；内置静态 Noto Sans CJK SC 字体及 OFL 许可。代码接受 SRT/ASS/SSA/VTT；已保存的原生像素实验重点为 SRT/ASS。
+- 视频和原生字幕共用同一纹理，Flutter 控件独立叠放。进度和播放选项放在顶部，给下方台词留出空间；控件显隐不改变画面适配、视频位置或 ASS 样式。当前没有字幕边界数据，顶部或特殊定位字幕仍可能和控件重叠。
 - iOS Swift AppDelegate 的 `dev.orvex/audio-session` 通道负责 AVAudioSession 激活/释放、模拟器识别、音频中断及耳机断开通知。会话收到事件只暂停，不自动继续。
 - `PlayerBrightness` 使用独立 `dev.orvex/display` 通道读取/设置 iOS 主屏亮度；首次调整时保存原值，退出播放视图或应用失活时恢复。模拟器、外接屏和其他平台返回不可用或不提供该能力，界面提示使用系统亮度，不显示无效调节控件。iPhone 本轮整体操作已获用户通过反馈，亮度恢复与真实系统事件仍需单独验证；音量仍由已有 PlaybackSession / MediaKitEngine 接口控制，只改变播放器音量，不改变系统音量。
 - 新增的 `dev.orvex/appearance` 只在 iOS/macOS 读取并通知减少透明度/动态偏好，不创建原生玻璃视图。当前材质由 Flutter 的 GlassSurface 实现，普通卡片不模糊；播放器覆盖层保留固定沉浸式配色，设置面板随应用主题更新。

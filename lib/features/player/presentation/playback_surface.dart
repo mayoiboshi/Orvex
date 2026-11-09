@@ -49,6 +49,9 @@ class PlaybackSurface extends StatefulWidget {
 
 class _PlaybackSurfaceState extends State<PlaybackSurface>
     with WidgetsBindingObserver {
+  static const _hideDelay = Duration(seconds: 3);
+  static const _targetSize = 44.0;
+
   final _focus = FocusNode(debugLabel: 'Video controls');
   late final ThemeData _playerTheme = OrvexTheme.create(
     Brightness.dark,
@@ -63,6 +66,10 @@ class _PlaybackSurfaceState extends State<PlaybackSurface>
   bool _visible = true;
   bool _locked = false;
   bool _wasPlaying = false;
+  bool _wasBuffering = false;
+  bool _accessibleNavigation = false;
+  bool _controlsHaveFocus = false;
+  final _controlPointers = <int>{};
   bool _foreground = true;
   bool _dragging = false;
   bool _seekPending = false;
@@ -96,6 +103,7 @@ class _PlaybackSurfaceState extends State<PlaybackSurface>
     _observedEngine = session.engine;
     WidgetsBinding.instance.addObserver(this);
     session.addListener(_playbackChanged);
+    FocusManager.instance.addHighlightModeListener(_highlightModeChanged);
     _playbackChanged();
     unawaited(_readBrightness());
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -109,6 +117,15 @@ class _PlaybackSurfaceState extends State<PlaybackSurface>
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _accessibleNavigation = MediaQuery.accessibleNavigationOf(context);
+    _armHide();
+  }
+
+  void _highlightModeChanged(FocusHighlightMode _) => _armHide();
+
+  @override
   void didUpdateWidget(covariant PlaybackSurface oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.session != widget.session) {
@@ -118,6 +135,9 @@ class _PlaybackSurfaceState extends State<PlaybackSurface>
       _observedEngine = session.engine;
       _locked = false;
       _visible = true;
+      _wasPlaying = false;
+      _wasBuffering = false;
+      _armHide();
       session.addListener(_playbackChanged);
       _playbackChanged();
     }
@@ -151,17 +171,21 @@ class _PlaybackSurfaceState extends State<PlaybackSurface>
       _observedEngine = session.engine;
       _locked = false;
       _visible = true;
+      _wasPlaying = false;
+      _wasBuffering = false;
+      _armHide();
     }
-    if (!session.frame.playing) {
+    if (!session.frame.playing && !session.frame.buffering) {
       _restoreRate();
       _hideTimer?.cancel();
       if (_wasPlaying) {
-        _cancelSeek();
         _level = null;
         _feedback = null;
         _visible = true;
       }
-    } else if (!_wasPlaying) {
+    } else if (session.frame.buffering) {
+      _hideTimer?.cancel();
+    } else if (!_wasPlaying || _wasBuffering) {
       _armHide();
     }
     if (_seekPending &&
@@ -171,20 +195,36 @@ class _PlaybackSurfaceState extends State<PlaybackSurface>
       _cancelSeek();
       _armHide();
     }
-    _wasPlaying = session.frame.playing;
+    if (!session.frame.buffering) _wasPlaying = session.frame.playing;
+    _wasBuffering = session.frame.buffering;
     if (mounted) setState(() {});
   }
 
+  bool get _canAutoHide =>
+      _foreground &&
+      _visible &&
+      !_locked &&
+      session.frame.playing &&
+      !session.frame.buffering &&
+      !_menuOpen &&
+      !_interacting &&
+      _controlPointers.isEmpty &&
+      !_accessibleNavigation &&
+      !(_controlsHaveFocus &&
+          FocusManager.instance.highlightMode ==
+              FocusHighlightMode.traditional);
+
   void _armHide() {
     _hideTimer?.cancel();
-    if (!_foreground || !session.frame.playing || _menuOpen || _interacting) {
-      return;
-    }
-    _hideTimer = Timer(const Duration(seconds: 3), () {
-      if (mounted && session.frame.playing && !_menuOpen && !_interacting) {
-        setState(() => _visible = false);
-      }
+    if (!_canAutoHide) return;
+    _hideTimer = Timer(_hideDelay, () {
+      if (mounted && _canAutoHide) setState(() => _visible = false);
     });
+  }
+
+  void _releaseControlPointer(PointerEvent event) {
+    _controlPointers.remove(event.pointer);
+    _armHide();
   }
 
   void _showControls() {
@@ -273,6 +313,7 @@ class _PlaybackSurfaceState extends State<PlaybackSurface>
 
   void _resetInteraction() {
     _hideTimer?.cancel();
+    _controlPointers.clear();
     _feedbackTimer?.cancel();
     _cancelSeek();
     _restoreRate();
@@ -370,6 +411,7 @@ class _PlaybackSurfaceState extends State<PlaybackSurface>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    FocusManager.instance.removeHighlightModeListener(_highlightModeChanged);
     session.removeListener(_playbackChanged);
     _resetInteraction();
     _brightnessRevision++;
@@ -387,7 +429,6 @@ class _PlaybackSurfaceState extends State<PlaybackSurface>
         builder: (context, constraints) {
           final frame = session.frame;
           final show = !_locked && _visible;
-          final compact = constraints.maxWidth < 520;
           return Focus(
             focusNode: _focus,
             autofocus: true,
@@ -535,38 +576,36 @@ class _PlaybackSurfaceState extends State<PlaybackSurface>
                           key: const ValueKey('playback-controls'),
                           opacity: show ? 1 : 0,
                           duration: OrvexMetrics.duration(context),
-                          child: Stack(
-                            fit: StackFit.expand,
-                            children: [
-                              SafeArea(
+                          child: Focus(
+                            canRequestFocus: false,
+                            onFocusChange: (focused) {
+                              _controlsHaveFocus = focused;
+                              _armHide();
+                            },
+                            child: Listener(
+                              onPointerDown: (event) {
+                                _controlPointers.add(event.pointer);
+                                _hideTimer?.cancel();
+                              },
+                              onPointerUp: _releaseControlPointer,
+                              onPointerCancel: _releaseControlPointer,
+                              child: SafeArea(
                                 top: widget.fullscreen,
                                 bottom: widget.fullscreen,
                                 left: widget.fullscreen,
                                 right: widget.fullscreen,
-                                minimum: const EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                  vertical: 8,
+                                minimum: const EdgeInsets.fromLTRB(
+                                  12,
+                                  8,
+                                  12,
+                                  0,
                                 ),
-                                child: Stack(
-                                  children: [
-                                    Align(
-                                      alignment: Alignment.topCenter,
-                                      child: _header(),
-                                    ),
-                                    Align(
-                                      alignment: compact
-                                          ? const Alignment(0, -0.12)
-                                          : Alignment.center,
-                                      child: _transport(compact),
-                                    ),
-                                    Align(
-                                      alignment: Alignment.bottomCenter,
-                                      child: _timeline(compact),
-                                    ),
-                                  ],
+                                child: LayoutBuilder(
+                                  builder: (context, constraints) =>
+                                      _controls(context, constraints),
                                 ),
                               ),
-                            ],
+                            ),
                           ),
                         ),
                       ),
@@ -575,7 +614,7 @@ class _PlaybackSurfaceState extends State<PlaybackSurface>
                   if (_dragSeconds != null || _feedback != null)
                     IgnorePointer(
                       child: Align(
-                        alignment: const Alignment(0, -0.3),
+                        alignment: const Alignment(0, 0.28),
                         child: Container(
                           margin: const EdgeInsets.symmetric(horizontal: 16),
                           padding: const EdgeInsets.symmetric(
@@ -626,238 +665,299 @@ class _PlaybackSurfaceState extends State<PlaybackSurface>
     ),
   );
 
-  Widget _header() => ConstrainedBox(
-    constraints: const BoxConstraints(maxWidth: 900),
-    child: GlassSurface(
-      immersive: true,
-      blur: true,
-      subtle: true,
-      radius: OrvexMetrics.controlRadius,
-      child: SizedBox(
-        height: 44,
-        child: Row(
-          children: [
-            if (widget.onBack != null || widget.fullscreen)
-              IconButton(
-                tooltip: widget.fullscreen ? '退出全屏' : '返回媒体库',
-                onPressed: widget.fullscreen
-                    ? widget.onFullscreen
-                    : widget.onBack,
-                icon: const Icon(Icons.arrow_back_rounded, size: 20),
-              ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                widget.title ?? session.media?.name ?? '正在播放',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: OrvexColors.player.text,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w500,
+  Widget _controls(BuildContext context, BoxConstraints constraints) {
+    final width = constraints.maxWidth;
+    final inDock = constraints.maxHeight < 320;
+    final compact = width < 510;
+    final labeled =
+        width >= 680 && MediaQuery.textScalerOf(context).scale(12) <= 16;
+    final position = _dragSeconds == null
+        ? session.frame.position
+        : Duration(milliseconds: (_dragSeconds! * 1000).round());
+    final actions = [
+      if (inDock) _transport(compact: true, inDock: true),
+      _speedMenu(),
+      if (!compact && (!inDock || width >= 610)) ...[
+        _tracks(audio: true, labeled: labeled),
+        _tracks(audio: false, labeled: labeled),
+      ],
+      if (!inDock || width >= 350) _muteButton(),
+      if (!widget.fullscreen && widget.onToggleWide != null) _wideButton(),
+      _fullscreenButton(),
+    ];
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        Align(
+          alignment: Alignment.topCenter,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 920),
+            // libmpv composites subtitles into the video texture. Keep the
+            // dock above the usual dialogue area without moving that texture.
+            child: GlassSurface(
+              key: const ValueKey('playback-upper-dock'),
+              immersive: true,
+              blur: true,
+              subtle: true,
+              radius: OrvexMetrics.controlRadius,
+              padding: const EdgeInsets.symmetric(horizontal: 6),
+              child: SingleChildScrollView(
+                primary: false,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _header(),
+                    if (compact)
+                      Row(
+                        children: [
+                          ConstrainedBox(
+                            constraints: BoxConstraints(maxWidth: width * 0.5),
+                            child: _timeButton(position),
+                          ),
+                          Expanded(child: _progressSlider(position)),
+                        ],
+                      )
+                    else
+                      _progressSlider(position),
+                    if (compact)
+                      Wrap(
+                        alignment: WrapAlignment.center,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: actions,
+                      )
+                    else
+                      Row(
+                        children: [
+                          _timeButton(position),
+                          Expanded(
+                            child: Wrap(
+                              alignment: WrapAlignment.end,
+                              crossAxisAlignment: WrapCrossAlignment.center,
+                              children: actions,
+                            ),
+                          ),
+                        ],
+                      ),
+                  ],
                 ),
               ),
             ),
-            const SizedBox(width: 8),
-            if (widget.fullscreen && _mobile)
-              IconButton(
-                tooltip: '锁定屏幕',
-                onPressed: () {
-                  _resetInteraction();
-                  setState(() => _locked = true);
-                },
-                icon: const Icon(Icons.lock_open_rounded, size: 20),
-              ),
-            IconButton(
-              tooltip: '播放设置',
-              onPressed: session.ready ? _showSettings : null,
-              icon: const Icon(Icons.tune_rounded, size: 20),
-            ),
-          ],
+          ),
+        ),
+        if (!inDock)
+          Align(
+            alignment: const Alignment(0, 0.06),
+            child: _transport(compact: compact, inDock: false),
+          ),
+      ],
+    );
+  }
+
+  Widget _header() => Row(
+    children: [
+      if (widget.onBack != null || widget.fullscreen)
+        IconButton(
+          tooltip: widget.fullscreen ? '退出全屏' : '返回媒体库',
+          onPressed: widget.fullscreen ? widget.onFullscreen : widget.onBack,
+          icon: const Icon(Icons.arrow_back_rounded, size: 20),
+        ),
+      const SizedBox(width: 8),
+      Expanded(
+        child: Text(
+          widget.title ?? session.media?.name ?? '正在播放',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: _playerTheme.textTheme.titleSmall,
         ),
       ),
-    ),
+      const SizedBox(width: 8),
+      if (widget.fullscreen && _mobile)
+        IconButton(
+          tooltip: '锁定屏幕',
+          onPressed: () {
+            _resetInteraction();
+            setState(() => _locked = true);
+          },
+          icon: const Icon(Icons.lock_open_rounded, size: 20),
+        ),
+      IconButton(
+        tooltip: '播放设置',
+        onPressed: session.ready ? _showSettings : null,
+        icon: const Icon(Icons.tune_rounded, size: 20),
+      ),
+    ],
   );
 
-  Widget _transport(bool compact) => GlassSurface(
-    immersive: true,
-    blur: true,
-    subtle: true,
-    radius: OrvexMetrics.pillRadius,
-    child: Row(
+  Widget _transport({required bool compact, required bool inDock}) {
+    Widget action({
+      required String label,
+      required IconData icon,
+      required VoidCallback? onPressed,
+      bool primary = false,
+    }) {
+      final size = primary && !inDock ? (compact ? 52.0 : 58.0) : _targetSize;
+      final button = IconButton(
+        style: IconButton.styleFrom(
+          foregroundColor: OrvexColors.player.text,
+          fixedSize: Size.square(size),
+          padding: EdgeInsets.zero,
+        ),
+        tooltip: label,
+        onPressed: onPressed,
+        icon: Icon(icon, size: primary ? (inDock ? 28 : 34) : 23),
+      );
+      return inDock
+          ? button
+          : GlassSurface(
+              immersive: true,
+              translucent: true,
+              subtle: !primary,
+              radius: OrvexMetrics.pillRadius,
+              child: button,
+            );
+    }
+
+    final frame = session.frame;
+    return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        if (!compact)
-          IconButton(
-            tooltip: '后退 $_step 秒',
-            onPressed: () => _skip(-_step),
-            icon: Icon(switch (_step) {
-              5 => Icons.replay_5_rounded,
-              30 => Icons.replay_30_rounded,
-              _ => Icons.replay_10_rounded,
-            }, size: 23),
-          ),
-        IconButton(
-          style: IconButton.styleFrom(
-            foregroundColor: OrvexColors.player.text,
-            minimumSize: Size(compact ? 48 : 56, compact ? 48 : 54),
-          ),
-          tooltip: session.frame.playing ? '暂停' : '播放',
+        action(
+          label: '后退 $_step 秒',
+          onPressed: session.ready ? () => _skip(-_step) : null,
+          icon: switch (_step) {
+            5 => Icons.replay_5_rounded,
+            30 => Icons.replay_30_rounded,
+            _ => Icons.replay_10_rounded,
+          },
+        ),
+        if (!inDock) const SizedBox(width: OrvexMetrics.small),
+        action(
+          label: frame.playing ? '暂停' : '播放',
           onPressed: session.ready
               ? () {
                   unawaited(session.togglePause());
                   _showControls();
                 }
               : null,
-          icon: Icon(
-            session.frame.playing
-                ? Icons.pause_rounded
-                : Icons.play_arrow_rounded,
-            size: compact ? 30 : 34,
-          ),
+          icon: frame.playing ? Icons.pause_rounded : Icons.play_arrow_rounded,
+          primary: true,
         ),
-        if (!compact)
-          IconButton(
-            tooltip: '快进 $_step 秒',
-            onPressed: () => _skip(_step),
-            icon: Icon(switch (_step) {
-              5 => Icons.forward_5_rounded,
-              30 => Icons.forward_30_rounded,
-              _ => Icons.forward_10_rounded,
-            }, size: 23),
-          ),
+        if (!inDock) const SizedBox(width: OrvexMetrics.small),
+        action(
+          label: '快进 $_step 秒',
+          onPressed: session.ready ? () => _skip(_step) : null,
+          icon: switch (_step) {
+            5 => Icons.forward_5_rounded,
+            30 => Icons.forward_30_rounded,
+            _ => Icons.forward_10_rounded,
+          },
+        ),
       ],
-    ),
-  );
+    );
+  }
 
-  Widget _timeline(bool compact) {
-    final frame = session.frame;
-    final duration = frame.duration.inMilliseconds.toDouble();
-    final position = (_dragSeconds == null
-        ? frame.position
-        : Duration(milliseconds: (_dragSeconds! * 1000).round()));
-    return ConstrainedBox(
-      constraints: const BoxConstraints(maxWidth: 920),
-      child: GlassSurface(
-        immersive: true,
-        blur: true,
-        subtle: true,
-        radius: OrvexMetrics.controlRadius,
-        padding: const EdgeInsets.symmetric(horizontal: 6),
-        child: SliderTheme(
-          data: _playerTheme.sliderTheme.copyWith(
-            trackHeight: _dragging ? 4 : 2,
-            thumbShape: RoundSliderThumbShape(
-              enabledThumbRadius: _dragging ? 7 : 4,
+  Widget _progressSlider(Duration position) {
+    final duration = session.frame.duration.inMilliseconds.toDouble();
+    return SliderTheme(
+      data: _playerTheme.sliderTheme.copyWith(
+        trackHeight: _dragging ? 4 : 2,
+        thumbShape: RoundSliderThumbShape(
+          enabledThumbRadius: _dragging ? 7 : 4,
+        ),
+        overlayShape: const RoundSliderOverlayShape(overlayRadius: 12),
+      ),
+      child: Listener(
+        onPointerCancel: (_) {
+          setState(_cancelSeek);
+          _armHide();
+        },
+        child: SizedBox(
+          height: _targetSize,
+          child: Slider(
+            key: const ValueKey('playback-progress'),
+            value: position.inMilliseconds.toDouble().clamp(
+              0,
+              duration > 0 ? duration : 1,
             ),
-            overlayShape: const RoundSliderOverlayShape(overlayRadius: 12),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Listener(
-                onPointerCancel: (_) {
-                  setState(_cancelSeek);
-                  _armHide();
-                },
-                child: SizedBox(
-                  height: 28,
-                  child: Slider(
-                    key: const ValueKey('playback-progress'),
-                    value: position.inMilliseconds.toDouble().clamp(
-                      0,
-                      duration > 0 ? duration : 1,
-                    ),
-                    max: duration > 0 ? duration : 1,
-                    onChangeStart: (value) => _startSeek(value / 1000),
-                    onChanged: session.ready && duration > 0
-                        ? (value) {
-                            if (_dragging) {
-                              setState(() => _dragSeconds = value / 1000);
-                            }
-                          }
-                        : null,
-                    onChangeEnd: (_) => _commitSeek(),
-                  ),
-                ),
-              ),
-              SizedBox(
-                height: 44,
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: TextButton(
-                        style: TextButton.styleFrom(
-                          foregroundColor: OrvexColors.player.text,
-                          padding: const EdgeInsets.symmetric(horizontal: 4),
-                          alignment: Alignment.centerLeft,
-                        ),
-                        onPressed: () {
-                          setState(() => _remaining = !_remaining);
-                          _armHide();
-                        },
-                        child: Text(
-                          '${formatTime(position)} / ${_remaining ? '-${formatTime(frame.duration - position)}' : formatTime(frame.duration)}',
-                          style: const TextStyle(fontSize: 11),
-                        ),
-                      ),
-                    ),
-                    _speedMenu(),
-                    if (!compact) ...[
-                      _tracks(audio: true),
-                      _tracks(audio: false),
-                    ],
-                    IconButton(
-                      tooltip: frame.volume == 0 ? '取消静音' : '静音',
-                      onPressed: () {
-                        unawaited(
-                          session.setVolume(frame.volume == 0 ? 100 : 0),
-                        );
-                        _showControls();
-                      },
-                      icon: Icon(
-                        frame.volume == 0
-                            ? Icons.volume_off_outlined
-                            : Icons.volume_up_outlined,
-                        size: 20,
-                      ),
-                    ),
-                    if (!widget.fullscreen && widget.onToggleWide != null)
-                      IconButton(
-                        key: const ValueKey('playback-wide-mode'),
-                        tooltip: widget.wide ? '窄屏模式 · 右侧显示列表' : '宽屏模式',
-                        isSelected: widget.wide,
-                        onPressed: session.ready
-                            ? () {
-                                widget.onToggleWide!();
-                                _showControls();
-                              }
-                            : null,
-                        icon: const Icon(Icons.width_wide_outlined, size: 21),
-                        selectedIcon: const Icon(
-                          Icons.width_normal_outlined,
-                          size: 21,
-                        ),
-                      ),
-                    IconButton(
-                      tooltip: widget.fullscreen ? '退出全屏' : '全屏播放',
-                      onPressed: session.ready ? widget.onFullscreen : null,
-                      icon: Icon(
-                        widget.fullscreen
-                            ? Icons.fullscreen_exit_rounded
-                            : Icons.fullscreen_rounded,
-                        size: 22,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
+            max: duration > 0 ? duration : 1,
+            onChangeStart: (value) => _startSeek(value / 1000),
+            onChanged: session.ready && duration > 0
+                ? (value) {
+                    if (_dragging) {
+                      setState(() => _dragSeconds = value / 1000);
+                    }
+                  }
+                : null,
+            onChangeEnd: (_) => _commitSeek(),
           ),
         ),
       ),
     );
   }
+
+  Widget _timeButton(Duration position) {
+    final duration = session.frame.duration;
+    final total = _remaining
+        ? '-${formatTime(duration - position)}'
+        : formatTime(duration);
+    return TextButton(
+      style: TextButton.styleFrom(
+        foregroundColor: OrvexColors.player.text,
+        minimumSize: const Size(0, _targetSize),
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+      ),
+      onPressed: () {
+        setState(() => _remaining = !_remaining);
+        _armHide();
+      },
+      child: Text(
+        '${formatTime(position)} / ${duration > Duration.zero ? total : '—'}',
+        style: const TextStyle(fontSize: 11),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      ),
+    );
+  }
+
+  Widget _muteButton() {
+    final muted = session.frame.volume == 0;
+    return IconButton(
+      tooltip: muted ? '取消静音' : '静音',
+      onPressed: () {
+        unawaited(session.setVolume(muted ? 100 : 0));
+        _showControls();
+      },
+      icon: Icon(
+        muted ? Icons.volume_off_outlined : Icons.volume_up_outlined,
+        size: 20,
+      ),
+    );
+  }
+
+  Widget _wideButton() => IconButton(
+    key: const ValueKey('playback-wide-mode'),
+    tooltip: widget.wide ? '窄屏模式 · 右侧显示列表' : '宽屏模式',
+    isSelected: widget.wide,
+    onPressed: session.ready
+        ? () {
+            widget.onToggleWide!();
+            _showControls();
+          }
+        : null,
+    icon: const Icon(Icons.width_wide_outlined, size: 21),
+    selectedIcon: const Icon(Icons.width_normal_outlined, size: 21),
+  );
+
+  Widget _fullscreenButton() => IconButton(
+    tooltip: widget.fullscreen ? '退出全屏' : '全屏播放',
+    onPressed: session.ready ? widget.onFullscreen : null,
+    icon: Icon(
+      widget.fullscreen
+          ? Icons.fullscreen_exit_rounded
+          : Icons.fullscreen_rounded,
+      size: 22,
+    ),
+  );
 
   void _openedMenu() {
     _menuOpen = true;
@@ -885,11 +985,18 @@ class _PlaybackSurfaceState extends State<PlaybackSurface>
           child: Text('$rate 倍速'),
         ),
     ],
-    child: Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-      child: Text(
-        '${session.frame.rate}×',
-        style: TextStyle(fontSize: 12, color: OrvexColors.player.text),
+    child: ConstrainedBox(
+      constraints: const BoxConstraints(minWidth: 44, minHeight: _targetSize),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        child: Center(
+          widthFactor: 1,
+          heightFactor: 1,
+          child: Text(
+            '${session.frame.rate}×',
+            style: TextStyle(fontSize: 12, color: OrvexColors.player.text),
+          ),
+        ),
       ),
     ),
   );
@@ -985,16 +1092,22 @@ class _PlaybackSurfaceState extends State<PlaybackSurface>
     }
   }
 
-  Widget _tracks({required bool audio, bool inSettings = false}) {
+  Widget _tracks({
+    required bool audio,
+    bool inSettings = false,
+    bool labeled = false,
+  }) {
     final frame = session.frame;
     final tracks = audio ? frame.audioTracks : frame.subtitleTracks;
     final selected = audio ? frame.audioTrackId : frame.subtitleTrackId;
+    final label = audio ? '音轨' : '字幕';
+    final icon = Icon(
+      audio ? Icons.audiotrack_outlined : Icons.subtitles_outlined,
+      size: 20,
+    );
     return PopupMenuButton<String>(
-      tooltip: audio ? '音轨' : '字幕',
-      icon: Icon(
-        audio ? Icons.audiotrack_outlined : Icons.subtitles_outlined,
-        size: 21,
-      ),
+      tooltip: label,
+      icon: labeled ? null : icon,
       onOpened: _openedMenu,
       onCanceled: inSettings ? null : _closedMenu,
       onSelected: (id) {
@@ -1029,6 +1142,22 @@ class _PlaybackSurfaceState extends State<PlaybackSurface>
           const PopupMenuItem(value: 'external', child: Text('打开外挂字幕…')),
         ],
       ],
+      child: labeled
+          ? ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: _targetSize),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    icon,
+                    const SizedBox(width: 4),
+                    Text(label, style: _playerTheme.textTheme.labelMedium),
+                  ],
+                ),
+              ),
+            )
+          : null,
     );
   }
 
