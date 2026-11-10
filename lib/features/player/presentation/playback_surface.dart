@@ -73,7 +73,6 @@ class _PlaybackSurfaceState extends State<PlaybackSurface>
   int _volumeRevision = 0;
   bool _volumePresented = false;
   bool _volumeVisible = false;
-  double? _beforeMute;
 
   double get _outputVolume => _systemLevel.value ?? session.frame.volume;
   Timer? _hideTimer;
@@ -238,7 +237,6 @@ class _PlaybackSurfaceState extends State<PlaybackSurface>
       final level = (reading.level * 100).clamp(0.0, 100.0);
       _volumeSteps.observe(reading);
       _systemLevel.value = level;
-      if (reading.reset) _beforeMute = null;
       if (previous == null && session.ready && session.frame.volume != 100) {
         // Use one gain control once the system route becomes available.
         unawaited(session.setVolume(100));
@@ -980,7 +978,6 @@ class _PlaybackSurfaceState extends State<PlaybackSurface>
                     if (directTracks) ...[
                       _tracks(audio: true),
                       _tracks(audio: false),
-                      _muteButton(),
                     ],
                     if (narrow)
                       SizedBox(
@@ -1155,24 +1152,6 @@ class _PlaybackSurfaceState extends State<PlaybackSurface>
     );
   }
 
-  Widget _muteButton() {
-    final muted = _outputVolume == 0;
-    return IconButton(
-      tooltip: muted ? '取消静音' : '静音',
-      onPressed: () {
-        if (!muted) _beforeMute = _outputVolume;
-        final restored =
-            _beforeMute ?? (_systemLevel.value == null ? 100.0 : 25.0);
-        unawaited(_setOutputVolume(muted ? restored : 0));
-        _showControls();
-      },
-      icon: Icon(
-        muted ? Icons.volume_off_outlined : Icons.volume_up_outlined,
-        size: 20,
-      ),
-    );
-  }
-
   Widget _wideButton() => IconButton(
     key: const ValueKey('playback-wide-mode'),
     tooltip: widget.wide ? '窄屏模式 · 右侧显示列表' : '宽屏模式',
@@ -1291,7 +1270,6 @@ class _PlaybackSurfaceState extends State<PlaybackSurface>
                       _speedMenu(inSettings: true),
                       _skipButton(forward: false),
                       _skipButton(forward: true),
-                      _muteButton(),
                     ],
                   ),
                   Row(

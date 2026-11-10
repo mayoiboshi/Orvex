@@ -200,6 +200,11 @@ void main() {
   }
 
   Finder getProgress() => find.byKey(const ValueKey('playback-progress'));
+  testWidgets('fullscreen does not show a mute button', (tester) async {
+    await mount(tester, width: 740, height: 350, fullscreen: true);
+    expect(find.byTooltip('静音'), findsNothing);
+    expect(find.byTooltip('取消静音'), findsNothing);
+  });
   testWidgets(
     'audio menu shows available metadata and still selects the requested track',
     (tester) async {
@@ -1172,15 +1177,8 @@ void main() {
     await tester.tapAt(tester.getRect(slider).centerLeft + const Offset(50, 0));
     await tester.pumpAndSettle();
     expect(volume.writes.last, lessThan(0.5));
-    final beforeMute = volume.writes.last;
-    final mute = find.byTooltip('静音');
-    await tester.ensureVisible(mute);
-    await tester.tap(mute);
-    await tester.pumpAndSettle();
-    expect(volume.writes.last, 0);
-    await tester.tap(find.byTooltip('取消静音'));
-    await tester.pumpAndSettle();
-    expect(volume.writes.last, closeTo(beforeMute, 0.0001));
+    expect(find.byTooltip('静音'), findsNothing);
+    expect(find.byTooltip('取消静音'), findsNothing);
     expect(session.volumes, isEmpty);
 
     await tester.pumpWidget(const SizedBox.shrink());
