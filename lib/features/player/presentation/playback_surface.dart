@@ -934,15 +934,26 @@ class _PlaybackSurfaceState extends State<PlaybackSurface>
     final directTracks = width >= 600;
     final narrow = width < 240;
     final tiny = width < 176;
+    final largeText = MediaQuery.textScalerOf(context).scale(12) > 16;
+    final hasEpisodePicker = width >= 440 && widget.onEpisodes != null;
+    final directEpisodes =
+        width >=
+        (largeText
+            ? 560
+            : hasEpisodePicker
+            ? 464
+            : 380);
     Widget transportButton(Widget child) => narrow
         ? SizedBox(width: _targetSize, height: _targetSize, child: child)
         : child;
     final transport = Row(
       mainAxisSize: MainAxisSize.min,
       children: [
+        if (directEpisodes) _episodeStepButton(previous: true),
         transportButton(_skipButton(forward: false)),
         transportButton(_playButton()),
         transportButton(_skipButton(forward: true)),
+        if (directEpisodes) _episodeStepButton(previous: false),
       ],
     );
     return Column(
@@ -961,8 +972,7 @@ class _PlaybackSurfaceState extends State<PlaybackSurface>
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       _speedMenu(),
-                      if (width >= 440 && widget.onEpisodes != null)
-                        _episodesButton(),
+                      if (hasEpisodePicker) _episodesButton(),
                     ],
                   ),
                 ),
@@ -1081,6 +1091,30 @@ class _PlaybackSurfaceState extends State<PlaybackSurface>
       }, size: 22),
     );
   }
+
+  Widget _episodeStepButton({required bool previous}) => IconButton(
+    tooltip: previous ? '上一集' : '下一集',
+    onPressed:
+        _foreground &&
+            session.ready &&
+            (previous ? session.hasPrevious : session.hasNext)
+        ? () {
+            if (!mounted ||
+                !_foreground ||
+                !session.ready ||
+                !(previous ? session.hasPrevious : session.hasNext)) {
+              return;
+            }
+            _resetInteraction();
+            unawaited(previous ? session.previous() : session.next());
+            _showControls();
+          }
+        : null,
+    icon: Icon(
+      previous ? Icons.skip_previous_rounded : Icons.skip_next_rounded,
+      size: 22,
+    ),
+  );
 
   Widget _progressSlider(Duration position) {
     final duration = session.frame.duration.inMilliseconds.toDouble();
@@ -1268,8 +1302,10 @@ class _PlaybackSurfaceState extends State<PlaybackSurface>
                     children: [
                       const Text('播放速度'),
                       _speedMenu(inSettings: true),
+                      _episodeStepButton(previous: true),
                       _skipButton(forward: false),
                       _skipButton(forward: true),
+                      _episodeStepButton(previous: false),
                     ],
                   ),
                   Row(

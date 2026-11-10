@@ -31,6 +31,8 @@ class SurfaceSession extends PlaybackSession {
   final audio = <String>[];
   final subtitles = <String>[];
   int toggles = 0;
+  int previousCalls = 0;
+  int nextCalls = 0;
   bool acknowledgeSeek = true;
 
   @override
@@ -94,6 +96,10 @@ class SurfaceSession extends PlaybackSession {
   Future<void> selectAudio(String id) async => audio.add(id);
   @override
   Future<void> selectSubtitle(String id) async => subtitles.add(id);
+  @override
+  Future<void> previous() async => previousCalls++;
+  @override
+  Future<void> next() async => nextCalls++;
 }
 
 class DisplayStub extends PlayerBrightness {
@@ -205,6 +211,176 @@ void main() {
     expect(find.byTooltip('静音'), findsNothing);
     expect(find.byTooltip('取消静音'), findsNothing);
   });
+  testWidgets(
+    'fullscreen previous and next surround skips and disable at queue ends',
+    (tester) async {
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      final session = await mount(
+        tester,
+        width: 740,
+        height: 350,
+        fullscreen: true,
+        playing: false,
+      );
+      final first = LocalMedia(uri: Uri.file('/one.mp4'), name: 'one.mp4');
+      final second = LocalMedia(uri: Uri.file('/two.mp4'), name: 'two.mp4');
+      final third = LocalMedia(uri: Uri.file('/three.mp4'), name: 'three.mp4');
+      session.playlist = [first, second, third];
+      session.media = first;
+      session.update(playing: false);
+      await tester.pump();
+      final previous = find.byWidgetPredicate(
+        (w) => w is IconButton && w.tooltip == '上一集',
+      );
+      final next = find.byWidgetPredicate(
+        (w) => w is IconButton && w.tooltip == '下一集',
+      );
+      expect(tester.widget<IconButton>(previous).onPressed, isNull);
+      expect(tester.widget<IconButton>(next).onPressed, isNotNull);
+      final staleNext = tester.widget<IconButton>(next).onPressed!;
+      expect(
+        tester.getRect(previous).right,
+        lessThanOrEqualTo(tester.getRect(find.byTooltip('后退 10 秒')).left),
+      );
+      expect(
+        tester.getRect(find.byTooltip('快进 10 秒')).right,
+        lessThanOrEqualTo(tester.getRect(next).left),
+      );
+      await tester.tap(next);
+      expect(session.nextCalls, 1);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+      staleNext();
+      expect(session.nextCalls, 1);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      session.media = second;
+      session.update(playing: false);
+      await tester.pump();
+      await tester.tap(previous);
+      expect(session.previousCalls, 1);
+      session.media = third;
+      session.update(playing: false);
+      await tester.pump();
+      expect(tester.widget<IconButton>(next).onPressed, isNull);
+      staleNext();
+      expect(session.nextCalls, 1);
+      expect(find.byTooltip('静音'), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'narrow fullscreen keeps previous and next reachable in settings',
+    (tester) async {
+      final session = await mount(
+        tester,
+        width: 320,
+        height: 180,
+        fullscreen: true,
+        playing: false,
+      );
+      final first = LocalMedia(uri: Uri.file('/one.mp4'), name: 'one.mp4');
+      final second = LocalMedia(uri: Uri.file('/two.mp4'), name: 'two.mp4');
+      session.playlist = [first, second];
+      session.media = first;
+      session.update(playing: false);
+      await tester.pump();
+      await tester.tap(find.byTooltip('播放设置'));
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .widget<IconButton>(
+              find.byWidgetPredicate(
+                (w) => w is IconButton && w.tooltip == '上一集',
+              ),
+            )
+            .onPressed,
+        isNull,
+      );
+      await tester.tap(find.byTooltip('下一集'));
+      await tester.pumpAndSettle();
+      expect(session.nextCalls, 1);
+      expect(find.byTooltip('静音'), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  for (final width in [396.0, 480.0, 616.0]) {
+    testWidgets(
+      'episode controls do not overlap neighboring actions at width $width',
+      (tester) async {
+        await mount(
+          tester,
+          width: width,
+          height: 240,
+          fullscreen: true,
+          playing: false,
+          onEpisodes: () {},
+        );
+        final previous = find.byWidgetPredicate(
+          (w) => w is IconButton && w.tooltip == '上一集',
+        );
+        final next = find.byWidgetPredicate(
+          (w) => w is IconButton && w.tooltip == '下一集',
+        );
+        expect(
+          tester.getRect(find.byTooltip('播放速度')).right,
+          lessThanOrEqualTo(tester.getRect(previous).left),
+        );
+        final picker = find.byTooltip('选择集数');
+        if (picker.evaluate().isNotEmpty) {
+          expect(
+            tester.getRect(picker).right,
+            lessThanOrEqualTo(tester.getRect(previous).left),
+          );
+        }
+        final audio = find.byTooltip('音轨');
+        final right = audio.evaluate().isNotEmpty
+            ? audio
+            : find.byTooltip('退出全屏').last;
+        expect(
+          tester.getRect(next).right,
+          lessThanOrEqualTo(tester.getRect(right).left),
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
+  for (final width in [576.0, 616.0]) {
+    testWidgets('large text episode controls avoid neighbors at width $width', (
+      tester,
+    ) async {
+      await mount(
+        tester,
+        width: width,
+        height: 240,
+        fullscreen: true,
+        playing: false,
+        onEpisodes: () {},
+        textScaler: const TextScaler.linear(1.5),
+      );
+      final previous = find.byWidgetPredicate(
+        (w) => w is IconButton && w.tooltip == '上一集',
+      );
+      final next = find.byWidgetPredicate(
+        (w) => w is IconButton && w.tooltip == '下一集',
+      );
+      expect(
+        tester.getRect(find.byTooltip('选择集数')).right,
+        lessThanOrEqualTo(tester.getRect(previous).left),
+      );
+      final audio = find.byTooltip('音轨');
+      final right = audio.evaluate().isNotEmpty
+          ? audio
+          : find.byTooltip('退出全屏').last;
+      expect(
+        tester.getRect(next).right,
+        lessThanOrEqualTo(tester.getRect(right).left),
+      );
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   testWidgets(
     'audio menu shows available metadata and still selects the requested track',
     (tester) async {
