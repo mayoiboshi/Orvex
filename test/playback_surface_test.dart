@@ -11,6 +11,7 @@ import 'package:orvex/features/player/infrastructure/player_brightness.dart';
 import 'package:orvex/features/player/infrastructure/player_system_volume.dart';
 import 'package:orvex/features/player/presentation/volume_indicator.dart';
 import 'package:orvex/features/player/presentation/playback_surface.dart';
+import 'package:orvex/features/player/presentation/subtitle_style_settings.dart';
 
 import 'support/fakes.dart';
 
@@ -42,6 +43,7 @@ class SurfaceSession extends PlaybackSession {
     bool buffering = false,
     double? rate,
     double? volume,
+    List<MediaTrack>? subtitleTracks,
   }) {
     frame = PlaybackFrame(
       position: Duration(seconds: seconds ?? 30),
@@ -50,6 +52,7 @@ class SurfaceSession extends PlaybackSession {
       buffering: buffering,
       rate: rate ?? frame.rate,
       volume: volume ?? frame.volume,
+      subtitleTracks: subtitleTracks ?? frame.subtitleTracks,
     );
     notifyListeners();
   }
@@ -191,6 +194,132 @@ void main() {
   }
 
   Finder getProgress() => find.byKey(const ValueKey('playback-progress'));
+  testWidgets(
+    'fullscreen subtitle menu opens style settings and preserves subtitle choices',
+    (tester) async {
+      var external = false;
+      final session = await mount(
+        tester,
+        width: 740,
+        height: 350,
+        fullscreen: true,
+        playing: false,
+        onSubtitle: () => external = true,
+      );
+      session.update(
+        playing: false,
+        subtitleTracks: const [MediaTrack('3', '中文字幕')],
+      );
+      await tester.pump();
+      await tester.tap(find.byTooltip('字幕'));
+      await tester.pumpAndSettle();
+      expect(find.text('自动选择'), findsOneWidget);
+      expect(find.text('关闭字幕'), findsOneWidget);
+      expect(find.text('打开外挂字幕…'), findsOneWidget);
+      await tester.tap(find.text('字幕设置…'));
+      await tester.pumpAndSettle();
+      expect(find.byType(SubtitleStyleSettings), findsOneWidget);
+      expect(find.text('字幕设置'), findsOneWidget);
+      expect(session.toggles, 0);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.byType(SubtitleStyleSettings), findsNothing);
+      await tester.tap(find.byTooltip('字幕'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('关闭字幕'));
+      await tester.pumpAndSettle();
+      expect(session.subtitles, contains('no'));
+      await tester.tap(find.byTooltip('字幕'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('中文字幕'));
+      await tester.pumpAndSettle();
+      expect(session.subtitles, contains('3'));
+      await tester.tap(find.byTooltip('字幕'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('打开外挂字幕…'));
+      await tester.pumpAndSettle();
+      expect(external, isTrue);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('subtitle settings suspend and then restore control auto-hide', (
+    tester,
+  ) async {
+    await mount(
+      tester,
+      width: 740,
+      height: 350,
+      fullscreen: true,
+      playing: true,
+    );
+    await tester.tap(find.byTooltip('字幕'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('字幕设置…'));
+    await tester.pumpAndSettle();
+    await tester.pump(const Duration(seconds: 4));
+    expect(
+      tester
+          .widget<AnimatedOpacity>(
+            find.byKey(const ValueKey('playback-controls')),
+          )
+          .opacity,
+      1,
+    );
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    await tester.pump(const Duration(seconds: 4));
+    await tester.pump(const Duration(milliseconds: 200));
+    expect(
+      tester
+          .widget<AnimatedOpacity>(
+            find.byKey(const ValueKey('playback-controls')),
+          )
+          .opacity,
+      0,
+    );
+  });
+
+  for (final fullscreen in [false, true]) {
+    testWidgets(
+      'small ${fullscreen ? 'fullscreen' : 'inline'} subtitle settings return to playback settings',
+      (tester) async {
+        final session = await mount(
+          tester,
+          width: 320,
+          height: 180,
+          fullscreen: fullscreen,
+          playing: true,
+        );
+        await tester.tap(find.byTooltip('播放设置'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byTooltip('字幕'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('字幕设置…'));
+        await tester.pumpAndSettle();
+        expect(find.byType(SubtitleStyleSettings), findsOneWidget);
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        expect(find.byType(SubtitleStyleSettings), findsNothing);
+        expect(find.text('播放设置'), findsOneWidget);
+        await tester.tap(find.byTooltip('字幕'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('关闭字幕'));
+        await tester.pumpAndSettle();
+        expect(session.subtitles, contains('no'));
+        await tester.pump(const Duration(seconds: 4));
+        expect(
+          tester
+              .widget<AnimatedOpacity>(
+                find.byKey(const ValueKey('playback-controls')),
+              )
+              .opacity,
+          1,
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
   testWidgets('fullscreen episode entry follows speed', (tester) async {
     var opened = false;
     await mount(
