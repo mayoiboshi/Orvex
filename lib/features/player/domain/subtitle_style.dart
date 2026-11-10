@@ -69,7 +69,7 @@ class SubtitleStyle {
     return SubtitleStyle(
       delay: number('delay', 0, -10, 10),
       scale: number('scale', 1, .5, 2),
-      position: number('position', 100, 0, 100),
+      position: number('position', 100, 0, 100).roundToDouble(),
       outlineSize: number('outlineSize', 3, 0, 8),
       bold: json['bold'] == true,
       italic: json['italic'] == true,

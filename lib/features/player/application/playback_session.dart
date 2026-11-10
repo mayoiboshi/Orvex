@@ -128,6 +128,27 @@ class PlaybackSession extends ChangeNotifier {
     _notify();
   }
 
+  void clearError() {
+    if (error == null) return;
+    error = null;
+    _notify();
+  }
+
+  void _reportEngineError(String message) {
+    // mpv reports option parsing errors on the same stream as decoding errors.
+    // Limit classification to the exact subtitle options we set ourselves.
+    final subtitleOption = RegExp(
+      r'^The (?:--)?sub-(?:delay|scale|pos|bold|italic|color|border-color|border-size|ass-override) option\b',
+      caseSensitive: false,
+    );
+    if (subtitleOption.hasMatch(message.trimLeft())) {
+      subtitleStyleIssue = '字幕设置未完全应用，部分设置可能已生效';
+      _notify();
+    } else {
+      reportError('播放失败：$message');
+    }
+  }
+
   Future<void> _enqueue(Future<void> Function() action) {
     final result = _operations.then((_) => action());
     _operations = result.catchError((Object exception) {
@@ -200,7 +221,7 @@ class PlaybackSession extends ChangeNotifier {
         active.subscriptions.addAll([
           active.engine.frames.listen((next) => _onFrame(active, next)),
           active.engine.errors.listen((message) {
-            if (_current(active)) reportError('播放失败：$message');
+            if (_current(active)) _reportEngineError(message);
           }),
           active.engine.interruptions.listen((_) {
             if (_current(active)) unawaited(pauseForInterruption());

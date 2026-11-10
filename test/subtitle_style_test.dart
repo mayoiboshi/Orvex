@@ -5,6 +5,7 @@ import 'package:orvex/features/player/application/playback_session.dart';
 import 'package:orvex/features/player/domain/playback_engine.dart';
 import 'package:orvex/features/player/domain/subtitle_style.dart';
 import 'package:orvex/features/player/infrastructure/subtitle_style_preferences.dart';
+import 'package:orvex/features/player/infrastructure/media_kit_engine.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
 import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
@@ -24,6 +25,36 @@ void main() {
     () => SharedPreferencesAsyncPlatform.instance =
         InMemorySharedPreferencesAsync.empty(),
   );
+
+  test('native subtitle options serialize position as an integer', () {
+    Map<String, String> options(SubtitleStyle style) =>
+        subtitleStyleNativeProperties(style, 'yes');
+    expect(options(const SubtitleStyle())['sub-pos'], '100');
+    expect(options(const SubtitleStyle(position: 0))['sub-pos'], '0');
+    expect(options(const SubtitleStyle(position: 80))['sub-pos'], '80');
+    expect(options(const SubtitleStyle(position: 50.6))['sub-pos'], '51');
+    expect(options(const SubtitleStyle(position: -5))['sub-pos'], '0');
+    expect(options(const SubtitleStyle(position: 120))['sub-pos'], '100');
+    final custom = options(
+      const SubtitleStyle(
+        delay: -1.5,
+        scale: 1.25,
+        outlineSize: 4.5,
+        bold: true,
+        italic: true,
+        color: '#FF00FF00',
+        overrideAss: true,
+      ),
+    );
+    expect(custom['sub-delay'], '-1.5');
+    expect(custom['sub-scale'], '1.25');
+    expect(custom['sub-border-size'], '4.5');
+    expect(custom['sub-bold'], 'yes');
+    expect(custom['sub-italic'], 'yes');
+    expect(custom['sub-color'], '#FF00FF00');
+    expect(custom['sub-ass-override'], 'force');
+    expect(SubtitleStyle.fromJson({'position': 82.7}).position, 83);
+  });
 
   test(
     'style preferences tolerate missing and invalid fields and persist choices',
@@ -210,6 +241,34 @@ void main() {
       for (final engine in engines) {
         await engine.cleanUp();
       }
+    },
+  );
+
+  test(
+    'subtitle option errors are distinct from dismissible playback failures',
+    () async {
+      final engine = FakeEngine();
+      final session = PlaybackSession(
+        createEngine: () => engine,
+        resumeStore: MemoryResumeStore(),
+      );
+      await session.open(
+        LocalMedia(uri: Uri.file('/video.mp4'), name: 'video.mp4'),
+      );
+      engine.errorController.add(
+        'The sub-pos option must be an integer: 100.0',
+      );
+      expect(session.error, isNull);
+      expect(session.subtitleStyleIssue, contains('未完全应用'));
+      engine.errorController.add('decoder failed');
+      expect(session.error, '播放失败：decoder failed');
+      session.clearError();
+      expect(session.error, isNull);
+      engine.errorController.add('another decoding failure');
+      expect(session.error, '播放失败：another decoding failure');
+      await session.shutdown();
+      session.dispose();
+      await engine.cleanUp();
     },
   );
 }

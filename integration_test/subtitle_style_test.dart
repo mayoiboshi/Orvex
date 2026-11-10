@@ -85,6 +85,22 @@ void main() {
       await native.setProperty('sub-auto', 'no');
       await player.open(Media(video.path));
       await until(() => player.state.duration.inSeconds > 10);
+      final optionErrors = <String>[];
+      final errors = player.stream.error.listen(optionErrors.add);
+      await native.setProperty('sub-pos', '100.0');
+      await tester.pump(const Duration(milliseconds: 500));
+      debugPrint(
+        'ORVEX_INVALID_POSITION_EVIDENCE errors=$optionErrors readback=${await native.getProperty('sub-pos')}',
+      );
+      expect(
+        optionErrors.any((value) => value.contains('sub-pos')),
+        isTrue,
+        reason: 'A decimal integer option must surface the rejected write',
+      );
+      await native.setProperty('sub-pos', '80');
+      expect(await native.getProperty('sub-pos'), '80');
+      await native.setProperty('sub-pos', '100');
+      await errors.cancel();
       await player.seek(const Duration(seconds: 4));
       await player.pause();
       await player.setSubtitleTrack(SubtitleTrack.uri(subtitle.uri.toString()));
@@ -250,6 +266,10 @@ void main() {
         'open',
       );
       await opening;
+      // mpv emits option parsing failures asynchronously through its error
+      // stream even when reading the unchanged default value appears valid.
+      await tester.pump(const Duration(milliseconds: 500));
+      expect(session.error, isNull, reason: 'default subtitle settings');
       expect(session.subtitleStyleIssue, isEmpty);
       await session.seek(const Duration(seconds: 4));
       await session.pauseForInterruption();
@@ -275,6 +295,8 @@ void main() {
       );
       await session.setSubtitleStyle(const SubtitleStyle(position: 80));
       final srtMoved = await capture();
+      expect(session.error, isNull, reason: 'non-default subtitle position');
+      expect(session.subtitleStyleIssue, isEmpty);
       final srtPositionChanged = changed(srtDefault, srtMoved);
       expect(
         srtPositionChanged,

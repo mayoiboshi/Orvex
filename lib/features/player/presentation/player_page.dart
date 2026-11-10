@@ -73,6 +73,7 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
   String? _seriesSelection;
   Timer? _catalogTimer;
   String? _libraryError;
+  bool _dismissedStartupError = false;
   bool _picking = false;
   LibraryImportStatus? _importStatus;
   LibrarySort _librarySort = defaultLibrarySort;
@@ -676,6 +677,7 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
   );
 
   Widget _buildShell({required bool watching}) {
+    final startupError = _dismissedStartupError ? null : widget.startupError;
     final homeHasResume =
         _tab == 0 &&
         _showContinue &&
@@ -738,11 +740,22 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
                             ),
                           ),
                         ),
-                      if (widget.startupError ?? _libraryError ?? _session.error
+                      if (startupError ?? _libraryError ?? _session.error
                           case final String message)
                         Padding(
                           padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
-                          child: _error(message),
+                          child: _error(
+                            message,
+                            onDismiss: () {
+                              if (startupError != null) {
+                                setState(() => _dismissedStartupError = true);
+                              } else if (_libraryError != null) {
+                                setState(() => _libraryError = null);
+                              } else {
+                                _session.clearError();
+                              }
+                            },
+                          ),
                         ),
                       Expanded(
                         child: watching
@@ -1261,7 +1274,12 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
                 ),
               ),
             if (_session.error case final String message)
-              Positioned(top: 70, left: 20, right: 20, child: _error(message)),
+              Positioned(
+                top: 70,
+                left: 20,
+                right: 20,
+                child: _error(message, onDismiss: _session.clearError),
+              ),
           ],
         ),
       ),
@@ -1284,7 +1302,7 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
     ),
   );
 
-  Widget _error(String message) => Container(
+  Widget _error(String message, {required VoidCallback onDismiss}) => Container(
     width: double.infinity,
     padding: const EdgeInsets.all(18),
     decoration: BoxDecoration(
@@ -1301,6 +1319,12 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
             message,
             style: TextStyle(color: _colors.error),
           ),
+        ),
+        IconButton(
+          tooltip: '关闭错误提示',
+          onPressed: onDismiss,
+          icon: const Icon(Icons.close_rounded),
+          color: _colors.error,
         ),
       ],
     ),

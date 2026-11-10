@@ -11,6 +11,23 @@ import '../domain/playback_defaults.dart';
 import '../domain/playback_engine.dart';
 import '../domain/subtitle_style.dart';
 
+/// Native mpv distinguishes integer options such as sub-pos from floats.
+@visibleForTesting
+Map<String, String> subtitleStyleNativeProperties(
+  SubtitleStyle style,
+  String defaultAssOverride,
+) => {
+  'sub-delay': '${style.delay}',
+  'sub-scale': '${style.scale}',
+  'sub-pos': '${style.position.clamp(0, 100).round()}',
+  'sub-bold': style.bold ? 'yes' : 'no',
+  'sub-italic': style.italic ? 'yes' : 'no',
+  'sub-color': style.color,
+  'sub-border-color': style.outlineColor,
+  'sub-border-size': '${style.outlineSize}',
+  'sub-ass-override': style.overrideAss ? 'force' : defaultAssOverride,
+};
+
 class MediaKitEngine implements PlaybackEngine {
   MediaKitEngine({bool diagnostics = false, this.silentAudioForTesting = false})
     : _player = Player(
@@ -201,17 +218,10 @@ class MediaKitEngine implements PlaybackEngine {
     if (_defaultAssOverride!.isEmpty) {
       throw StateError('不支持字幕设置 sub-ass-override');
     }
-    final properties = <String, String>{
-      'sub-delay': '${style.delay}',
-      'sub-scale': '${style.scale}',
-      'sub-pos': '${style.position}',
-      'sub-bold': style.bold ? 'yes' : 'no',
-      'sub-italic': style.italic ? 'yes' : 'no',
-      'sub-color': style.color,
-      'sub-border-color': style.outlineColor,
-      'sub-border-size': '${style.outlineSize}',
-      'sub-ass-override': style.overrideAss ? 'force' : _defaultAssOverride!,
-    };
+    final properties = subtitleStyleNativeProperties(
+      style,
+      _defaultAssOverride!,
+    );
     for (final property in properties.entries) {
       await native.setProperty(property.key, property.value);
       final actual = await native.getProperty(property.key);

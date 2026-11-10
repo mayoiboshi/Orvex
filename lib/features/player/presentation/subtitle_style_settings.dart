@@ -150,7 +150,7 @@ class _SubtitleStyleSettingsState extends State<SubtitleStyleSettings> {
       const Text('字幕设置', style: TextStyle(fontSize: 18)),
       const SizedBox(height: 6),
       const Text(
-        '文字字幕可调整；图片字幕及画面烧录字幕不支持样式调整。ASS 字幕默认保留原样，位置和样式可能不生效；调整大小或强制覆盖可能改变排版和特效。',
+        '文字字幕可调整；图片字幕及画面烧录字幕不支持样式调整。ASS 字幕默认保留原样，部分效果可能无法调整；改变大小、位置或强制覆盖可能影响排版和特效。',
       ),
       if (widget.session.subtitleStyleIssue.isNotEmpty)
         Text(

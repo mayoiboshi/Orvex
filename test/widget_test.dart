@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:orvex/app/orvex_app.dart';
@@ -133,6 +134,48 @@ void main() {
         }),
       )
       .map((card) => card.key);
+
+  testWidgets('playback errors can be dismissed in and outside fullscreen', (
+    tester,
+  ) async {
+    const fullscreenChannel = MethodChannel(
+      'com.alexmercerind/media_kit_video',
+    );
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(fullscreenChannel, (_) async => null);
+    addTearDown(
+      () => TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(fullscreenChannel, null),
+    );
+    final video = LocalMedia(
+      uri: Uri.file('/local/test.mp4'),
+      name: 'test.mp4',
+    );
+    imports.videos = [video];
+    await mount(tester, const Size(1210, 834));
+    await session.open(video);
+    await tester.pumpAndSettle();
+    engine.errorController.add('decoder failed');
+    await tester.pump();
+    expect(find.text('播放失败：decoder failed').hitTestable(), findsOneWidget);
+    await tester.tap(find.byTooltip('关闭错误提示').hitTestable());
+    await tester.pump();
+    expect(session.error, isNull);
+    await tester.tap(find.byTooltip('全屏播放').hitTestable());
+    await tester.pumpAndSettle();
+    expect(find.byTooltip('退出全屏'), findsWidgets);
+    engine.errorController.add('second failure');
+    await tester.pump();
+    expect(find.text('播放失败：second failure').hitTestable(), findsOneWidget);
+    await tester.tap(find.byTooltip('关闭错误提示').hitTestable());
+    await tester.pump();
+    expect(session.error, isNull);
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.text('播放失败：second failure').hitTestable(), findsNothing);
+    expect(find.byTooltip('关闭错误提示').hitTestable(), findsNothing);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
 
   LocalMedia datedVideo(String name, int day) => LocalMedia(
     uri: Uri.file('/test/$name.mp4'),
