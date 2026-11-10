@@ -136,6 +136,7 @@ void main() {
     bool fullscreen = false,
     bool accessibleNavigation = false,
     TextScaler textScaler = TextScaler.noScaling,
+    ThemeData? theme,
     EdgeInsets padding = EdgeInsets.zero,
     VoidCallback? onFullscreen,
     VoidCallback? onSubtitle,
@@ -148,7 +149,7 @@ void main() {
     final session = SurfaceSession(engine)..update(playing: playing);
     await tester.pumpWidget(
       MaterialApp(
-        theme: ThemeData.dark(),
+        theme: theme ?? ThemeData.dark(),
         home: Scaffold(
           body: Focus(
             autofocus: true,
@@ -204,6 +205,7 @@ void main() {
         height: 350,
         fullscreen: true,
         playing: false,
+        theme: ThemeData.light(),
         onSubtitle: () => external = true,
       );
       session.update(
@@ -216,16 +218,22 @@ void main() {
       expect(find.text('自动选择'), findsOneWidget);
       expect(find.text('关闭字幕'), findsOneWidget);
       expect(find.text('打开外挂字幕…'), findsOneWidget);
+      final panel = find.byKey(const ValueKey('subtitle-menu-panel'));
+      final route = ModalRoute.of(tester.element(panel));
+      final right = tester.getRect(panel).right;
+      expect(Theme.of(tester.element(panel)).brightness, Brightness.dark);
       await tester.tap(find.text('字幕设置…'));
       await tester.pumpAndSettle();
       expect(find.byType(SubtitleStyleSettings), findsOneWidget);
       expect(find.text('字幕设置'), findsOneWidget);
+      expect(ModalRoute.of(tester.element(panel)), same(route));
+      expect(tester.getRect(panel).right, right);
+      expect(find.byTooltip('返回字幕轨道'), findsOneWidget);
       expect(session.toggles, 0);
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
       expect(find.byType(SubtitleStyleSettings), findsNothing);
-      await tester.tap(find.byTooltip('字幕'));
-      await tester.pumpAndSettle();
+      expect(find.text('关闭字幕'), findsOneWidget);
       await tester.tap(find.text('关闭字幕'));
       await tester.pumpAndSettle();
       expect(session.subtitles, contains('no'));
@@ -235,6 +243,8 @@ void main() {
       await tester.pumpAndSettle();
       expect(session.subtitles, contains('3'));
       await tester.tap(find.byTooltip('字幕'));
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text('打开外挂字幕…'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('打开外挂字幕…'));
       await tester.pumpAndSettle();
@@ -268,6 +278,9 @@ void main() {
     );
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
+    expect(find.text('关闭字幕'), findsOneWidget);
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
     await tester.pump(const Duration(seconds: 4));
     await tester.pump(const Duration(milliseconds: 200));
     expect(
@@ -279,6 +292,125 @@ void main() {
       0,
     );
   });
+
+  testWidgets(
+    'subtitle settings stay in one anchored route and outside click closes it',
+    (tester) async {
+      await mount(
+        tester,
+        width: 740,
+        height: 350,
+        fullscreen: true,
+        playing: false,
+      );
+      await tester.tap(find.byTooltip('字幕'));
+      await tester.pumpAndSettle();
+      final panel = find.byKey(const ValueKey('subtitle-menu-panel'));
+      final route = ModalRoute.of(tester.element(panel));
+      final right = tester.getRect(panel).right;
+      await tester.tap(find.text('字幕设置…'));
+      await tester.pumpAndSettle();
+      expect(ModalRoute.of(tester.element(panel)), same(route));
+      expect(tester.getRect(panel).right, right);
+      await tester.tapAt(const Offset(2, 2));
+      await tester.pumpAndSettle();
+      expect(panel, findsNothing);
+      expect(find.byType(SubtitleStyleSettings), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'subtitle menu closes on resize, background, and session switch even with color list open',
+    (tester) async {
+      final session = await mount(
+        tester,
+        width: 740,
+        height: 350,
+        fullscreen: true,
+        playing: false,
+      );
+      Future<void> show() async {
+        await tester.tap(find.byTooltip('字幕'));
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(const ValueKey('subtitle-menu-panel')),
+          findsOneWidget,
+        );
+      }
+
+      await show();
+      tester.binding.handleMetricsChanged();
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('subtitle-menu-panel')), findsNothing);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pumpAndSettle();
+      await show();
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+      await tester.pumpAndSettle();
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('subtitle-menu-panel')), findsNothing);
+      await show();
+      await tester.tap(find.text('字幕设置…'));
+      await tester.pumpAndSettle();
+      final color = find.byType(DropdownButton<String>).first;
+      await tester.ensureVisible(color);
+      await tester.pumpAndSettle();
+      await tester.tap(color);
+      await tester.pumpAndSettle();
+      expect(find.text('黄色'), findsWidgets);
+      final replacement = FakeEngine();
+      session.player = replacement;
+      session.update(playing: false);
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('subtitle-menu-panel')), findsNothing);
+      expect(find.byType(SubtitleStyleSettings), findsNothing);
+      expect(find.text('黄色'), findsNothing);
+      await replacement.cleanUp();
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'subtitle menu remains within a small screen with large text and keyboard return',
+    (tester) async {
+      tester.view.physicalSize = const Size(400, 240);
+      tester.view.devicePixelRatio = 1;
+      tester.platformDispatcher.textScaleFactorTestValue = 1.5;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      await mount(
+        tester,
+        width: 320,
+        height: 180,
+        fullscreen: true,
+        playing: false,
+      );
+      await tester.tap(find.byTooltip('播放设置'));
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.byTooltip('字幕'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('字幕'));
+      await tester.pumpAndSettle();
+      final panel = find.byKey(const ValueKey('subtitle-menu-panel'));
+      final rect = tester.getRect(panel);
+      expect(rect.left, greaterThanOrEqualTo(0));
+      expect(rect.right, lessThanOrEqualTo(400));
+      expect(rect.top, greaterThanOrEqualTo(0));
+      expect(rect.bottom, lessThanOrEqualTo(240));
+      await tester.ensureVisible(find.text('字幕设置…'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('字幕设置…'));
+      await tester.pumpAndSettle();
+      expect(find.byType(SubtitleStyleSettings), findsOneWidget);
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await tester.pumpAndSettle();
+      expect(find.byType(SubtitleStyleSettings), findsNothing);
+      expect(find.text('关闭字幕'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   for (final fullscreen in [false, true]) {
     testWidgets(
@@ -302,8 +434,7 @@ void main() {
         await tester.pumpAndSettle();
         expect(find.byType(SubtitleStyleSettings), findsNothing);
         expect(find.text('播放设置'), findsOneWidget);
-        await tester.tap(find.byTooltip('字幕'));
-        await tester.pumpAndSettle();
+        expect(find.text('关闭字幕'), findsOneWidget);
         await tester.tap(find.text('关闭字幕'));
         await tester.pumpAndSettle();
         expect(session.subtitles, contains('no'));

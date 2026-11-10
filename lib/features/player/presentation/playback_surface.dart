@@ -11,7 +11,7 @@ import '../infrastructure/player_brightness.dart';
 import '../infrastructure/player_system_volume.dart';
 import '../../subtitles/domain/subtitle_models.dart';
 import 'volume_indicator.dart';
-import 'subtitle_style_settings.dart';
+import 'subtitle_menu.dart';
 
 String formatTime(Duration value) {
   final seconds = value.inSeconds.clamp(0, 1 << 32);
@@ -21,8 +21,6 @@ String formatTime(Duration value) {
       ? '${seconds ~/ 3600}:$minutes:$remainder'
       : '$minutes:$remainder';
 }
-
-enum _TrackMenuAction { external, subtitleSettings }
 
 class PlaybackSurface extends StatefulWidget {
   const PlaybackSurface({
@@ -1362,56 +1360,38 @@ class _PlaybackSurfaceState extends State<PlaybackSurface>
     }
   }
 
-  Future<void> _showSubtitleStyleSettings({required bool inSettings}) async {
-    if (!inSettings) _openedMenu();
-    try {
-      await showModalBottomSheet<void>(
-        context: context,
-        useSafeArea: true,
-        isScrollControlled: true,
-        showDragHandle: true,
-        backgroundColor: OrvexColors.of(context).surface,
-        builder: (_) => ListenableBuilder(
-          listenable: session,
-          builder: (context, _) => SafeArea(
-            top: false,
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-              child: SubtitleStyleSettings(session: session),
-            ),
-          ),
+  Widget _tracks({required bool audio, bool inSettings = false}) {
+    if (!audio) {
+      return Builder(
+        builder: (anchorContext) => IconButton(
+          tooltip: '字幕',
+          icon: const Icon(Icons.subtitles_outlined, size: 20),
+          onPressed: () async {
+            if (!inSettings) _openedMenu();
+            try {
+              await showSubtitleMenu(
+                anchorContext: anchorContext,
+                session: session,
+                onSubtitle: widget.onSubtitle,
+                inSettings: inSettings,
+              );
+            } finally {
+              if (!inSettings) _closedMenu();
+            }
+          },
         ),
       );
-    } finally {
-      if (!inSettings) _closedMenu();
     }
-  }
-
-  Widget _tracks({required bool audio, bool inSettings = false}) {
     final frame = session.frame;
-    final tracks = audio ? frame.audioTracks : frame.subtitleTracks;
-    final selected = audio ? frame.audioTrackId : frame.subtitleTrackId;
-    final label = audio ? '音轨' : '字幕';
-    final icon = Icon(
-      audio ? Icons.audiotrack_outlined : Icons.subtitles_outlined,
-      size: 20,
-    );
-    return PopupMenuButton<Object>(
-      tooltip: label,
-      icon: icon,
+    final tracks = frame.audioTracks;
+    final selected = frame.audioTrackId;
+    return PopupMenuButton<String>(
+      tooltip: '音轨',
+      icon: const Icon(Icons.audiotrack_outlined, size: 20),
       onOpened: _openedMenu,
       onCanceled: inSettings ? null : _closedMenu,
       onSelected: (id) {
-        if (id == _TrackMenuAction.subtitleSettings) {
-          unawaited(_showSubtitleStyleSettings(inSettings: inSettings));
-          return;
-        } else if (id == _TrackMenuAction.external) {
-          widget.onSubtitle();
-        } else if (id is String && audio) {
-          unawaited(session.selectAudio(id));
-        } else if (id is String) {
-          unawaited(session.selectSubtitle(id));
-        }
+        unawaited(session.selectAudio(id));
         if (!inSettings) _closedMenu();
       },
       itemBuilder: (_) => [
@@ -1423,7 +1403,7 @@ class _PlaybackSurfaceState extends State<PlaybackSurface>
         CheckedPopupMenuItem<String>(
           value: 'no',
           checked: session.error == null && selected == 'no',
-          child: Text(audio ? '关闭音轨' : '关闭字幕'),
+          child: const Text('关闭音轨'),
         ),
         for (final track in tracks)
           CheckedPopupMenuItem<String>(
@@ -1431,18 +1411,6 @@ class _PlaybackSurfaceState extends State<PlaybackSurface>
             checked: session.error == null && selected == track.id,
             child: Text(track.label),
           ),
-        if (!audio) ...[
-          const PopupMenuDivider(),
-          const PopupMenuItem(
-            value: _TrackMenuAction.subtitleSettings,
-            child: Text('字幕设置…'),
-          ),
-          if (!inSettings)
-            const PopupMenuItem(
-              value: _TrackMenuAction.external,
-              child: Text('打开外挂字幕…'),
-            ),
-        ],
       ],
     );
   }

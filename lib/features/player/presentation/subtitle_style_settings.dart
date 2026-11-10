@@ -6,8 +6,13 @@ import '../application/playback_session.dart';
 import '../domain/subtitle_style.dart';
 
 class SubtitleStyleSettings extends StatefulWidget {
-  const SubtitleStyleSettings({super.key, required this.session});
+  const SubtitleStyleSettings({
+    super.key,
+    required this.session,
+    this.showTitle = true,
+  });
   final PlaybackSession session;
+  final bool showTitle;
 
   @override
   State<SubtitleStyleSettings> createState() => _SubtitleStyleSettingsState();
@@ -147,8 +152,10 @@ class _SubtitleStyleSettingsState extends State<SubtitleStyleSettings> {
   Widget build(BuildContext context) => Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
-      const Text('字幕设置', style: TextStyle(fontSize: 18)),
-      const SizedBox(height: 6),
+      if (widget.showTitle) ...[
+        const Text('字幕设置', style: TextStyle(fontSize: 18)),
+        const SizedBox(height: 6),
+      ],
       const Text(
         '文字字幕可调整；图片字幕及画面烧录字幕不支持样式调整。ASS 字幕默认保留原样，部分效果可能无法调整；改变大小、位置或强制覆盖可能影响排版和特效。',
       ),
