@@ -17,6 +17,9 @@ class FakeEngine implements PlaybackEngine {
   final subtitleStyles = <SubtitleStyle>[];
   bool failSubtitleStyle = false;
   Completer<void>? subtitleStyleGate;
+  Completer<void>? subtitleSelectionGate;
+  bool failSubtitleSelection = false;
+  String? confirmedSubtitleId;
   Duration? openedAt;
   Completer<void>? openGate;
   bool disposed = false;
@@ -78,7 +81,14 @@ class FakeEngine implements PlaybackEngine {
   }
 
   @override
-  Future<void> selectSubtitle(String id) async {}
+  Future<void> selectSubtitle(String id) async {
+    if (subtitleSelectionGate != null) await subtitleSelectionGate!.future;
+    if (failSubtitleSelection) throw StateError('subtitle selection failed');
+  }
+
+  @override
+  Future<String?> confirmedSubtitleTrackId() async => confirmedSubtitleId;
+
   @override
   Future<void> loadSubtitle(Uri uri, String name) async {
     if (failSubtitle) throw StateError('unreadable subtitle');

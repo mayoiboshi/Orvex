@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../application/playback_session.dart';
+import '../domain/playback_engine.dart';
 import '../domain/subtitle_style.dart';
 
 class SubtitleStyleSettings extends StatefulWidget {
@@ -21,7 +22,12 @@ class SubtitleStyleSettings extends StatefulWidget {
 class _SubtitleStyleSettingsState extends State<SubtitleStyleSettings> {
   late SubtitleStyle _style = widget.session.subtitleStyle;
   bool _dragging = false;
+  bool _draggingAssStyle = false;
   Timer? _previewTimer;
+
+  bool get _assStyleLocked =>
+      widget.session.currentSubtitleFormat == SubtitleTrackFormat.ass &&
+      !_style.overrideAss;
 
   @override
   void didUpdateWidget(covariant SubtitleStyleSettings oldWidget) {
@@ -33,6 +39,14 @@ class _SubtitleStyleSettingsState extends State<SubtitleStyleSettings> {
         oldWidget.session.previewSubtitleStyle(oldWidget.session.subtitleStyle),
       );
       _dragging = false;
+    }
+    if (_dragging && _draggingAssStyle && _assStyleLocked) {
+      _previewTimer?.cancel();
+      _previewTimer = null;
+      _dragging = false;
+      unawaited(
+        widget.session.previewSubtitleStyle(widget.session.subtitleStyle),
+      );
     }
     if (oldWidget.session != widget.session ||
         (!_dragging && !identical(_style, widget.session.subtitleStyle))) {
@@ -63,8 +77,10 @@ class _SubtitleStyleSettingsState extends State<SubtitleStyleSettings> {
     double max,
     int divisions,
     String suffix,
-    SubtitleStyle Function(double) change,
-  ) => Column(
+    SubtitleStyle Function(double) change, {
+    bool enabled = true,
+    bool assStyle = false,
+  }) => Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
       Text('$label  ${value.toStringAsFixed(label == '位置' ? 0 : 1)}$suffix'),
@@ -78,24 +94,32 @@ class _SubtitleStyleSettingsState extends State<SubtitleStyleSettings> {
           label: '$label ${value.toStringAsFixed(1)}$suffix',
           semanticFormatterCallback: (next) =>
               '${next.toStringAsFixed(label == '位置' ? 0 : 1)}$suffix',
-          onChanged: (next) {
-            setState(() {
-              _dragging = true;
-              _style = change(next);
-            });
-            _previewTimer ??= Timer(const Duration(milliseconds: 120), () {
-              _previewTimer = null;
-              if (mounted && _dragging) {
-                unawaited(widget.session.previewSubtitleStyle(_style));
-              }
-            });
-          },
-          onChangeEnd: (next) {
-            _previewTimer?.cancel();
-            _previewTimer = null;
-            _dragging = false;
-            _commit(change(next));
-          },
+          onChanged: !enabled
+              ? null
+              : (next) {
+                  setState(() {
+                    _dragging = true;
+                    _draggingAssStyle = assStyle;
+                    _style = change(next);
+                  });
+                  _previewTimer ??= Timer(
+                    const Duration(milliseconds: 120),
+                    () {
+                      _previewTimer = null;
+                      if (mounted && _dragging) {
+                        unawaited(widget.session.previewSubtitleStyle(_style));
+                      }
+                    },
+                  );
+                },
+          onChangeEnd: !enabled
+              ? null
+              : (next) {
+                  _previewTimer?.cancel();
+                  _previewTimer = null;
+                  _dragging = false;
+                  _commit(change(next));
+                },
         ),
       ),
     ],
@@ -110,7 +134,12 @@ class _SubtitleStyleSettingsState extends State<SubtitleStyleSettings> {
     '#FF00FF00': '绿色',
   };
 
-  Widget _color(String title, String value, ValueChanged<String> update) => Row(
+  Widget _color(
+    String title,
+    String value,
+    ValueChanged<String> update, {
+    bool enabled = true,
+  }) => Row(
     children: [
       Expanded(child: Text(title)),
       DropdownButton<String>(
@@ -141,9 +170,11 @@ class _SubtitleStyleSettingsState extends State<SubtitleStyleSettings> {
               ),
             ),
         ],
-        onChanged: (next) {
-          if (next != null) update(next);
-        },
+        onChanged: !enabled
+            ? null
+            : (next) {
+                if (next != null) update(next);
+              },
       ),
     ],
   );
@@ -193,21 +224,49 @@ class _SubtitleStyleSettingsState extends State<SubtitleStyleSettings> {
       ),
       SwitchListTile(
         contentPadding: EdgeInsets.zero,
+        title: const Text('覆盖 ASS 原有样式'),
+        subtitle: const Text('关闭后恢复字幕文件自带的排版和样式。'),
+        value: _style.overrideAss,
+        onChanged: (v) => _commit(_style.copyWith(overrideAss: v)),
+      ),
+      if (_assStyleLocked)
+        Semantics(
+          liveRegion: true,
+          child: const Text('当前字幕为 ASS/SSA；开启覆盖 ASS 原有样式后，粗斜体、颜色和描边设置才可调整。'),
+        )
+      else if (widget.session.currentSubtitleFormat ==
+          SubtitleTrackFormat.unknown)
+        const Text('当前字幕格式未知，可在字幕菜单手动选择具体轨道后识别；如果是 ASS/SSA，部分样式需开启覆盖后才会生效。')
+      else if (widget.session.currentSubtitleFormat ==
+          SubtitleTrackFormat.bitmap)
+        const Text('当前为图片字幕，无法调整文字样式。'),
+      SwitchListTile(
+        contentPadding: EdgeInsets.zero,
         title: const Text('粗体'),
         value: _style.bold,
-        onChanged: (v) => _commit(_style.copyWith(bold: v)),
+        onChanged: _assStyleLocked
+            ? null
+            : (v) => _commit(_style.copyWith(bold: v)),
       ),
       SwitchListTile(
         contentPadding: EdgeInsets.zero,
         title: const Text('斜体'),
         value: _style.italic,
-        onChanged: (v) => _commit(_style.copyWith(italic: v)),
+        onChanged: _assStyleLocked
+            ? null
+            : (v) => _commit(_style.copyWith(italic: v)),
       ),
-      _color('文字颜色', _style.color, (v) => _commit(_style.copyWith(color: v))),
+      _color(
+        '文字颜色',
+        _style.color,
+        (v) => _commit(_style.copyWith(color: v)),
+        enabled: !_assStyleLocked,
+      ),
       _color(
         '描边颜色',
         _style.outlineColor,
         (v) => _commit(_style.copyWith(outlineColor: v)),
+        enabled: !_assStyleLocked,
       ),
       _slider(
         '描边粗细',
@@ -217,13 +276,8 @@ class _SubtitleStyleSettingsState extends State<SubtitleStyleSettings> {
         16,
         '',
         (v) => _style.copyWith(outlineSize: v),
-      ),
-      SwitchListTile(
-        contentPadding: EdgeInsets.zero,
-        title: const Text('覆盖 ASS 原有样式'),
-        subtitle: const Text('关闭后恢复字幕文件自带的排版和样式。'),
-        value: _style.overrideAss,
-        onChanged: (v) => _commit(_style.copyWith(overrideAss: v)),
+        enabled: !_assStyleLocked,
+        assStyle: true,
       ),
       Align(
         alignment: Alignment.centerRight,

@@ -57,11 +57,14 @@ bool validImportPath(String path) {
       );
 }
 
+enum SubtitleTrackFormat { ass, text, bitmap, unknown }
+
 class MediaTrack {
-  const MediaTrack(this.id, this.label, {this.language});
+  const MediaTrack(this.id, this.label, {this.language, this.codec});
   final String id;
   final String label;
   final String? language;
+  final String? codec;
 }
 
 class PlaybackFrame {
@@ -108,6 +111,9 @@ abstract interface class PlaybackEngine {
   Future<void> setSubtitleStyle(SubtitleStyle style);
   Future<void> selectAudio(String id);
   Future<void> selectSubtitle(String id);
+
+  /// Native selected subtitle ID after a command, or null when unconfirmed.
+  Future<String?> confirmedSubtitleTrackId();
   Future<void> loadSubtitle(Uri uri, String name);
   Future<void> dispose();
 }

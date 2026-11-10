@@ -80,6 +80,7 @@ class _SubtitleEngine extends FakeEngine {
   final tracks = <MediaTrack>[];
   final ids = <Uri, String>{};
   String current = 'auto';
+  Completer<void>? selectionGate;
   void emit() => frameController.add(
     PlaybackFrame(
       duration: const Duration(minutes: 20),
@@ -111,6 +112,7 @@ class _SubtitleEngine extends FakeEngine {
 
   @override
   Future<void> selectSubtitle(String id) async {
+    if (selectionGate != null) await selectionGate!.future;
     selected.add(id);
     current = id;
     emit();
@@ -149,6 +151,118 @@ void main() {
     sessions.add(session);
     return session;
   }
+
+  test(
+    'changing automatic matching clears an invalidated queued track selection',
+    () async {
+      final session = create(
+        embedded: const [
+          MediaTrack('1', 'ASS', codec: 'ass'),
+          MediaTrack('2', 'SRT', codec: 'subrip'),
+        ],
+      );
+      await session.open(_one);
+      await session.subtitlesReady;
+      final engine = engines.last;
+      engine.current = '1';
+      engine.emit();
+      expect(session.currentSubtitleFormat, SubtitleTrackFormat.ass);
+      engine.subtitleStyleGate = Completer<void>();
+      final blocking = session.setSubtitleStyle(
+        session.subtitleStyle.copyWith(scale: 1.1),
+      );
+      await Future<void>.delayed(Duration.zero);
+      final selection = session.selectSubtitle('2');
+      expect(session.currentSubtitleFormat, SubtitleTrackFormat.unknown);
+      await session.setAutomaticSubtitleMatching(false);
+      await session.subtitlesReady;
+      expect(session.currentSubtitleFormat, SubtitleTrackFormat.ass);
+      engine.subtitleStyleGate!.complete();
+      await Future.wait([blocking, selection]);
+      expect(engine.selected, isNot(contains('2')));
+      expect(session.currentSubtitleFormat, SubtitleTrackFormat.ass);
+    },
+  );
+
+  test('changing automatic matching keeps an executing track selection unconfirmed until its frame', () async {
+    final session = create(
+      embedded: const [
+        MediaTrack('1', 'ASS', codec: 'ass'),
+        MediaTrack('2', 'SRT', codec: 'subrip'),
+      ],
+    );
+    await session.open(_one);
+    await session.subtitlesReady;
+    final engine = engines.last;
+    engine.current = '1';
+    engine.emit();
+    engine.selectionGate = Completer<void>();
+    final selection = session.selectSubtitle('2');
+    await Future<void>.delayed(Duration.zero);
+    expect(session.currentSubtitleFormat, SubtitleTrackFormat.unknown);
+    await session.setAutomaticSubtitleMatching(false);
+    await session.subtitlesReady;
+    expect(session.currentSubtitleFormat, SubtitleTrackFormat.unknown);
+    engine.selectionGate!.complete();
+    await selection;
+    expect(engine.selected, contains('2'));
+    expect(session.currentSubtitleFormat, SubtitleTrackFormat.text);
+  });
+
+  test('automatic toggle during executing and queued selections stays unknown until a fresh choice', () async {
+    final session = create(
+      embedded: const [
+        MediaTrack('1', 'ASS', codec: 'ass'),
+        MediaTrack('2', 'SRT', codec: 'subrip'),
+        MediaTrack('3', 'ASS 2', codec: 'ass'),
+      ],
+    );
+    await session.open(_one);
+    await session.subtitlesReady;
+    final engine = engines.last;
+    engine.current = '1';
+    engine.emit();
+    engine.selectionGate = Completer<void>();
+    final executing = session.selectSubtitle('2');
+    await Future<void>.delayed(Duration.zero);
+    final queued = session.selectSubtitle('3');
+    await session.setAutomaticSubtitleMatching(false);
+    await session.subtitlesReady;
+    expect(session.currentSubtitleFormat, SubtitleTrackFormat.unknown);
+    engine.selectionGate!.complete();
+    await Future.wait([executing, queued]);
+    expect(engine.selected, contains('2'));
+    expect(engine.selected, isNot(contains('3')));
+    expect(session.currentSubtitleFormat, SubtitleTrackFormat.unknown);
+    await session.selectSubtitle('2');
+    expect(session.currentSubtitleFormat, SubtitleTrackFormat.text);
+  });
+
+  test(
+    'reselecting the displayed track waits for an older running selection',
+    () async {
+      final session = create(
+        embedded: const [
+          MediaTrack('1', 'ASS', codec: 'ass'),
+          MediaTrack('2', 'SRT', codec: 'subrip'),
+        ],
+      );
+      await session.open(_one);
+      await session.subtitlesReady;
+      final engine = engines.last;
+      engine.current = '1';
+      engine.emit();
+      engine.selectionGate = Completer<void>();
+      final earlier = session.selectSubtitle('2');
+      await Future<void>.delayed(Duration.zero);
+      final latest = session.selectSubtitle('1');
+      expect(session.currentSubtitleFormat, SubtitleTrackFormat.unknown);
+      engine.selectionGate!.complete();
+      await Future.wait([earlier, latest]);
+      expect(engine.selected, ['2', '1']);
+      expect(session.currentSubtitleFormat, SubtitleTrackFormat.ass);
+    },
+  );
 
   test(
     'subtitle language uses tags and respects existing media memory',

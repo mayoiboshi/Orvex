@@ -109,6 +109,12 @@ void main() {
             player.state.track.subtitle.id != 'no' &&
             player.state.track.subtitle.id != 'auto',
       );
+      debugPrint(
+        'ORVEX_TRACK_CODEC_EVIDENCE SRT=${player.state.tracks.subtitle.map((track) => '${track.id}:${track.codec}').join(',')}',
+      );
+      debugPrint(
+        'ORVEX_SID_EVIDENCE explicit-srt native=${await native.getProperty('sid')} mediaKit=${player.state.track.subtitle.id}',
+      );
       final baseline = await capture();
       await native.setProperty('sub-back-color', '#FF00FF00');
       await native.setProperty('sub-shadow-offset', '6');
@@ -166,6 +172,25 @@ void main() {
       await native.setProperty('sub-ass-override', 'yes');
       await player.setSubtitleTrack(SubtitleTrack.uri(ass.uri.toString()));
       await until(() => player.state.tracks.subtitle.length >= 2);
+      debugPrint(
+        'ORVEX_TRACK_CODEC_EVIDENCE ASS=${player.state.tracks.subtitle.map((track) => '${track.id}:${track.codec}').join(',')}',
+      );
+      final assTrackId = player.state.track.subtitle.id;
+      debugPrint(
+        'ORVEX_SID_EVIDENCE explicit-ass native=${await native.getProperty('sid')} mediaKit=$assTrackId',
+      );
+      await player.setSubtitleTrack(SubtitleTrack.auto());
+      await tester.pump(const Duration(milliseconds: 500));
+      debugPrint(
+        'ORVEX_SID_EVIDENCE auto native=${await native.getProperty('sid')} mediaKit=${player.state.track.subtitle.id}',
+      );
+      await player.setSubtitleTrack(SubtitleTrack.no());
+      await tester.pump(const Duration(milliseconds: 500));
+      debugPrint(
+        'ORVEX_SID_EVIDENCE off native=${await native.getProperty('sid')} mediaKit=${player.state.track.subtitle.id}',
+      );
+      await player.setSubtitleTrack(SubtitleTrack(assTrackId, null, null));
+      await tester.pump(const Duration(milliseconds: 500));
       final oldDefaultAss = await capture();
       await native.setProperty('sub-ass-override', 'no');
       final newDefaultAss = await capture();
@@ -281,7 +306,44 @@ void main() {
             session.frame.subtitleTrackId != 'auto',
         'SRT selected',
       );
+      await until(
+        () => session.currentSubtitleFormat == SubtitleTrackFormat.text,
+        'SRT format',
+      );
+      final srtSid = await session.engine!.confirmedSubtitleTrackId();
+      debugPrint(
+        'ORVEX_SESSION_FORMAT srt sid=$srtSid frame=${session.frame.subtitleTrackId} format=${session.currentSubtitleFormat}',
+      );
+      expect(srtSid, session.frame.subtitleTrackId);
       final srtDefault = await capture();
+      for (final overrideAss in [false, true]) {
+        for (final setting in ['bold', 'italic']) {
+          await session.setSubtitleStyle(
+            SubtitleStyle(overrideAss: overrideAss),
+          );
+          final base = await capture();
+          await session.setSubtitleStyle(
+            SubtitleStyle(
+              overrideAss: overrideAss,
+              bold: setting == 'bold',
+              italic: setting == 'italic',
+            ),
+          );
+          final styled = await capture();
+          expect(session.subtitleStyleIssue, isEmpty);
+          expect(session.error, isNull);
+          final difference = changed(base, styled);
+          expect(
+            difference,
+            greaterThan(50),
+            reason: 'SRT $setting must change pixels',
+          );
+          debugPrint(
+            'ORVEX_WEIGHT_EVIDENCE srt override=$overrideAss $setting changed=$difference',
+          );
+        }
+      }
+      await session.setSubtitleStyle(const SubtitleStyle());
       await session.setSubtitleStyle(
         const SubtitleStyle(color: '#FF00FF00', scale: 1.5),
       );
@@ -307,6 +369,13 @@ void main() {
       final srtDelayed = await capture();
       await session.selectSubtitle('no');
       final srtHidden = await capture();
+      await until(
+        () => session.currentSubtitleFormat == SubtitleTrackFormat.unknown,
+        'closed format',
+      );
+      debugPrint(
+        'ORVEX_SESSION_FORMAT off sid=${await session.engine!.confirmedSubtitleTrackId()} frame=${session.frame.subtitleTrackId} format=${session.currentSubtitleFormat}',
+      );
       final delayedVsHidden = changed(srtDelayed, srtHidden);
       expect(
         delayedVsHidden,
@@ -321,7 +390,60 @@ void main() {
         () => session.frame.subtitleTracks.length >= 2,
         'ASS selected',
       );
+      await until(
+        () => session.currentSubtitleFormat == SubtitleTrackFormat.ass,
+        'ASS format',
+      );
+      final assSid = await session.engine!.confirmedSubtitleTrackId();
+      debugPrint(
+        'ORVEX_SESSION_FORMAT ass sid=$assSid frame=${session.frame.subtitleTrackId} format=${session.currentSubtitleFormat}',
+      );
+      expect(assSid, session.frame.subtitleTrackId);
+      await session.selectSubtitle('auto');
+      await tester.pump(const Duration(milliseconds: 600));
+      final autoSid = await session.engine!.confirmedSubtitleTrackId();
+      debugPrint(
+        'ORVEX_SESSION_FORMAT auto sid=$autoSid frame=${session.frame.subtitleTrackId} format=${session.currentSubtitleFormat}',
+      );
+      if (autoSid == null ||
+          autoSid == 'no' ||
+          autoSid != session.frame.subtitleTrackId) {
+        expect(session.currentSubtitleFormat, SubtitleTrackFormat.unknown);
+      }
+      await session.selectSubtitle(assSid!);
+      await until(
+        () => session.currentSubtitleFormat == SubtitleTrackFormat.ass,
+        'ASS restored',
+      );
       final assDefault = await capture();
+      for (final overrideAss in [false, true]) {
+        for (final setting in ['bold', 'italic']) {
+          await session.setSubtitleStyle(
+            SubtitleStyle(overrideAss: overrideAss),
+          );
+          final base = await capture();
+          await session.setSubtitleStyle(
+            SubtitleStyle(
+              overrideAss: overrideAss,
+              bold: setting == 'bold',
+              italic: setting == 'italic',
+            ),
+          );
+          final styled = await capture();
+          expect(session.subtitleStyleIssue, isEmpty);
+          expect(session.error, isNull);
+          final difference = changed(base, styled);
+          expect(
+            difference,
+            overrideAss ? greaterThan(50) : lessThan(20),
+            reason:
+                'ASS $setting should ${overrideAss ? 'apply' : 'preserve authored styling'}',
+          );
+          debugPrint(
+            'ORVEX_WEIGHT_EVIDENCE ass override=$overrideAss $setting changed=$difference',
+          );
+        }
+      }
       await session.setSubtitleStyle(const SubtitleStyle(color: '#FF00FF00'));
       expect(session.subtitleStyleIssue, isEmpty);
       final assPreserved = await capture();

@@ -151,6 +151,7 @@ class MediaKitEngine implements PlaybackEngine {
               track.id,
               label(track.id, track.title, track.language),
               language: track.language,
+              codec: track.codec,
             ),
       ],
       audioTrackId: state.track.audio.id,
@@ -245,6 +246,13 @@ class MediaKitEngine implements PlaybackEngine {
   @override
   Future<void> selectSubtitle(String id) =>
       _player.setSubtitleTrack(SubtitleTrack(id, null, null));
+  @override
+  Future<String?> confirmedSubtitleTrackId() async {
+    final value = (await (_player.platform as NativePlayer).getProperty('sid'))
+        .trim();
+    return value == 'no' || int.tryParse(value) != null ? value : null;
+  }
+
   @override
   Future<void> loadSubtitle(Uri uri, String name) async {
     if (uri.scheme == 'file' && !await File.fromUri(uri).exists()) {

@@ -271,4 +271,104 @@ void main() {
       await engine.cleanUp();
     },
   );
+
+  test(
+    'format stays unknown during asynchronous subtitle-track changes',
+    () async {
+      final engine = FakeEngine();
+      final session = PlaybackSession(
+        createEngine: () => engine,
+        resumeStore: MemoryResumeStore(),
+      );
+      await session.open(
+        LocalMedia(uri: Uri.file('/video.mp4'), name: 'video.mp4'),
+      );
+      const tracks = [
+        MediaTrack('1', 'ASS', codec: 'ass'),
+        MediaTrack('2', 'SRT', codec: 'subrip'),
+      ];
+      engine.frameController.add(
+        const PlaybackFrame(subtitleTracks: tracks, subtitleTrackId: '1'),
+      );
+      expect(session.currentSubtitleFormat, SubtitleTrackFormat.ass);
+      engine.subtitleSelectionGate = Completer<void>();
+      final changing = session.selectSubtitle('2');
+      expect(session.currentSubtitleFormat, SubtitleTrackFormat.unknown);
+      await Future<void>.delayed(Duration.zero);
+      engine.frameController.add(
+        const PlaybackFrame(subtitleTracks: tracks, subtitleTrackId: '1'),
+      );
+      expect(session.currentSubtitleFormat, SubtitleTrackFormat.unknown);
+      engine.subtitleSelectionGate!.complete();
+      await changing;
+      expect(session.currentSubtitleFormat, SubtitleTrackFormat.unknown);
+      engine.frameController.add(
+        const PlaybackFrame(subtitleTracks: tracks, subtitleTrackId: '2'),
+      );
+      expect(session.currentSubtitleFormat, SubtitleTrackFormat.text);
+      await session.shutdown();
+      session.dispose();
+      await engine.cleanUp();
+    },
+  );
+
+  test(
+    'auto track waits for command completion and confirmed selected id',
+    () async {
+      final engine = FakeEngine();
+      final session = PlaybackSession(
+        createEngine: () => engine,
+        resumeStore: MemoryResumeStore(),
+      );
+      await session.selectSubtitle(
+        '2',
+      ); // No engine yet; must not leave a pending barrier.
+      await session.open(
+        LocalMedia(uri: Uri.file('/video.mp4'), name: 'video.mp4'),
+      );
+      const tracks = [
+        MediaTrack('1', 'ASS', codec: 'ass'),
+        MediaTrack('2', 'SRT', codec: 'subrip'),
+      ];
+      engine.frameController.add(
+        const PlaybackFrame(subtitleTracks: tracks, subtitleTrackId: '1'),
+      );
+      expect(session.currentSubtitleFormat, SubtitleTrackFormat.ass);
+      engine.subtitleSelectionGate = Completer<void>();
+      engine.confirmedSubtitleId = '2';
+      final changing = session.selectSubtitle('auto');
+      await Future<void>.delayed(Duration.zero);
+      for (var i = 0; i < 3; i++) {
+        engine.frameController.add(
+          const PlaybackFrame(subtitleTracks: tracks, subtitleTrackId: '1'),
+        );
+        expect(session.currentSubtitleFormat, SubtitleTrackFormat.unknown);
+      }
+      engine.subtitleSelectionGate!.complete();
+      await changing;
+      expect(session.currentSubtitleFormat, SubtitleTrackFormat.unknown);
+      engine.frameController.add(
+        const PlaybackFrame(subtitleTracks: tracks, subtitleTrackId: '2'),
+      );
+      expect(session.currentSubtitleFormat, SubtitleTrackFormat.text);
+      engine.subtitleSelectionGate = null;
+      engine.confirmedSubtitleId = null;
+      await session.selectSubtitle('auto');
+      engine.frameController.add(
+        const PlaybackFrame(subtitleTracks: tracks, subtitleTrackId: '1'),
+      );
+      expect(session.currentSubtitleFormat, SubtitleTrackFormat.unknown);
+      await session.selectSubtitle(
+        '1',
+      ); // Selecting an already active explicit ID recovers.
+      expect(session.currentSubtitleFormat, SubtitleTrackFormat.ass);
+      engine.failSubtitleSelection = true;
+      await session.selectSubtitle('2');
+      expect(session.currentSubtitleFormat, SubtitleTrackFormat.ass);
+      expect(session.error, contains('操作失败'));
+      await session.shutdown();
+      session.dispose();
+      await engine.cleanUp();
+    },
+  );
 }

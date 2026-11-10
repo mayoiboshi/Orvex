@@ -51,6 +51,88 @@ class PlaybackSession extends ChangeNotifier {
   Future<void> get subtitlesReady => _subtitleRestoration;
   String? get selectedLocalSubtitle =>
       _active?.externalTracks[frame.subtitleTrackId]?.key;
+  String? _pendingSubtitleTrack;
+  String? _pendingSubtitleExpected;
+  bool _pendingSubtitleComplete = false;
+  int? _inFlightSubtitleGeneration;
+  int _subtitleSelectionGeneration = 0;
+
+  void _clearPendingSubtitle() {
+    _pendingSubtitleTrack = null;
+    _pendingSubtitleExpected = null;
+    _pendingSubtitleComplete = false;
+  }
+
+  void _confirmPendingSubtitle() {
+    if (_pendingSubtitleTrack != null &&
+        _pendingSubtitleComplete &&
+        _pendingSubtitleExpected != null &&
+        frame.subtitleTrackId == _pendingSubtitleExpected) {
+      _clearPendingSubtitle();
+    }
+  }
+
+  Future<void> _finishSubtitleSelection(
+    PlaybackEngine engine,
+    String requested,
+    int revision,
+  ) async {
+    String? selected = requested;
+    if (requested == 'auto') {
+      try {
+        selected = await engine.confirmedSubtitleTrackId();
+      } catch (_) {
+        selected = null;
+      }
+    }
+    if (_disposed ||
+        revision != _subtitleSelectionGeneration ||
+        _pendingSubtitleTrack == null) {
+      return;
+    }
+    _pendingSubtitleExpected = selected;
+    _pendingSubtitleComplete = true;
+    _confirmPendingSubtitle();
+    _notify();
+  }
+
+  SubtitleTrackFormat get currentSubtitleFormat {
+    if (loading || subtitleBusy || _pendingSubtitleTrack != null) {
+      return SubtitleTrackFormat.unknown;
+    }
+    final id = frame.subtitleTrackId;
+    if (id == 'auto' || id == 'no') return SubtitleTrackFormat.unknown;
+    final track = frame.subtitleTracks
+        .where((item) => item.id == id)
+        .firstOrNull;
+    if (track == null) return SubtitleTrackFormat.unknown;
+    final codec = track.codec?.trim().toLowerCase();
+    if (codec == 'ass' || codec == 'ssa') return SubtitleTrackFormat.ass;
+    if (const {'subrip', 'srt', 'webvtt', 'mov_text', 'text'}.contains(codec)) {
+      return SubtitleTrackFormat.text;
+    }
+    if (const {
+      'hdmv_pgs_subtitle',
+      'dvd_subtitle',
+      'dvb_subtitle',
+      'xsub',
+    }.contains(codec)) {
+      return SubtitleTrackFormat.bitmap;
+    }
+    // Only trust an extension from the reference associated with the active
+    // native track, never an arbitrary embedded track label or old selection.
+    final name = _active?.externalTracks[id]?.name.toLowerCase();
+    if (name != null) {
+      if (name.endsWith('.ass') || name.endsWith('.ssa')) {
+        return SubtitleTrackFormat.ass;
+      }
+      if (name.endsWith('.srt') || name.endsWith('.vtt')) {
+        return SubtitleTrackFormat.text;
+      }
+    }
+    return SubtitleTrackFormat.unknown;
+  }
+
   final Future<void> Function(LocalMedia media, PlaybackFrame frame)?
   onCheckpoint;
   final Future<PreparedPlayback> Function(LocalMedia media)? prepare;
@@ -165,6 +247,8 @@ class PlaybackSession extends ChangeNotifier {
   }) {
     if (_disposed) return Future.value();
     final generation = ++_generation;
+    ++_subtitleSelectionGeneration;
+    _clearPendingSubtitle();
     ++_subtitleRevision;
     ++_subtitleScanRevision;
     subtitleChoice = const SubtitleChoice.automatic();
@@ -268,6 +352,7 @@ class PlaybackSession extends ChangeNotifier {
     if (!_current(active)) return;
     active.frame = next;
     frame = next;
+    _confirmPendingSubtitle();
     if (next.subtitleTracks.isNotEmpty && !active.tracksReady.isCompleted) {
       active.tracksReady.complete();
     }
@@ -481,17 +566,50 @@ class PlaybackSession extends ChangeNotifier {
   }
 
   Future<void> selectSubtitle(String id) {
+    if (_disposed || !ready) return Future.value();
+    if (subtitleSupport != null && _active == null) return Future.value();
+    final selectionGeneration = ++_subtitleSelectionGeneration;
+    _pendingSubtitleTrack =
+        id == frame.subtitleTrackId && _inFlightSubtitleGeneration == null
+        ? null
+        : id;
+    _pendingSubtitleExpected = null;
+    _pendingSubtitleComplete = false;
+    _notify();
     if (subtitleSupport == null) {
-      return _control((engine) => engine.selectSubtitle(id));
+      return _control((engine) async {
+        if (selectionGeneration != _subtitleSelectionGeneration) return;
+        _inFlightSubtitleGeneration = selectionGeneration;
+        try {
+          await engine.selectSubtitle(id);
+          await _finishSubtitleSelection(engine, id, selectionGeneration);
+        } catch (_) {
+          if (selectionGeneration == _subtitleSelectionGeneration) {
+            _clearPendingSubtitle();
+            _notify();
+          }
+          rethrow;
+        } finally {
+          if (_inFlightSubtitleGeneration == selectionGeneration) {
+            _inFlightSubtitleGeneration = null;
+          }
+        }
+      });
     }
     final active = _active;
-    if (active == null || !ready) return Future.value();
+    if (active == null || !ready) {
+      _clearPendingSubtitle();
+      return Future.value();
+    }
     final revision = ++_subtitleRevision;
     subtitleBusy = false;
     return _enqueue(() async {
       if (!_subtitleCurrent(active, revision)) return;
       try {
+        if (selectionGeneration != _subtitleSelectionGeneration) return;
+        _inFlightSubtitleGeneration = selectionGeneration;
         await active.engine.selectSubtitle(id);
+        await _finishSubtitleSelection(active.engine, id, selectionGeneration);
         if (!_subtitleCurrent(active, revision)) return;
         final external = active.externalTracks[id];
         final track = frame.subtitleTracks
@@ -525,9 +643,17 @@ class PlaybackSession extends ChangeNotifier {
           }();
         }
       } catch (error) {
-        if (_subtitleCurrent(active, revision)) subtitleIssue = '字幕选择失败：$error';
+        if (selectionGeneration == _subtitleSelectionGeneration) {
+          _clearPendingSubtitle();
+        }
+        if (_subtitleCurrent(active, revision)) {
+          subtitleIssue = '字幕选择失败：$error';
+        }
       } finally {
-        if (_subtitleCurrent(active, revision)) _notify();
+        if (_inFlightSubtitleGeneration == selectionGeneration) {
+          _inFlightSubtitleGeneration = null;
+        }
+        if (_current(active)) _notify();
       }
     });
   }
@@ -798,6 +924,8 @@ class PlaybackSession extends ChangeNotifier {
   Future<void> chooseLocalSubtitle(SubtitleReference reference) async {
     final active = _active;
     if (subtitleSupport == null || active == null || !ready) return;
+    ++_subtitleSelectionGeneration;
+    _clearPendingSubtitle();
     final revision = ++_subtitleRevision;
     subtitleBusy = true;
     _notify();
@@ -820,6 +948,19 @@ class PlaybackSession extends ChangeNotifier {
     final support = subtitleSupport;
     if (support == null) return;
     final active = _active;
+    if (_inFlightSubtitleGeneration != _subtitleSelectionGeneration) {
+      ++_subtitleSelectionGeneration;
+      if (_inFlightSubtitleGeneration == null) {
+        _clearPendingSubtitle();
+      } else {
+        // A newer queued selection is cancelled, but an older native command
+        // is already running and cannot be cancelled. Do not present its old
+        // frame as confirmed; an explicit later choice can resolve unknown.
+        _pendingSubtitleTrack = 'auto';
+        _pendingSubtitleExpected = null;
+        _pendingSubtitleComplete = false;
+      }
+    }
     final revision = ++_subtitleRevision;
     automaticSubtitles = value;
     subtitleBusy = false;
@@ -866,6 +1007,8 @@ class PlaybackSession extends ChangeNotifier {
 
   Future<void> close() {
     ++_generation;
+    ++_subtitleSelectionGeneration;
+    _clearPendingSubtitle();
     ++_subtitleRevision;
     ++_subtitleScanRevision;
     subtitleBusy = findingSubtitles = false;
@@ -881,6 +1024,8 @@ class PlaybackSession extends ChangeNotifier {
   Future<void> shutdown() {
     _disposed = true;
     ++_generation;
+    ++_subtitleSelectionGeneration;
+    _clearPendingSubtitle();
     return _enqueue(_retire);
   }
 
