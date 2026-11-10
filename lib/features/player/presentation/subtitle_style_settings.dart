@@ -236,7 +236,9 @@ class _SubtitleStyleSettingsState extends State<SubtitleStyleSettings> {
         )
       else if (widget.session.currentSubtitleFormat ==
           SubtitleTrackFormat.unknown)
-        const Text('当前字幕格式未知，可在字幕菜单手动选择具体轨道后识别；如果是 ASS/SSA，部分样式需开启覆盖后才会生效。')
+        const Text(
+          '当前字幕格式未知，可尝试在字幕菜单手动选择具体轨道；部分格式仍可能无法识别。如果是 ASS/SSA，部分样式需开启覆盖后才会生效。',
+        )
       else if (widget.session.currentSubtitleFormat ==
           SubtitleTrackFormat.bitmap)
         const Text('当前为图片字幕，无法调整文字样式。'),
