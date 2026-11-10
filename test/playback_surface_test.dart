@@ -382,6 +382,72 @@ void main() {
   }
 
   testWidgets(
+    'supported brightness slider updates live and unsupported brightness has no slider',
+    (tester) async {
+      final display = DisplayStub();
+      await mount(
+        tester,
+        width: 320,
+        height: 180,
+        display: display,
+        playing: false,
+      );
+      await tester.tap(find.byTooltip('播放设置'));
+      await tester.pumpAndSettle();
+      final slider = find.byKey(const ValueKey('settings-brightness'));
+      await tester.ensureVisible(slider);
+      await tester.pumpAndSettle();
+      expect(find.text('亮度 50%'), findsOneWidget);
+      await tester.tapAt(
+        tester.getRect(slider).centerRight - const Offset(45, 0),
+      );
+      await tester.pumpAndSettle();
+      expect(display.writes.last, greaterThan(.5));
+      expect(
+        find.text('亮度 ${(display.writes.last * 100).round()}%'),
+        findsOneWidget,
+      );
+      expect(find.byTooltip('静音'), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'brightness slider disables in background and re-enables at the same level',
+    (tester) async {
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      final display = DisplayStub();
+      await mount(
+        tester,
+        width: 320,
+        height: 180,
+        display: display,
+        playing: false,
+      );
+      await tester.tap(find.byTooltip('播放设置'));
+      await tester.pumpAndSettle();
+      final slider = find.byKey(const ValueKey('settings-brightness'));
+      await tester.ensureVisible(slider);
+      await tester.pumpAndSettle();
+      final stale = tester.widget<Slider>(slider).onChanged!;
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+      await tester.pump();
+      expect(tester.widget<Slider>(slider).onChanged, isNull);
+      stale(75);
+      await tester.pump();
+      expect(display.writes, isEmpty);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pump();
+      await tester.pump();
+      expect(tester.widget<Slider>(slider).onChanged, isNotNull);
+      expect(find.text('亮度 50%'), findsOneWidget);
+      tester.widget<Slider>(slider).onChanged!(70);
+      await tester.pump();
+      expect(display.writes.last, closeTo(.7, .001));
+      expect(tester.takeException(), isNull);
+    },
+  );
+  testWidgets(
     'audio menu shows available metadata and still selects the requested track',
     (tester) async {
       final session = await mount(
@@ -1406,6 +1472,7 @@ void main() {
       await tester.tap(find.byTooltip('播放设置'));
       await tester.pumpAndSettle();
       expect(find.text('亮度请使用系统控制'), findsOneWidget);
+      expect(find.byKey(const ValueKey('settings-brightness')), findsNothing);
       await tester.pump(const Duration(seconds: 4));
       expect(opacity(tester), 1, reason: 'settings keep controls awake');
       await tester.tap(find.byTooltip('音轨'));

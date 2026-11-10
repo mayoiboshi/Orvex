@@ -67,6 +67,8 @@ class _PlaybackSurfaceState extends State<PlaybackSurface>
   late PlayerBrightness _display;
   late final PlayerSystemVolume _volume;
   final _systemLevel = ValueNotifier<double?>(null);
+  final _brightnessLevel = ValueNotifier<double?>(null);
+  final _foregroundState = ValueNotifier<bool>(true);
   final _volumeSteps = VolumeSteps();
   StreamSubscription<SystemVolumeReading>? _volumeSubscription;
   Timer? _volumeTimer;
@@ -86,7 +88,8 @@ class _PlaybackSurfaceState extends State<PlaybackSurface>
   bool _accessibleNavigation = false;
   bool _controlsHaveFocus = false;
   final _controlPointers = <int>{};
-  bool _foreground = true;
+  bool get _foreground => _foregroundState.value;
+  set _foreground(bool value) => _foregroundState.value = value;
   bool _dragging = false;
   bool _seekPending = false;
   bool _menuOpen = false;
@@ -94,7 +97,8 @@ class _PlaybackSurfaceState extends State<PlaybackSurface>
   double? _dragSeconds;
   double? _level;
   bool _adjustingBrightness = false;
-  double? _brightness;
+  double? get _brightness => _brightnessLevel.value;
+  set _brightness(double? value) => _brightnessLevel.value = value;
   double? _previousRate;
   Object? _rateEngine;
   String? _feedback;
@@ -555,6 +559,8 @@ class _PlaybackSurfaceState extends State<PlaybackSurface>
     _resetInteraction();
     _stopWatchingVolume();
     _systemLevel.dispose();
+    _brightnessLevel.dispose();
+    _foregroundState.dispose();
     _brightnessRevision++;
     unawaited(_display.restore());
     _focus.dispose();
@@ -1276,7 +1282,12 @@ class _PlaybackSurfaceState extends State<PlaybackSurface>
         showDragHandle: true,
         backgroundColor: OrvexColors.of(context).surface,
         builder: (sheetContext) => ListenableBuilder(
-          listenable: Listenable.merge([session, _systemLevel]),
+          listenable: Listenable.merge([
+            session,
+            _systemLevel,
+            _brightnessLevel,
+            _foregroundState,
+          ]),
           builder: (context, _) => SafeArea(
             top: false,
             child: SingleChildScrollView(
@@ -1348,6 +1359,27 @@ class _PlaybackSurfaceState extends State<PlaybackSurface>
                     max: 100,
                     onChanged: (value) => unawaited(_setOutputVolume(value)),
                   ),
+                  if (_brightness case final double brightness) ...[
+                    Text('亮度 ${(brightness * 100).round()}%'),
+                    Semantics(
+                      label: '亮度',
+                      child: Slider(
+                        key: const ValueKey('settings-brightness'),
+                        value: (brightness * 100).clamp(5, 100),
+                        min: 5,
+                        max: 100,
+                        semanticFormatterCallback: (value) =>
+                            '${value.round()}%',
+                        onChanged: !_foreground
+                            ? null
+                            : (value) {
+                                if (!_foreground || _brightness == null) return;
+                                setState(() => _brightness = value / 100);
+                                unawaited(_writeBrightness(value / 100));
+                              },
+                      ),
+                    ),
+                  ],
                   if (_touchGestures)
                     Text(
                       _brightness == null ? '亮度请使用系统控制' : '左侧上下滑动调亮度，右侧上下滑动调音量',
