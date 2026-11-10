@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 
 import '../domain/playback_engine.dart';
 import '../domain/playback_defaults.dart';
+import '../domain/subtitle_style.dart';
 import '../../subtitles/domain/subtitle_models.dart';
 
 class PlaybackSession extends ChangeNotifier {
@@ -13,11 +14,31 @@ class PlaybackSession extends ChangeNotifier {
     this.onCheckpoint,
     this.prepare,
     this.subtitleSupport,
+    this.subtitleStyleStore,
   });
 
   final PlaybackEngine Function() createEngine;
   final ResumeStore resumeStore;
   final SubtitleSupport? subtitleSupport;
+  final SubtitleStyleStore? subtitleStyleStore;
+  SubtitleStyle subtitleStyle = const SubtitleStyle();
+  String subtitleStyleIssue = '';
+  late final Future<void> _subtitleStyleLoaded = _readSubtitleStyle();
+  Future<void> _subtitleStyleWrites = Future.value();
+  int _subtitleStyleRevision = 0;
+  int _subtitlePreviewRevision = 0;
+
+  Future<void> _readSubtitleStyle() async {
+    try {
+      final saved = await subtitleStyleStore?.read();
+      if (saved != null && !_disposed && _subtitleStyleRevision == 0) {
+        subtitleStyle = saved;
+      }
+    } catch (_) {
+      if (!_disposed) subtitleStyleIssue = '字幕设置读取失败，已使用默认值';
+    }
+  }
+
   SubtitleChoice subtitleChoice = const SubtitleChoice.automatic();
   List<SubtitleCandidate> localSubtitles = const [];
   bool automaticSubtitles = true,
@@ -186,6 +207,14 @@ class PlaybackSession extends ChangeNotifier {
           }),
         ]);
         await active.engine.open(active.media, start: start);
+        await _subtitleStyleLoaded;
+        if (_current(active)) {
+          try {
+            await active.engine.setSubtitleStyle(subtitleStyle);
+          } catch (_) {
+            if (_current(active)) subtitleStyleIssue = '字幕设置未完全应用，部分设置可能已生效';
+          }
+        }
         if (_current(active) && preferences.rate != 1) {
           try {
             await active.engine.setRate(preferences.rate);
@@ -319,6 +348,67 @@ class PlaybackSession extends ChangeNotifier {
 
   Future<void> setVolume(double volume) =>
       _control((engine) => engine.setVolume(volume.clamp(0, 100)));
+
+  Future<void> setSubtitleStyle(SubtitleStyle style) async {
+    await _subtitleStyleLoaded;
+    if (_disposed) return;
+    final normalized = SubtitleStyle.fromJson(style.toJson());
+    final revision = ++_subtitleStyleRevision;
+    ++_subtitlePreviewRevision;
+    final generation = _generation;
+    subtitleStyle = normalized;
+    subtitleStyleIssue = '';
+    _notify();
+    _subtitleStyleWrites = _subtitleStyleWrites.then((_) async {
+      try {
+        await subtitleStyleStore?.write(normalized);
+      } catch (_) {
+        if (!_disposed && revision == _subtitleStyleRevision) {
+          subtitleStyleIssue = '字幕设置保存失败';
+          _notify();
+        }
+      }
+    });
+    final applied = _enqueue(() async {
+      if (_disposed || generation != _generation || !ready) return;
+      try {
+        await engine!.setSubtitleStyle(normalized);
+      } catch (_) {
+        if (generation == _generation && revision == _subtitleStyleRevision) {
+          subtitleStyleIssue = '字幕设置未完全应用，部分设置可能已生效';
+          _notify();
+        }
+        return;
+      }
+    });
+    await Future.wait([applied, _subtitleStyleWrites]);
+  }
+
+  /// Preview does not persist or modify the selected style. Older queued
+  /// previews are dropped, and session changes never target a new engine.
+  Future<void> previewSubtitleStyle(SubtitleStyle style) {
+    final revision = ++_subtitlePreviewRevision;
+    final generation = _generation;
+    final normalized = SubtitleStyle.fromJson(style.toJson());
+    return _enqueue(() async {
+      if (_disposed ||
+          generation != _generation ||
+          revision != _subtitlePreviewRevision ||
+          !ready) {
+        return;
+      }
+      try {
+        await engine!.setSubtitleStyle(normalized);
+      } catch (_) {
+        if (!_disposed &&
+            generation == _generation &&
+            revision == _subtitlePreviewRevision) {
+          subtitleStyleIssue = '字幕设置未完全应用，部分设置可能已生效';
+          _notify();
+        }
+      }
+    });
+  }
 
   Future<void> seek(Duration target) => _control((engine) {
     final duration = frame.duration;

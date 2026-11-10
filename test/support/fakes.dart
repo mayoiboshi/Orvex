@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/widgets.dart';
 import 'package:orvex/features/player/domain/playback_defaults.dart';
 import 'package:orvex/features/player/domain/playback_engine.dart';
+import 'package:orvex/features/player/domain/subtitle_style.dart';
 
 class FakeEngine implements PlaybackEngine {
   final frameController = StreamController<PlaybackFrame>.broadcast(sync: true);
@@ -13,6 +14,9 @@ class FakeEngine implements PlaybackEngine {
   final rates = <double>[];
   final volumes = <double>[];
   final audioSelections = <String>[];
+  final subtitleStyles = <SubtitleStyle>[];
+  bool failSubtitleStyle = false;
+  Completer<void>? subtitleStyleGate;
   Duration? openedAt;
   Completer<void>? openGate;
   bool disposed = false;
@@ -64,6 +68,13 @@ class FakeEngine implements PlaybackEngine {
   @override
   Future<void> setVolume(double volume) async {
     volumes.add(volume);
+  }
+
+  @override
+  Future<void> setSubtitleStyle(SubtitleStyle style) async {
+    if (subtitleStyleGate != null) await subtitleStyleGate!.future;
+    if (failSubtitleStyle) throw StateError('subtitle style unavailable');
+    subtitleStyles.add(style);
   }
 
   @override

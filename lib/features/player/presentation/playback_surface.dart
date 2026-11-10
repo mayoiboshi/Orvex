@@ -11,6 +11,7 @@ import '../infrastructure/player_brightness.dart';
 import '../infrastructure/player_system_volume.dart';
 import '../../subtitles/domain/subtitle_models.dart';
 import 'volume_indicator.dart';
+import 'subtitle_style_settings.dart';
 
 String formatTime(Duration value) {
   final seconds = value.inSeconds.clamp(0, 1 << 32);
@@ -1299,6 +1300,11 @@ class _PlaybackSurfaceState extends State<PlaybackSurface>
                       const Expanded(child: Text('字幕')),
                       _tracks(audio: false, inSettings: true),
                     ],
+                  ),
+                  ExpansionTile(
+                    tilePadding: EdgeInsets.zero,
+                    title: const Text('字幕设置'),
+                    children: [SubtitleStyleSettings(session: session)],
                   ),
                   if (session.subtitleSupport != null) _localSubtitleSettings(),
                   ListTile(

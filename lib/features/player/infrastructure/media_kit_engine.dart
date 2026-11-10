@@ -9,6 +9,7 @@ import 'package:path_provider/path_provider.dart';
 
 import '../domain/playback_defaults.dart';
 import '../domain/playback_engine.dart';
+import '../domain/subtitle_style.dart';
 
 class MediaKitEngine implements PlaybackEngine {
   MediaKitEngine({bool diagnostics = false, this.silentAudioForTesting = false})
@@ -73,6 +74,7 @@ class MediaKitEngine implements PlaybackEngine {
     sync: true,
   );
   bool _disposed = false;
+  String? _defaultAssOverride;
   static Future<String>? _fontDirectory;
 
   static Future<String> _prepareSubtitleFonts() {
@@ -192,6 +194,41 @@ class MediaKitEngine implements PlaybackEngine {
   Future<void> setRate(double rate) => _player.setRate(rate);
   @override
   Future<void> setVolume(double volume) => _player.setVolume(volume);
+  @override
+  Future<void> setSubtitleStyle(SubtitleStyle style) async {
+    final native = _player.platform as NativePlayer;
+    _defaultAssOverride ??= await native.getProperty('sub-ass-override');
+    if (_defaultAssOverride!.isEmpty) {
+      throw StateError('不支持字幕设置 sub-ass-override');
+    }
+    final properties = <String, String>{
+      'sub-delay': '${style.delay}',
+      'sub-scale': '${style.scale}',
+      'sub-pos': '${style.position}',
+      'sub-bold': style.bold ? 'yes' : 'no',
+      'sub-italic': style.italic ? 'yes' : 'no',
+      'sub-color': style.color,
+      'sub-border-color': style.outlineColor,
+      'sub-border-size': '${style.outlineSize}',
+      'sub-ass-override': style.overrideAss ? 'force' : _defaultAssOverride!,
+    };
+    for (final property in properties.entries) {
+      await native.setProperty(property.key, property.value);
+      final actual = await native.getProperty(property.key);
+      if (actual.isEmpty) throw StateError('不支持字幕设置 ${property.key}');
+      final expectedNumber = double.tryParse(property.value);
+      if (expectedNumber != null) {
+        final actualNumber = double.tryParse(actual);
+        if (actualNumber == null ||
+            (actualNumber - expectedNumber).abs() > .001) {
+          throw StateError('字幕设置 ${property.key} 未生效');
+        }
+      } else if (actual.toUpperCase() != property.value.toUpperCase()) {
+        throw StateError('字幕设置 ${property.key} 未生效');
+      }
+    }
+  }
+
   @override
   Future<void> selectAudio(String id) =>
       _player.setAudioTrack(AudioTrack(id, null, null));

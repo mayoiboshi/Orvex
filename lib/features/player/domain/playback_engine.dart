@@ -1,6 +1,7 @@
 import 'package:flutter/widgets.dart';
 
 import 'playback_defaults.dart';
+import 'subtitle_style.dart';
 
 class LocalMedia {
   const LocalMedia({
@@ -104,6 +105,7 @@ abstract interface class PlaybackEngine {
   Future<void> seek(Duration position);
   Future<void> setRate(double rate);
   Future<void> setVolume(double volume);
+  Future<void> setSubtitleStyle(SubtitleStyle style);
   Future<void> selectAudio(String id);
   Future<void> selectSubtitle(String id);
   Future<void> loadSubtitle(Uri uri, String name);

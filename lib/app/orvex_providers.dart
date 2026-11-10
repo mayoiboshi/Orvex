@@ -15,6 +15,7 @@ import '../features/subtitles/infrastructure/local_subtitles.dart';
 import '../features/player/application/playback_session.dart';
 import '../features/player/infrastructure/media_kit_engine.dart';
 import '../features/player/infrastructure/preferences_resume_store.dart';
+import '../features/player/infrastructure/subtitle_style_preferences.dart';
 
 final localFilesProvider = Provider<LocalFileSource>(
   (ref) => LocalFileSource(),
@@ -59,6 +60,7 @@ final sessionProvider = Provider<PlaybackSession>((ref) {
       ),
     ),
     resumeStore: PreferencesResumeStore(),
+    subtitleStyleStore: SubtitleStylePreferences(),
     subtitleSupport: LocalSubtitles(
       folders: ref.read(folderLibraryProvider),
       imports: ref.read(localFilesProvider).imports,
