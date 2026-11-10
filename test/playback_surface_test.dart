@@ -4,6 +4,7 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:orvex/design/orvex_theme.dart';
 import 'package:orvex/features/player/application/playback_session.dart';
 import 'package:orvex/features/player/domain/playback_defaults.dart';
 import 'package:orvex/features/player/domain/playback_engine.dart';
@@ -44,6 +45,8 @@ class SurfaceSession extends PlaybackSession {
     double? rate,
     double? volume,
     List<MediaTrack>? subtitleTracks,
+    List<MediaTrack>? audioTracks,
+    String? audioTrackId,
   }) {
     frame = PlaybackFrame(
       position: Duration(seconds: seconds ?? 30),
@@ -53,6 +56,8 @@ class SurfaceSession extends PlaybackSession {
       rate: rate ?? frame.rate,
       volume: volume ?? frame.volume,
       subtitleTracks: subtitleTracks ?? frame.subtitleTracks,
+      audioTracks: audioTracks ?? frame.audioTracks,
+      audioTrackId: audioTrackId ?? frame.audioTrackId,
     );
     notifyListeners();
   }
@@ -195,6 +200,136 @@ void main() {
   }
 
   Finder getProgress() => find.byKey(const ValueKey('playback-progress'));
+  testWidgets(
+    'audio menu shows available metadata and still selects the requested track',
+    (tester) async {
+      final session = await mount(
+        tester,
+        width: 740,
+        height: 350,
+        fullscreen: true,
+        playing: false,
+        textScaler: const TextScaler.linear(1.5),
+      );
+      session.update(
+        playing: false,
+        audioTrackId: '2',
+        audioTracks: const [
+          MediaTrack(
+            '1',
+            'jpn',
+            language: 'jpn',
+            codec: 'aac',
+            channelLayout: 'stereo',
+            channelCount: 2,
+          ),
+          MediaTrack('2', '轨道 2', codec: 'aac', channelCount: 1),
+        ],
+      );
+      await tester.pump();
+      await tester.tap(find.byTooltip('音轨'));
+      await tester.pumpAndSettle();
+      expect(find.text('Japanese [日语] : AAC'), findsOneWidget);
+      expect(find.text('立体声'), findsOneWidget);
+      expect(find.text('轨道 2 : AAC'), findsOneWidget);
+      expect(find.text('1 声道'), findsOneWidget);
+      expect(find.textContaining('HE-AAC'), findsNothing);
+      final selected = tester.widget<CheckedPopupMenuItem<String>>(
+        find.ancestor(
+          of: find.text('轨道 2 : AAC'),
+          matching: find.byType(CheckedPopupMenuItem<String>),
+        ),
+      );
+      expect(selected.checked, isTrue);
+      await tester.tap(find.text('Japanese [日语] : AAC'));
+      await tester.pumpAndSettle();
+      expect(session.audio, ['1']);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'inline audio menu handles absent metadata through existing settings',
+    (tester) async {
+      final session = await mount(
+        tester,
+        width: 320,
+        height: 180,
+        playing: false,
+      );
+      session.update(
+        playing: false,
+        audioTracks: const [MediaTrack('1', '轨道 1')],
+      );
+      await tester.pump();
+      await tester.tap(find.byTooltip('播放设置'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('音轨'));
+      await tester.pumpAndSettle();
+      expect(find.text('轨道 1'), findsOneWidget);
+      expect(find.text('立体声'), findsNothing);
+      await tester.tap(find.text('轨道 1'));
+      await tester.pumpAndSettle();
+      expect(session.audio, ['1']);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  for (final brightness in [Brightness.light, Brightness.dark]) {
+    testWidgets(
+      'fullscreen audio badge uses player theme when app is $brightness',
+      (tester) async {
+        final session = await mount(
+          tester,
+          width: 740,
+          height: 350,
+          fullscreen: true,
+          playing: false,
+          theme: ThemeData(brightness: brightness),
+        );
+        session.update(
+          playing: false,
+          audioTracks: const [MediaTrack('1', '轨道 1', channelLayout: 'stereo')],
+        );
+        await tester.pump();
+        await tester.tap(find.byTooltip('音轨'));
+        await tester.pumpAndSettle();
+        expect(
+          tester.widget<Text>(find.text('立体声')).style?.color,
+          OrvexColors.player.success,
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+    testWidgets(
+      'inline audio badge follows settings theme when app is $brightness',
+      (tester) async {
+        final session = await mount(
+          tester,
+          width: 320,
+          height: 180,
+          playing: false,
+          theme: ThemeData(brightness: brightness),
+        );
+        session.update(
+          playing: false,
+          audioTracks: const [MediaTrack('1', '轨道 1', channelLayout: 'stereo')],
+        );
+        await tester.pump();
+        await tester.tap(find.byTooltip('播放设置'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byTooltip('音轨'));
+        await tester.pumpAndSettle();
+        expect(
+          tester.widget<Text>(find.text('立体声')).style?.color,
+          brightness == Brightness.dark
+              ? OrvexColors.dark.success
+              : OrvexColors.light.success,
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
   testWidgets(
     'fullscreen subtitle menu opens style settings and preserves subtitle choices',
     (tester) async {

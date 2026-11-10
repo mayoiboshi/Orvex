@@ -142,6 +142,9 @@ class MediaKitEngine implements PlaybackEngine {
               track.id,
               label(track.id, track.title, track.language),
               language: track.language,
+              codec: track.codec,
+              channelLayout: track.channels,
+              channelCount: track.channelscount,
             ),
       ],
       subtitleTracks: [

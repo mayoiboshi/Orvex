@@ -7,10 +7,12 @@ import 'package:flutter/services.dart';
 import '../../../design/orvex_theme.dart';
 import '../application/playback_session.dart';
 import '../domain/playback_defaults.dart';
+import '../domain/playback_engine.dart';
 import '../infrastructure/player_brightness.dart';
 import '../infrastructure/player_system_volume.dart';
 import '../../subtitles/domain/subtitle_models.dart';
 import 'volume_indicator.dart';
+import 'audio_track_label.dart';
 import 'subtitle_menu.dart';
 
 String formatTime(Duration value) {
@@ -1394,7 +1396,7 @@ class _PlaybackSurfaceState extends State<PlaybackSurface>
         unawaited(session.selectAudio(id));
         if (!inSettings) _closedMenu();
       },
-      itemBuilder: (_) => [
+      itemBuilder: (menuContext) => [
         CheckedPopupMenuItem<String>(
           value: 'auto',
           checked: session.error == null && selected == 'auto',
@@ -1409,9 +1411,42 @@ class _PlaybackSurfaceState extends State<PlaybackSurface>
           CheckedPopupMenuItem<String>(
             value: track.id,
             checked: session.error == null && selected == track.id,
-            child: Text(track.label),
+            child: _audioTrackDetails(menuContext, track),
           ),
       ],
+    );
+  }
+
+  Widget _audioTrackDetails(BuildContext context, MediaTrack track) {
+    final details = audioTrackLabel(track);
+    final colors = OrvexColors.of(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(details.title, maxLines: 2, overflow: TextOverflow.ellipsis),
+          if (details.channels case final String channels) ...[
+            const SizedBox(height: 4),
+            DecoratedBox(
+              decoration: BoxDecoration(
+                color: colors.success.withValues(alpha: 0.14),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                child: Text(
+                  channels,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(color: colors.success, fontSize: 12),
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
     );
   }
 

@@ -60,11 +60,20 @@ bool validImportPath(String path) {
 enum SubtitleTrackFormat { ass, text, bitmap, unknown }
 
 class MediaTrack {
-  const MediaTrack(this.id, this.label, {this.language, this.codec});
+  const MediaTrack(
+    this.id,
+    this.label, {
+    this.language,
+    this.codec,
+    this.channelLayout,
+    this.channelCount,
+  });
   final String id;
   final String label;
   final String? language;
   final String? codec;
+  final String? channelLayout;
+  final int? channelCount;
 }
 
 class PlaybackFrame {
