@@ -11,11 +11,17 @@ class LocalMedia {
     this.folderRoot,
     this.folderFile,
     this.modifiedAt,
+    this.accessHandle,
+    this.accessPath,
+    this.accessIdentity,
   });
   final Uri uri;
   final String name;
   final String? importPath;
   final String? folderRoot, folderFile;
+
+  /// Ephemeral native access capability, never persisted as media identity.
+  final String? accessHandle, accessPath, accessIdentity;
   final DateTime? modifiedAt;
   String? get relativeImportPath => importPath ?? legacyImportedPath(uri);
   String get resumeKey => folderRoot != null && folderFile != null
@@ -105,6 +111,28 @@ class PlaybackFrame {
 }
 
 enum PlaybackInterruption { audioFocusLost, headphonesDisconnected }
+
+/// A routed session may temporarily forbid opening a different media item.
+abstract interface class PlaybackMediaSelectionGuard {
+  bool get mediaSelectionLocked;
+  String? get mediaSelectionIssue;
+  Listenable get mediaSelectionChanges;
+}
+
+/// A disposal failure must retain media access until cleanup is confirmed.
+abstract interface class PlaybackSafetyCriticalDisposal {}
+
+/// Platform-level ownership acquired before any playback resources.
+abstract interface class PlaybackReservation {
+  Future<void> acquire();
+  Future<void> release();
+}
+
+class PlaybackReservationBusy implements Exception {
+  const PlaybackReservationBusy();
+  @override
+  String toString() => '其他播放器尚未关闭；如果问题持续，请重启应用';
+}
 
 abstract interface class PlaybackEngine {
   Stream<PlaybackFrame> get frames;

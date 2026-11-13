@@ -10,10 +10,12 @@ import '../domain/playback_defaults.dart';
 import '../domain/playback_engine.dart';
 import '../infrastructure/player_brightness.dart';
 import '../infrastructure/player_system_volume.dart';
+import '../infrastructure/airplay_playback_engine.dart';
 import '../../subtitles/domain/subtitle_models.dart';
 import 'volume_indicator.dart';
 import 'audio_track_label.dart';
 import 'subtitle_menu.dart';
+import 'airplay_route_dialog.dart';
 
 String formatTime(Duration value) {
   final seconds = value.inSeconds.clamp(0, 1 << 32);
@@ -890,6 +892,30 @@ class _PlaybackSurfaceState extends State<PlaybackSurface>
           ),
         ),
       ),
+      if (session.engine case final AirPlayPlaybackEngine airPlay)
+        ValueListenableBuilder<AirPlayPhase>(
+          valueListenable: airPlay.phaseNotifier,
+          builder: (context, phase, _) => IconButton(
+            tooltip: phase == AirPlayPhase.active
+                ? '结束 AirPlay 视频投屏'
+                : 'AirPlay 视频投屏',
+            onPressed: session.ready
+                ? () async {
+                    if (airPlay.externalActive) {
+                      await airPlay.cancelRoute();
+                    } else {
+                      await showAirPlayRouteDialog(context, session, airPlay);
+                    }
+                  }
+                : null,
+            icon: Icon(
+              phase == AirPlayPhase.active
+                  ? Icons.airplay
+                  : Icons.airplay_outlined,
+              size: 21,
+            ),
+          ),
+        ),
       IconButton(
         tooltip: '播放设置',
         onPressed: session.ready ? _showSettings : null,

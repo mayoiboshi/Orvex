@@ -14,6 +14,7 @@ import '../features/folder_library/media_kit_preview.dart';
 import '../features/subtitles/infrastructure/local_subtitles.dart';
 import '../features/player/application/playback_session.dart';
 import '../features/player/infrastructure/media_kit_engine.dart';
+import '../features/player/infrastructure/airplay_playback_engine.dart';
 import '../features/player/infrastructure/preferences_resume_store.dart';
 import '../features/player/infrastructure/subtitle_style_preferences.dart';
 
@@ -53,12 +54,25 @@ final thumbnailCacheProvider = Provider<ThumbnailCache>((ref) {
 });
 
 final sessionProvider = Provider<PlaybackSession>((ref) {
+  final reservation = Platform.isIOS ? NativePlaybackReservation() : null;
   final session = PlaybackSession(
-    createEngine: () => MediaKitEngine(
-      silentAudioForTesting: const bool.fromEnvironment(
-        'ORVEX_SILENT_SIMULATOR_TEST',
-      ),
-    ),
+    exclusivePlayback: Platform.isIOS,
+    playbackReservation: reservation,
+    createEngine: () {
+      final local = MediaKitEngine(
+        silentAudioForTesting: const bool.fromEnvironment(
+          'ORVEX_SILENT_SIMULATOR_TEST',
+        ),
+      );
+      return reservation != null
+          ? AirPlayPlaybackEngine(
+              local,
+              transport: MethodChannelAirPlayTransport(
+                reservation: reservation,
+              ),
+            )
+          : local;
+    },
     resumeStore: PreferencesResumeStore(),
     subtitleStyleStore: SubtitleStylePreferences(),
     subtitleSupport: LocalSubtitles(

@@ -15,9 +15,120 @@ class PlaybackSession extends ChangeNotifier {
     this.prepare,
     this.subtitleSupport,
     this.subtitleStyleStore,
+    this.exclusivePlayback = false,
+    this.playbackReservation,
   });
 
   final PlaybackEngine Function() createEngine;
+  final bool exclusivePlayback;
+  final PlaybackReservation? playbackReservation;
+  bool _nativeReservationHeld = false;
+  static Future<void>? _quarantinedCleanup;
+  static bool _cleanupFailed = false;
+  static PlaybackSession? _resourceOwner;
+
+  bool _acquireResources() {
+    if (_resourceOwner != null && !identical(_resourceOwner, this)) {
+      return false;
+    }
+    _resourceOwner = this;
+    return true;
+  }
+
+  void _releaseResources() {
+    if (identical(_resourceOwner, this) &&
+        _quarantinedCleanup == null &&
+        !_cleanupFailed) {
+      if (_nativeReservationHeld) {
+        final pending = playbackReservation!.release();
+        _quarantinedCleanup = pending;
+        pending.then(
+          (_) {
+            _nativeReservationHeld = false;
+            if (identical(_quarantinedCleanup, pending)) {
+              _quarantinedCleanup = null;
+            }
+            if (identical(_resourceOwner, this)) _resourceOwner = null;
+            _notify();
+          },
+          onError: (Object _, StackTrace trace) {
+            _cleanupFailed = true;
+            if (!_disposed) reportError('无法确认播放器资源已释放，请重启应用');
+          },
+        );
+      } else {
+        _resourceOwner = null;
+      }
+    }
+  }
+
+  Future<void> _acquireNativeReservation() async {
+    final pending = playbackReservation!.acquire();
+    try {
+      await pending.timeout(const Duration(seconds: 3));
+      _nativeReservationHeld = true;
+    } on TimeoutException {
+      final cleanup = () async {
+        try {
+          await pending;
+          _nativeReservationHeld = true;
+          await playbackReservation!.release();
+          _nativeReservationHeld = false;
+        } on PlaybackReservationBusy {
+          // A rejected reservation did not acquire native resources.
+        }
+      }();
+      _quarantinedCleanup = cleanup;
+      cleanup.then(
+        (_) {
+          if (identical(_quarantinedCleanup, cleanup)) {
+            _quarantinedCleanup = null;
+          }
+          _releaseResources();
+          _notify();
+        },
+        onError: (Object _, StackTrace trace) {
+          _cleanupFailed = true;
+          if (!_disposed) reportError('无法确认播放器资源已释放，请重启应用');
+        },
+      );
+      throw StateError('播放器资源申请尚未确认，请稍候');
+    } on PlaybackReservationBusy {
+      rethrow;
+    } catch (_) {
+      _cleanupFailed = true;
+      rethrow;
+    }
+  }
+
+  Future<void> _releasePrepared(PreparedPlayback prepared) async {
+    final release = Future<void>.sync(() async => prepared.release?.call());
+    _quarantinedCleanup = release;
+    var timedOut = false;
+    release.then(
+      (_) {
+        if (identical(_quarantinedCleanup, release)) {
+          _quarantinedCleanup = null;
+          if (timedOut) _releaseResources();
+          _notify();
+        }
+      },
+      onError: (Object _, StackTrace trace) {
+        _cleanupFailed = true;
+        if (!_disposed) reportError('无法确认目录权限已释放，请重启应用');
+      },
+    );
+    try {
+      await release.timeout(const Duration(seconds: 3));
+    } on TimeoutException {
+      timedOut = true;
+      if (!_disposed) reportError('目录权限清理尚未完成，暂时无法打开视频');
+    } catch (_) {
+      _cleanupFailed = true;
+      rethrow;
+    }
+  }
+
   final ResumeStore resumeStore;
   final SubtitleSupport? subtitleSupport;
   final SubtitleStyleStore? subtitleStyleStore;
@@ -145,8 +256,14 @@ class PlaybackSession extends ChangeNotifier {
   bool Function(List<LocalMedia>, int)? _canAutoAdvance;
   int get playlistIndex =>
       playlist.indexWhere((item) => item.resumeKey == media?.resumeKey);
-  bool get hasPrevious => playlistIndex > 0;
-  bool get hasNext => playlistIndex >= 0 && playlistIndex + 1 < playlist.length;
+  bool get _mediaSelectionLocked =>
+      engine is PlaybackMediaSelectionGuard &&
+      (engine! as PlaybackMediaSelectionGuard).mediaSelectionLocked;
+  bool get hasPrevious => !_mediaSelectionLocked && playlistIndex > 0;
+  bool get hasNext =>
+      !_mediaSelectionLocked &&
+      playlistIndex >= 0 &&
+      playlistIndex + 1 < playlist.length;
   Future<void> previous() => hasPrevious
       ? open(
           playlist[playlistIndex - 1],
@@ -164,6 +281,10 @@ class PlaybackSession extends ChangeNotifier {
 
   /// Select from the active queue without changing its auto-advance boundary.
   Future<void> selectFromPlaylist(LocalMedia item, {Duration? startAt}) {
+    if (_mediaSelectionLocked) {
+      reportError('请先结束视频投屏再切换视频');
+      return Future.value();
+    }
     if (!playlist.any((media) => media.resumeKey == item.resumeKey)) {
       return Future.value();
     }
@@ -246,6 +367,20 @@ class PlaybackSession extends ChangeNotifier {
     bool Function(List<LocalMedia>, int)? canAutoAdvance,
   }) {
     if (_disposed) return Future.value();
+    if (_quarantinedCleanup != null || _cleanupFailed) {
+      reportError('播放器清理尚未完成，暂时无法打开视频');
+      return Future.value();
+    }
+    if ((_resourceOwner != null && !identical(_resourceOwner, this)) ||
+        (exclusivePlayback && !_acquireResources())) {
+      reportError('其他播放器尚未关闭，暂时无法打开视频');
+      return Future.value();
+    }
+    if (_mediaSelectionLocked) {
+      reportError('请先结束视频投屏再切换视频');
+      return Future.value();
+    }
+    if (_active case final active?) _freezeAndStop(active);
     final generation = ++_generation;
     ++_subtitleSelectionGeneration;
     _clearPendingSubtitle();
@@ -268,7 +403,14 @@ class PlaybackSession extends ChangeNotifier {
     _notify();
     return _enqueue(() async {
       try {
-        await _retire();
+        await _retire(keepOwnership: true);
+        if (_quarantinedCleanup != null || _cleanupFailed) {
+          throw StateError('播放器清理尚未完成，暂时无法打开视频');
+        }
+        if (_disposed || generation != _generation) return;
+        if (playbackReservation != null && !_nativeReservationHeld) {
+          await _acquireNativeReservation();
+        }
         if (_disposed || generation != _generation) return;
         var start = startAt ?? Duration.zero;
         if (startAt == null) {
@@ -282,7 +424,7 @@ class PlaybackSession extends ChangeNotifier {
         final prepared =
             await prepare?.call(source) ?? PreparedPlayback(source);
         if (_disposed || generation != _generation) {
-          await prepared.release?.call();
+          await _releasePrepared(prepared);
           return;
         }
         _ActiveSession active;
@@ -294,11 +436,33 @@ class PlaybackSession extends ChangeNotifier {
             prepared.release,
           );
         } catch (_) {
-          await prepared.release?.call();
+          await _releasePrepared(prepared);
           rethrow;
         }
         media = prepared.media;
         _active = active;
+        if (active.engine is PlaybackSafetyCriticalDisposal &&
+            !exclusivePlayback) {
+          throw StateError('此播放器需要独占资源');
+        }
+        final guard = active.engine;
+        if (guard is PlaybackMediaSelectionGuard) {
+          final routeGuard = guard as PlaybackMediaSelectionGuard;
+          active.guardListener = () {
+            if (!_current(active)) return;
+            final issue = routeGuard.mediaSelectionIssue;
+            if (issue != null) {
+              error = issue;
+              active.guardIssue = issue;
+            } else if (active.guardIssue != null &&
+                error == active.guardIssue) {
+              error = null;
+              active.guardIssue = null;
+            }
+            _notify();
+          };
+          routeGuard.mediaSelectionChanges.addListener(active.guardListener!);
+        }
         // VideoController initializes after a Flutter frame. Publish the
         // surface before awaiting open, otherwise first playback can deadlock.
         _notify();
@@ -331,6 +495,9 @@ class PlaybackSession extends ChangeNotifier {
         if (generation == _generation) error = '无法打开视频：$exception';
         await _retire();
       } finally {
+        if ((generation == _generation || _disposed) && _active == null) {
+          _releaseResources();
+        }
         if (!_disposed && generation == _generation) {
           loading = false;
           if (_active case final active?) {
@@ -981,12 +1148,56 @@ class PlaybackSession extends ChangeNotifier {
     if (!_disposed) _notify();
   }
 
-  Future<void> _retire() async {
+  Future<void> _retire({bool keepOwnership = false}) async {
+    if (_quarantinedCleanup != null || _cleanupFailed) {
+      if (!_disposed) reportError('播放器清理尚未完成，暂时无法打开视频');
+      return;
+    }
     final active = _active;
     _active = null;
-    if (active == null) return;
-    for (final subscription in active.subscriptions) {
-      await subscription.cancel();
+    if (active == null) {
+      if (!keepOwnership) _releaseResources();
+      return;
+    }
+    final guard = active.engine;
+    if (guard is PlaybackMediaSelectionGuard && active.guardListener != null) {
+      (guard as PlaybackMediaSelectionGuard).mediaSelectionChanges
+          .removeListener(active.guardListener!);
+    }
+    if (active.engine is PlaybackSafetyCriticalDisposal) {
+      final cleanup = _retireSafely(active);
+      _quarantinedCleanup = cleanup;
+      var timedOut = false;
+      cleanup.then(
+        (_) {
+          if (identical(_quarantinedCleanup, cleanup)) {
+            _quarantinedCleanup = null;
+            if (!keepOwnership || timedOut) _releaseResources();
+            _notify();
+          }
+        },
+        onError: (Object _, StackTrace trace) {
+          _cleanupFailed = true;
+          if (!_disposed) reportError('无法确认播放器已关闭，请重启应用');
+        },
+      );
+      try {
+        await cleanup.timeout(const Duration(seconds: 3));
+      } on TimeoutException {
+        timedOut = true;
+        if (!_disposed) reportError('播放器清理尚未完成，暂时无法打开视频');
+      } catch (_) {
+        // Keep the scope and block all future sessions on unconfirmed close.
+      }
+      return;
+    }
+    try {
+      for (final subscription in active.subscriptions) {
+        await subscription.cancel();
+      }
+    } catch (_) {
+      _cleanupFailed = true;
+      rethrow;
     }
     try {
       await _save(active);
@@ -1003,10 +1214,34 @@ class PlaybackSession extends ChangeNotifier {
         }
       }
     }
+    if (!keepOwnership) _releaseResources();
+  }
+
+  Future<void> _retireSafely(_ActiveSession active) async {
+    _freezeAndStop(active);
+    await Future.wait([
+      active.finalCheckpoint!,
+      active.stopping!,
+      for (final subscription in active.subscriptions) subscription.cancel(),
+    ]);
+    await Future.wait(active.subtitleReleases.map((release) => release()));
+    await active.release?.call();
+  }
+
+  void _freezeAndStop(_ActiveSession active) {
+    if (active.engine is! PlaybackSafetyCriticalDisposal ||
+        active.stopping != null) {
+      return;
+    }
+    active.finalCheckpoint = _save(active);
+    active.stopping = active.engine.dispose();
+    active.stopping!.ignore();
   }
 
   Future<void> close() {
+    if (_active case final active?) _freezeAndStop(active);
     ++_generation;
+    final closingGeneration = _generation;
     ++_subtitleSelectionGeneration;
     _clearPendingSubtitle();
     ++_subtitleRevision;
@@ -1018,10 +1253,21 @@ class PlaybackSession extends ChangeNotifier {
     loading = false;
     error = null;
     _notify();
-    return _enqueue(_retire);
+    final cleanup = _enqueue(
+      () => _retire(
+        keepOwnership: !_disposed && closingGeneration != _generation,
+      ),
+    );
+    return cleanup.timeout(
+      const Duration(seconds: 3),
+      onTimeout: () {
+        if (!_disposed) reportError('播放器清理尚未完成，暂时无法打开视频');
+      },
+    );
   }
 
   Future<void> shutdown() {
+    if (_active case final active?) _freezeAndStop(active);
     _disposed = true;
     ++_generation;
     ++_subtitleSelectionGeneration;
@@ -1042,9 +1288,13 @@ class _ActiveSession {
   final LocalMedia media;
   final PlaybackEngine engine;
   final Future<void> Function()? release;
+  Future<void>? stopping;
+  Future<void>? finalCheckpoint;
   bool completedHandled = false;
   bool manualAudio = false, audioDefaultApplied = false;
   final List<StreamSubscription<dynamic>> subscriptions = [];
+  VoidCallback? guardListener;
+  String? guardIssue;
   PlaybackFrame frame = const PlaybackFrame();
   Duration lastCheckpoint = Duration.zero;
   bool wasPlaying = false;

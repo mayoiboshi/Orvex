@@ -10,6 +10,49 @@ import FlutterMacOS
 
 /// App-owned generated fixtures only. This does not test a File Provider grant.
 final class MediaFolderAccessTests: XCTestCase {
+  private func retain(_ access: MediaFolderAccess, handle: String, path: String, identity: String? = nil) throws -> MediaFolderAccess.PlaybackSource {
+    let finished = expectation(description: "retain playback source")
+    var outcome: Result<MediaFolderAccess.PlaybackSource, Error>?
+    access.retainPlaybackSource(handle: handle, path: path, identity: identity) {
+      outcome = $0
+      finished.fulfill()
+    }
+    wait(for: [finished], timeout: 5)
+    return try XCTUnwrap(outcome).get()
+  }
+
+  func testRetainedPlaybackSourceOwnsScopeAndRejectsInvalidSources() throws {
+    #if os(iOS) && !targetEnvironment(simulator)
+    throw XCTSkip("Generated fixtures are restricted to an iOS simulator")
+    #else
+    let manager = FileManager.default
+    let root = manager.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    try manager.createDirectory(at: root, withIntermediateDirectories: true)
+    defer { try? manager.removeItem(at: root) }
+    let file = root.appendingPathComponent("video.mp4")
+    try Data([1, 2, 3]).write(to: file)
+    let messenger = FolderTestMessenger()
+    #if os(iOS)
+    let access = MediaFolderAccess(messenger: messenger, presenter: { nil })
+    #else
+    let access = MediaFolderAccess(messenger: messenger)
+    #endif
+    let selected = try access.selection(root)
+    let granted = try XCTUnwrap(try request(access, "acquire", ["grant": selected["grant"]!]) as? [String: Any])
+    let handle = try XCTUnwrap(granted["handle"] as? String)
+    XCTAssertThrowsError(try retain(access, handle: handle, path: "../outside.mp4"))
+    XCTAssertThrowsError(try retain(access, handle: handle, path: "video.mp4", identity: "incorrect-identity"))
+    var source: MediaFolderAccess.PlaybackSource? = try retain(access, handle: handle, path: "video.mp4")
+    XCTAssertEqual(source?.url.standardizedFileURL, file.standardizedFileURL)
+    weak var scope = Mirror(reflecting: try XCTUnwrap(source)).children.first { $0.label == "retainedScope" }?.value as AnyObject?
+    XCTAssertNotNil(scope, "The opaque source must own the original scope object")
+    _ = try request(access, "release", ["handle": handle])
+    XCTAssertNotNil(scope, "Releasing the handle must not release a retained scope")
+    XCTAssertThrowsError(try retain(access, handle: handle, path: "video.mp4"))
+    source = nil
+    XCTAssertNil(scope, "The scope must be released after its last owner")
+    #endif
+  }
   private func request(_ access: MediaFolderAccess, _ method: String, _ args: [String: Any]) throws -> Any? {
     let finished = expectation(description: method)
     var outcome: Any?

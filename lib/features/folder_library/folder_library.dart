@@ -402,6 +402,9 @@ class FolderLibrary extends ChangeNotifier {
           name: node.name,
           folderRoot: node.rootId,
           folderFile: node.id,
+          accessHandle: lease.handle,
+          accessPath: node.path,
+          accessIdentity: node.identity,
         ),
         release: lease.release,
       );

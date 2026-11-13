@@ -12,6 +12,7 @@ import MediaPlayer
   private var playbackVolume: PlaybackVolumeBridge?
   private var displayChannel: FlutterMethodChannel?
   private var appearanceChannel: FlutterMethodChannel?
+  private var airPlayVideo: AirPlayVideoBridge?
   private var brightnessScreen: UIScreen?
   private var originalBrightness: CGFloat?
 
@@ -30,7 +31,9 @@ import MediaPlayer
   func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {
     GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
     guard let registrar = engineBridge.pluginRegistry.registrar(forPlugin: "OrvexAudioSession") else { return }
-    folderAccess = MediaFolderAccess(messenger: registrar.messenger(), presenter: { registrar.viewController })
+    let folders = MediaFolderAccess(messenger: registrar.messenger(), presenter: { registrar.viewController })
+    folderAccess = folders
+    airPlayVideo = AirPlayVideoBridge(messenger: registrar.messenger(), registrar: registrar, folders: folders)
     let channel = FlutterMethodChannel(name: "dev.orvex/audio-session", binaryMessenger: registrar.messenger())
     audioChannel = channel
     playbackVolume = PlaybackVolumeBridge(messenger: registrar.messenger()) {

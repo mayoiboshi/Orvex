@@ -26,6 +26,62 @@ final class MediaFolderAccess: NSObject {
     }
   }
 
+  /// A validated file URL retaining the same security scope as its handle.
+  /// The URL and scope remain usable until this object is released, even if
+  /// the original Flutter handle is released in the meantime.
+  final class PlaybackSource {
+    let url: URL
+    private let retainedScope: AnyObject
+
+    fileprivate init(url: URL, retainedScope: AnyObject) {
+      self.url = url
+      self.retainedScope = retainedScope
+    }
+  }
+
+  /// Resolve and retain on the same serial queue as acquire/release. Completion
+  /// runs on the main queue for the native player owner to check its epoch.
+  func retainPlaybackSource(
+    handle: String,
+    path: String,
+    identity expectedIdentity: String?,
+    completion: @escaping (Result<PlaybackSource, Error>) -> Void
+  ) {
+    accessQueue.async {
+      let outcome = Result<PlaybackSource, Error> {
+        let args: [String: Any] = ["handle": handle, "path": path]
+        let scope = try self.scope(args)
+        let target = try self.url(args, root: scope.url)
+        guard FileManager.default.isReadableFile(atPath: target.path) else {
+          throw self.failure("视频不存在或无法读取，请重新扫描或授权")
+        }
+        if let expectedIdentity, self.identity(target) != expectedIdentity {
+          throw self.failure("文件身份已变化，请重新扫描")
+        }
+        return PlaybackSource(url: target, retainedScope: scope)
+      }
+      DispatchQueue.main.async { completion(outcome) }
+    }
+  }
+
+  /// Resolve an app-imported file with the same boundary checks used by the
+  /// folder channel. Imported files do not need a security-scoped lease.
+  func resolveImportedPlaybackSource(
+    path: String,
+    completion: @escaping (Result<URL, Error>) -> Void
+  ) {
+    accessQueue.async {
+      let outcome = Result<URL, Error> {
+        let target = try self.importedURL(["path": path])
+        guard FileManager.default.isReadableFile(atPath: target.path) else {
+          throw self.failure("视频不存在或无法读取，请重新导入")
+        }
+        return target
+      }
+      DispatchQueue.main.async { completion(outcome) }
+    }
+  }
+
   private let channel: FlutterMethodChannel
   private let accessQueue = DispatchQueue(label: "dev.orvex.folders", qos: .utility)
   private let thumbnailQueue = DispatchQueue(label: "dev.orvex.folders.thumbnail", qos: .utility)
