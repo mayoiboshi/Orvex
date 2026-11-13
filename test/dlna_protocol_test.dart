@@ -24,6 +24,70 @@ Future<void> rejects(Future<Object?> Function() f, String message) async {
 }
 
 void main() {
+  ft.test('MPEG transport stream packets set HTTP and DIDL MIME', () async {
+    final dir = await Directory.systemTemp.createTemp('orvex-dlna-ts-');
+    final loop = InternetAddress.loopbackIPv4;
+    // This is a small ffmpeg-generated MPEG-2 transport stream, not an
+    // extension-based guess. Include the Blu-ray four-byte packet prefix too.
+    final packets = await File('test/fixtures/generated-mpegts.ts')
+        .readAsBytes();
+    final m2ts = <int>[
+      for (var i = 0; i < 4; i++) ...[
+        0,
+        0,
+        0,
+        i,
+        ...packets.sublist(i * 188, (i + 1) * 188),
+      ],
+    ];
+    final malformed = List<int>.of(packets)..[3] &= 0xcf;
+    final falseSync = List<int>.filled(188 * 4, 0)
+      ..[0] = 0x47
+      ..[188] = 0x47
+      ..[376] = 0x47
+      ..[564] = 0x47;
+    try {
+      for (final (name, bytes, expected) in [
+        ('transport.bin', packets, 'video/mp2t'),
+        ('bluray.bin', m2ts, 'video/mp2t'),
+        ('short.ts', packets.sublist(0, 188 * 3), 'application/octet-stream'),
+        ('malformed.ts', malformed, 'application/octet-stream'),
+        ('false-sync.ts', falseSync, 'application/octet-stream'),
+      ]) {
+        final file = File('${dir.path}/$name');
+        await file.writeAsBytes(bytes);
+        final lease = await LeasedMediaServer.start(
+          file: file,
+          bind: loop,
+          peer: loop,
+        );
+        final client = HttpClient()..findProxy = (_) => 'DIRECT';
+        try {
+          final response = await (await client.headUrl(lease.uri)).close();
+          expect(
+            response.headers.contentType?.mimeType == expected,
+            '$name HTTP MIME',
+          );
+          await response.drain<void>();
+          final metadata = DlnaDevice.mediaMetadata(
+            lease.uri,
+            name,
+            lease.mimeType,
+          );
+          expect(
+            metadata.contains('http-get:*:$expected:*'),
+            '$name DIDL MIME',
+          );
+        } finally {
+          client.close(force: true);
+          await lease.close();
+        }
+      }
+    } finally {
+      await dir.delete(recursive: true);
+    }
+  });
+
   ft.test('EBML DocType selects WebM MIME for HTTP and DIDL', () async {
     final dir = await Directory.systemTemp.createTemp('orvex-dlna-ebml-');
     final loop = InternetAddress.loopbackIPv4;

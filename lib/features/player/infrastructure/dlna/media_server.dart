@@ -93,7 +93,29 @@ class LeasedMediaServer {
         h[11] == 0x20) {
       return 'video/x-msvideo';
     }
+    if (_isTransportStream(h)) return 'video/mp2t';
     return 'application/octet-stream';
+  }
+
+  static bool _isTransportStream(List<int> bytes) {
+    // MPEG-TS uses 188-byte packets; Blu-ray transport streams prepend a
+    // four-byte timestamp to each packet. Check four complete packet headers
+    // so that a lone sync byte or a short file is not treated as video.
+    bool matches(int packetSize, int prefix) {
+      if (bytes.length < packetSize * 4) return false;
+      for (var i = 0; i < 4; i++) {
+        final offset = i * packetSize + prefix;
+        if (bytes[offset] != 0x47) return false;
+        final adaptation = (bytes[offset + 3] >> 4) & 0x03;
+        if (adaptation == 0) return false;
+        if ((adaptation & 0x02) != 0 && bytes[offset + 4] > 183) {
+          return false;
+        }
+      }
+      return true;
+    }
+
+    return matches(188, 0) || matches(192, 4);
   }
 
   static bool _isWebm(List<int> h) {
