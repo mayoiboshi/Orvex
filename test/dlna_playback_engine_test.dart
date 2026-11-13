@@ -304,19 +304,29 @@ void main() {
   });
   test('hung local pause times out visibly but retains owner until late completion', () async {
     final localGate = PauseGateEngine();
+    // Discovery must finish before the 50 ms budget starts: this test is
+    // about a blocked local pause, not loopback HTTP scheduling latency.
+    final target = await remote.resolve('test');
     final other = DlnaPlaybackEngine(
       AirPlayPlaybackEngine(localGate, transport: NoAirPlay()),
       NativePlaybackReservation(),
-      resolveTarget: remote.resolve,
+      resolveTarget: (_) async => target,
       connectTimeout: const Duration(milliseconds: 50),
     );
+    addTearDown(() async {
+      if (!localGate.gate.isCompleted) localGate.gate.complete();
+      await other.dispose().timeout(const Duration(seconds: 3));
+      await engine.dispose().timeout(const Duration(seconds: 3));
+    });
     await other.open(
       LocalMedia(uri: File('${dir.path}/fixture').uri, name: 'fixture'),
       start: Duration.zero,
     );
     final result = other.connect('test');
-    await localGate.started.future;
-    await expectLater(result, throwsA(isA<DlnaFailure>()));
+    // Observe failures immediately even if starting the pause fails or hangs.
+    final timedOut = expectLater(result, throwsA(isA<DlnaFailure>()));
+    await localGate.started.future.timeout(const Duration(seconds: 3));
+    await timedOut.timeout(const Duration(seconds: 3));
     expect(other.phase.value, DlnaPhase.uncertain);
     expect(other.mediaSelectionLocked, isTrue);
     var closed = false;
@@ -328,23 +338,25 @@ void main() {
     expect(localGate.disposed, isFalse);
     expect(await other.airplay.prepareRoute(), isFalse);
     localGate.gate.complete();
-    await closing;
+    await closing.timeout(const Duration(seconds: 3));
     expect(localGate.disposed, isTrue);
     expect(remote.actions, isNot(contains('SetAVTransportURI')));
-    await engine.dispose();
   });
   test(
     'hung file server startup retains owner and closes late source',
     () async {
       final local2 = FakeEngine();
       final gate = Completer<void>();
+      final serverStarted = Completer<void>();
+      final target = await remote.resolve('test');
       LeasedMediaServer? lateServer;
       final other = DlnaPlaybackEngine(
         AirPlayPlaybackEngine(local2, transport: NoAirPlay()),
         NativePlaybackReservation(),
-        resolveTarget: remote.resolve,
+        resolveTarget: (_) async => target,
         connectTimeout: const Duration(milliseconds: 50),
         startServer: (file, local, peer) async {
+          serverStarted.complete();
           await gate.future;
           return lateServer = await LeasedMediaServer.start(
             file: file,
@@ -353,11 +365,21 @@ void main() {
           );
         },
       );
+      addTearDown(() async {
+        if (!gate.isCompleted) gate.complete();
+        await other.dispose().timeout(const Duration(seconds: 3));
+        await engine.dispose().timeout(const Duration(seconds: 3));
+      });
       await other.open(
         LocalMedia(uri: File('${dir.path}/fixture').uri, name: 'fixture'),
         start: Duration.zero,
       );
-      await expectLater(other.connect('test'), throwsA(isA<DlnaFailure>()));
+      final timedOut = expectLater(
+        other.connect('test'),
+        throwsA(isA<DlnaFailure>()),
+      );
+      await serverStarted.future.timeout(const Duration(seconds: 3));
+      await timedOut.timeout(const Duration(seconds: 3));
       expect(other.phase.value, DlnaPhase.uncertain);
       var closed = false;
       final closing = other.dispose().then((_) {
@@ -367,11 +389,10 @@ void main() {
       expect(closed, isFalse);
       expect(local2.disposed, isFalse);
       gate.complete();
-      await closing;
+      await closing.timeout(const Duration(seconds: 3));
       expect(lateServer, isNotNull);
       expect(local2.disposed, isTrue);
       expect(remote.actions, isNot(contains('SetAVTransportURI')));
-      await engine.dispose();
     },
   );
   test(
