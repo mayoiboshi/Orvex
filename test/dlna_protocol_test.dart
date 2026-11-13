@@ -24,6 +24,169 @@ Future<void> rejects(Future<Object?> Function() f, String message) async {
 }
 
 void main() {
+  ft.test('EBML DocType selects WebM MIME for HTTP and DIDL', () async {
+    final dir = await Directory.systemTemp.createTemp('orvex-dlna-ebml-');
+    final loop = InternetAddress.loopbackIPv4;
+    // EBML header fields precede DocType, as in a real WebM file.
+    final webm = <int>[
+      0x1a,
+      0x45,
+      0xdf,
+      0xa3,
+      0x9f,
+      0x42,
+      0x86,
+      0x81,
+      0x01,
+      0x42,
+      0xf7,
+      0x81,
+      0x01,
+      0x42,
+      0xf2,
+      0x81,
+      0x04,
+      0x42,
+      0xf3,
+      0x81,
+      0x08,
+      0x42,
+      0x82,
+      0x84,
+      0x77,
+      0x65,
+      0x62,
+      0x6d,
+      0x42,
+      0x87,
+      0x81,
+      0x02,
+      0x42,
+      0x85,
+      0x81,
+      0x02,
+    ];
+    final matroska = <int>[
+      0x1a,
+      0x45,
+      0xdf,
+      0xa3,
+      0x8b,
+      0x42,
+      0x82,
+      0x88,
+      ...ascii.encode('matroska'),
+    ];
+    try {
+      for (final (name, bytes, expected) in [
+        ('wrong.mkv', webm, 'video/webm'),
+        (
+          'multibyte.mkv',
+          <int>[
+            0x1a,
+            0x45,
+            0xdf,
+            0xa3,
+            0x40,
+            0x08,
+            0x42,
+            0x82,
+            0x40,
+            0x04,
+            ...ascii.encode('webm'),
+          ],
+          'video/webm',
+        ),
+        ('wrong.webm', matroska, 'video/x-matroska'),
+        ('truncated.webm', webm.sublist(0, 26), 'video/x-matroska'),
+        (
+          'embedded.webm',
+          <int>[
+            0x1a,
+            0x45,
+            0xdf,
+            0xa3,
+            0x8a,
+            0x42,
+            0x86,
+            0x87,
+            0x42,
+            0x82,
+            0x84,
+            ...ascii.encode('webm'),
+          ],
+          'video/x-matroska',
+        ),
+        (
+          'oversized-header.webm',
+          <int>[
+            0x1a,
+            0x45,
+            0xdf,
+            0xa3,
+            0x7f,
+            0xff,
+            0x42,
+            0x82,
+            0x84,
+            ...ascii.encode('webm'),
+          ],
+          'video/x-matroska',
+        ),
+        (
+          'oversized-element.webm',
+          <int>[
+            0x1a,
+            0x45,
+            0xdf,
+            0xa3,
+            0x87,
+            0x42,
+            0x82,
+            0x88,
+            ...ascii.encode('webm'),
+          ],
+          'video/x-matroska',
+        ),
+        (
+          'unknown.webm',
+          <int>[0x1a, 0x45, 0xdf, 0xa3, 0x80],
+          'video/x-matroska',
+        ),
+      ]) {
+        final file = File('${dir.path}/$name');
+        await file.writeAsBytes(bytes);
+        final lease = await LeasedMediaServer.start(
+          file: file,
+          bind: loop,
+          peer: loop,
+        );
+        final client = HttpClient()..findProxy = ((_) => 'DIRECT');
+        try {
+          final res = await (await client.headUrl(lease.uri)).close();
+          expect(
+            res.headers.contentType?.mimeType == expected,
+            '$name HTTP MIME',
+          );
+          await res.drain<void>();
+          final metadata = DlnaDevice.mediaMetadata(
+            lease.uri,
+            name,
+            lease.mimeType,
+          );
+          expect(
+            metadata.contains('http-get:*:$expected:*'),
+            '$name DIDL MIME',
+          );
+        } finally {
+          client.close(force: true);
+          await lease.close();
+        }
+      }
+    } finally {
+      await dir.delete(recursive: true);
+    }
+  });
   ft.test(
     'container signatures drive MIME and escaped DIDL metadata',
     () async {

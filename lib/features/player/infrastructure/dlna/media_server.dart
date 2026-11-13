@@ -50,7 +50,9 @@ class LeasedMediaServer {
     final raf = await file.open(mode: FileMode.read);
     try {
       final len = await raf.length();
-      final header = await raf.read(min(16, len));
+      // EBML's DocType follows variable-length header fields, so read a
+      // bounded prefix rather than assuming the first four bytes identify MKV.
+      final header = await raf.read(min(4096, len));
       final mime = _containerMime(header);
       final srv = await HttpServer.bind(bind, 0, shared: false);
       final rng = Random.secure();
@@ -78,7 +80,7 @@ class LeasedMediaServer {
         h[1] == 0x45 &&
         h[2] == 0xdf &&
         h[3] == 0xa3) {
-      return 'video/x-matroska';
+      return _isWebm(h) ? 'video/webm' : 'video/x-matroska';
     }
     if (h.length >= 12 &&
         h[0] == 0x52 &&
@@ -92,6 +94,59 @@ class LeasedMediaServer {
       return 'video/x-msvideo';
     }
     return 'application/octet-stream';
+  }
+
+  static bool _isWebm(List<int> h) {
+    // Scan bounded header children until DocType is found, not a full EBML
+    // validation. Parsing failures before DocType retain the Matroska fallback.
+    (int, int)? sizeAt(int offset) {
+      if (offset >= h.length) return null;
+      final first = h[offset];
+      var marker = 0x80;
+      var width = 1;
+      while (marker != 0 && first & marker == 0) {
+        marker >>= 1;
+        width++;
+      }
+      if (marker == 0 || offset + width > h.length) return null;
+      var value = first & (marker - 1);
+      for (var i = 1; i < width; i++) {
+        if (value > h.length) return null;
+        value = (value << 8) | h[offset + i];
+      }
+      return (width, value);
+    }
+
+    final headerSize = sizeAt(4);
+    if (headerSize == null) return false;
+    var offset = 4 + headerSize.$1;
+    final end = offset + headerSize.$2;
+    if (end > h.length) return false;
+    while (offset < end) {
+      final first = h[offset];
+      var marker = 0x80;
+      var idWidth = 1;
+      while (marker != 0 && first & marker == 0) {
+        marker >>= 1;
+        idWidth++;
+      }
+      if (marker == 0 || idWidth > 4 || offset + idWidth > end) return false;
+      final isDocType = idWidth == 2 && first == 0x42 && h[offset + 1] == 0x82;
+      offset += idWidth;
+      final size = sizeAt(offset);
+      if (size == null) return false;
+      offset += size.$1;
+      if (offset + size.$2 > end) return false;
+      if (isDocType) {
+        return size.$2 == 4 &&
+            h[offset] == 0x77 &&
+            h[offset + 1] == 0x65 &&
+            h[offset + 2] == 0x62 &&
+            h[offset + 3] == 0x6d;
+      }
+      offset += size.$2;
+    }
+    return false;
   }
 
   Uri get uri => Uri(
