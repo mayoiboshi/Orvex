@@ -102,6 +102,43 @@ final class AirPlayVideoBridge: NSObject, FlutterStreamHandler {
     guard args["bridgeId"] as? String == bridgeID else {
       result(FlutterError(code: "stale_bridge", message: "投屏组件已失效", details: nil)); return
     }
+    if call.method == "localRouteForIPv4" {
+      guard let targetText = args["target"] as? String else {
+        result(FlutterError(code: "invalid_argument", message: "设备地址无效", details: nil)); return
+      }
+      var target = in_addr()
+      guard targetText.withCString({ inet_pton(AF_INET, $0, &target) }) == 1 else {
+        result(FlutterError(code: "invalid_address", message: "请输入 IPv4 地址", details: nil)); return
+      }
+      let firstOctet = UInt8((UInt32(bigEndian: target.s_addr) >> 24) & 0xff)
+      guard firstOctet > 0, firstOctet < 224, firstOctet != 127 else {
+        result(FlutterError(code: "invalid_address", message: "请输入局域网单播地址", details: nil)); return
+      }
+      var head: UnsafeMutablePointer<ifaddrs>?
+      guard getifaddrs(&head) == 0 else {
+        result(FlutterError(code: "network_unavailable", message: "无法读取局域网", details: nil)); return
+      }
+      defer { freeifaddrs(head) }
+      var cursor = head
+      while let entry = cursor {
+        defer { cursor = entry.pointee.ifa_next }
+        let flags = Int32(entry.pointee.ifa_flags)
+        guard (flags & IFF_UP) != 0, (flags & IFF_LOOPBACK) == 0,
+              String(cString: entry.pointee.ifa_name).hasPrefix("en"),
+              let address = entry.pointee.ifa_addr, address.pointee.sa_family == UInt8(AF_INET),
+              let mask = entry.pointee.ifa_netmask else { continue }
+        let local = address.withMemoryRebound(to: sockaddr_in.self, capacity: 1) { $0.pointee.sin_addr.s_addr }
+        let netmask = mask.withMemoryRebound(to: sockaddr_in.self, capacity: 1) { $0.pointee.sin_addr.s_addr }
+        let remote = target.s_addr
+        guard netmask != 0, (local & netmask) == (remote & netmask),
+              remote != local, remote != (local & netmask), remote != ((local & netmask) | ~netmask) else { continue }
+        var localIP = in_addr(s_addr: local)
+        var chars = [CChar](repeating: 0, count: Int(INET_ADDRSTRLEN))
+        guard inet_ntop(AF_INET, &localIP, &chars, socklen_t(INET_ADDRSTRLEN)) != nil else { continue }
+        result(String(cString: chars)); return
+      }
+      result(FlutterError(code: "not_local", message: "设备不在直连局域网中", details: nil)); return
+    }
     if call.method == "claimPlayback" {
       guard Self.owner == nil, claimID == nil else {
         result(FlutterError(code: "owner_busy", message: "其他播放器尚未关闭", details: nil)); return

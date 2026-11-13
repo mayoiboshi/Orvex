@@ -1,3 +1,6 @@
+import '../infrastructure/dlna/dlna_playback_engine.dart';
+import 'dlna_dialog.dart';
+
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
@@ -892,7 +895,46 @@ class _PlaybackSurfaceState extends State<PlaybackSurface>
           ),
         ),
       ),
-      if (session.engine case final AirPlayPlaybackEngine airPlay)
+      if (session.engine case final DlnaPlaybackEngine dlna)
+        ValueListenableBuilder<DlnaPhase>(
+          valueListenable: dlna.phase,
+          builder: (context, phase, _) => IconButton(
+            tooltip: 'DLNA 视频投屏',
+            onPressed: session.ready
+                ? () => showDlnaDialog(context, dlna)
+                : null,
+            icon: Icon(
+              phase == DlnaPhase.active ? Icons.cast_connected : Icons.cast,
+              size: 21,
+            ),
+          ),
+        ),
+      if (session.engine case final DlnaPlaybackEngine dlna)
+        ValueListenableBuilder<AirPlayPhase>(
+          valueListenable: dlna.airplay.phaseNotifier,
+          builder: (context, phase, _) {
+            final airPlay = dlna.airplay;
+            return IconButton(
+              tooltip: 'AirPlay 视频投屏',
+              onPressed: session.ready && dlna.phase.value == DlnaPhase.idle
+                  ? () async {
+                      if (airPlay.externalActive) {
+                        await airPlay.cancelRoute();
+                      } else {
+                        await showAirPlayRouteDialog(context, session, airPlay);
+                      }
+                    }
+                  : null,
+              icon: Icon(
+                phase == AirPlayPhase.active
+                    ? Icons.airplay
+                    : Icons.airplay_outlined,
+                size: 21,
+              ),
+            );
+          },
+        )
+      else if (session.engine case final AirPlayPlaybackEngine airPlay)
         ValueListenableBuilder<AirPlayPhase>(
           valueListenable: airPlay.phaseNotifier,
           builder: (context, phase, _) => IconButton(

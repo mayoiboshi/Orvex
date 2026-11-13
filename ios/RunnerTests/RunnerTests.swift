@@ -33,6 +33,19 @@ private final class BridgeTestMessenger: NSObject, FlutterBinaryMessenger {
 
 class RunnerTests: XCTestCase {
 
+  func testDlnaRejectsNonUnicastTargets() throws {
+    let engine = FlutterEngine(name: "orvex-dlna-address-test")
+    let registrar = try XCTUnwrap(engine.registrar(forPlugin: "dlna-address-test"))
+    let messenger = BridgeTestMessenger()
+    let folders = MediaFolderAccess(messenger: messenger, presenter: { nil })
+    let bridge = AirPlayVideoBridge(messenger: messenger, registrar: registrar, folders: folders)
+    let id = try XCTUnwrap(messenger.call("identity") as? String)
+    for address in ["127.0.0.1", "224.0.0.1", "0.0.0.0", "hostname.local", "255.255.255.255"] {
+      XCTAssertNotNil(messenger.call("localRouteForIPv4", ["bridgeId": id, "target": address]) as? FlutterError, address)
+    }
+    withExtendedLifetime((bridge, engine, folders)) {}
+  }
+
   func testNativeInterruptionRequiresExplicitResume() throws {
     #if !targetEnvironment(simulator)
     throw XCTSkip("Generated media is restricted to the iOS simulator")

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../application/playback_session.dart';
 import '../infrastructure/airplay_playback_engine.dart';
+import '../infrastructure/dlna/dlna_playback_engine.dart';
 
 /// Presents Apple's real route picker after the local session is paused and
 /// AVPlayer has prepared a silent candidate. No selection is guessed from the
@@ -49,7 +50,13 @@ class _AirPlayRouteDialogState extends State<_AirPlayRouteDialog> {
   }
 
   void _checkSession() {
-    if (mounted && !identical(widget.session.engine, widget.engine)) {
+    if (mounted &&
+        !identical(widget.session.engine, widget.engine) &&
+        !(widget.session.engine is DlnaPlaybackEngine &&
+            identical(
+              (widget.session.engine as DlnaPlaybackEngine).airplay,
+              widget.engine,
+            ))) {
       Navigator.of(context).maybePop();
     }
   }
