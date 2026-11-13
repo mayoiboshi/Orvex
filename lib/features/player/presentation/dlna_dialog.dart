@@ -65,11 +65,14 @@ class _DialogState extends State<_Dialog> {
             onPressed: busy
                 ? null
                 : () async {
-                    setState(() => busy = true);
+                    setState(() {
+                      busy = true;
+                      message = null;
+                    });
                     try {
                       await widget.engine.connect(address.text);
                     } catch (e) {
-                      message = '连接失败：$e';
+                      if (mounted) message = '连接失败：$e';
                     } finally {
                       if (mounted) setState(() => busy = false);
                     }
@@ -81,11 +84,14 @@ class _DialogState extends State<_Dialog> {
             onPressed: busy
                 ? null
                 : () async {
-                    setState(() => busy = true);
+                    setState(() {
+                      busy = true;
+                      message = null;
+                    });
                     try {
                       await widget.engine.disconnect();
                     } catch (e) {
-                      message = '停止失败：$e';
+                      if (mounted) message = '停止失败：$e';
                     } finally {
                       if (mounted) setState(() => busy = false);
                     }
