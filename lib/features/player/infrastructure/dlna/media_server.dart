@@ -231,26 +231,41 @@ class LeasedMediaServer {
         res.headers.set(HttpHeaders.allowHeader, 'GET, HEAD');
       } else {
         final ranges = req.headers[HttpHeaders.rangeHeader];
-        final raw = ranges?.join(',');
+        final requestedRange = ranges?.join(',');
+        // Range applies to GET only. We do not publish a strong validator, so
+        // an If-Range condition cannot be verified and must receive the whole
+        // representation. Ignore unsupported units and multi-range requests
+        // rather than returning 416 for ranges we have not evaluated.
+        final raw =
+            req.method == 'GET' &&
+                req.headers[HttpHeaders.ifRangeHeader] == null &&
+                requestedRange != null &&
+                requestedRange.toLowerCase().startsWith('bytes=') &&
+                !requestedRange.contains(',')
+            ? requestedRange
+            : null;
         var start = 0;
         var end = _length - 1;
         if (raw != null) {
-          final range = RegExp(r'^bytes=(\d*)-(\d*)$').firstMatch(raw);
+          final range = RegExp(
+            r'^bytes=(\d*)-(\d*)$',
+            caseSensitive: false,
+          ).firstMatch(raw);
           if (range == null ||
               (range[1]!.isEmpty && range[2]!.isEmpty) ||
               _length == 0) {
             res.statusCode = HttpStatus.requestedRangeNotSatisfiable;
           } else if (range[1]!.isEmpty) {
-            final suffix = int.tryParse(range[2]!) ?? 0;
+            final suffix = _boundedRangeNumber(range[2]!, _length);
             if (suffix <= 0) {
               res.statusCode = HttpStatus.requestedRangeNotSatisfiable;
             } else {
               start = max(0, _length - suffix);
             }
           } else {
-            start = int.tryParse(range[1]!) ?? _length;
+            start = _boundedRangeNumber(range[1]!, _length);
             if (range[2]!.isNotEmpty) {
-              end = min(int.tryParse(range[2]!) ?? -1, end);
+              end = _boundedRangeNumber(range[2]!, end);
             }
             if (start >= _length || end < start) {
               res.statusCode = HttpStatus.requestedRangeNotSatisfiable;
@@ -295,6 +310,24 @@ class LeasedMediaServer {
         await req.response.close();
       } catch (_) {}
     }
+  }
+
+  // HTTP byte positions can be arbitrarily large decimal numbers. Compare
+  // their digits before parsing and cap them at the useful file boundary.
+  static int _boundedRangeNumber(String digits, int limit) {
+    var first = 0;
+    while (first < digits.length && digits.codeUnitAt(first) == 48) {
+      first++;
+    }
+    if (first == digits.length) return 0;
+    final significant = digits.substring(first);
+    final boundary = limit.toString();
+    if (significant.length > boundary.length ||
+        (significant.length == boundary.length &&
+            significant.compareTo(boundary) > 0)) {
+      return limit;
+    }
+    return int.parse(significant);
   }
 
   /// Synchronous revocation precedes asynchronous draining. A timeout by a

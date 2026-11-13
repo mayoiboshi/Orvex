@@ -24,6 +24,97 @@ Future<void> rejects(Future<Object?> Function() f, String message) async {
 }
 
 void main() {
+  ft.test('file lease handles range requests and validators safely', () async {
+    final dir = await Directory.systemTemp.createTemp('orvex-dlna-range-');
+    final loop = InternetAddress.loopbackIPv4;
+    final file = File('${dir.path}/video')..writeAsStringSync('0123456789');
+    final lease = await LeasedMediaServer.start(
+      file: file,
+      bind: loop,
+      peer: loop,
+    );
+    final client = HttpClient()..findProxy = (_) => 'DIRECT';
+    try {
+      for (final (method, range, ifRange, status, length, body, contentRange)
+          in <(String, String, String?, int, int, String, String?)>[
+            ('HEAD', 'bytes=2-4', null, 200, 10, '', null),
+            ('HEAD', 'bytes=20-', null, 200, 10, '', null),
+            ('GET', 'widgets=0-1', null, 200, 10, '0123456789', null),
+            ('GET', 'bytes=0-1,4-5', null, 200, 10, '0123456789', null),
+            ('GET', 'bytes=2-4', '"stale"', 200, 10, '0123456789', null),
+            ('GET', 'bytes=2-4', null, 206, 3, '234', 'bytes 2-4/10'),
+            ('GET', 'BYTES=-3', null, 206, 3, '789', 'bytes 7-9/10'),
+            ('GET', 'bytes=8-', null, 206, 2, '89', 'bytes 8-9/10'),
+            (
+              'GET',
+              'bytes=0-999999999999999999999999',
+              null,
+              206,
+              10,
+              '0123456789',
+              'bytes 0-9/10',
+            ),
+            (
+              'GET',
+              'bytes=-999999999999999999999999',
+              null,
+              206,
+              10,
+              '0123456789',
+              'bytes 0-9/10',
+            ),
+            (
+              'GET',
+              'bytes=999999999999999999999999-',
+              null,
+              416,
+              0,
+              '',
+              'bytes */10',
+            ),
+            (
+              'GET',
+              'bytes=0000000000000000000001-2',
+              null,
+              206,
+              2,
+              '12',
+              'bytes 1-2/10',
+            ),
+            ('GET', 'bytes=20-', null, 416, 0, '', 'bytes */10'),
+            ('GET', 'bytes=x-y', null, 416, 0, '', 'bytes */10'),
+          ]) {
+        final request = await client.openUrl(method, lease.uri);
+        request.headers.set(HttpHeaders.rangeHeader, range);
+        if (ifRange != null) {
+          request.headers.set(HttpHeaders.ifRangeHeader, ifRange);
+        }
+        final response = await request.close();
+        final bytes = await response.fold<List<int>>(
+          [],
+          (a, b) => a..addAll(b),
+        );
+        expect(response.statusCode == status, '$method $range status');
+        expect(response.contentLength == length, '$method $range length');
+        expect(ascii.decode(bytes) == body, '$method $range body');
+        expect(
+          response.headers.value(HttpHeaders.contentRangeHeader) ==
+              contentRange,
+          '$method $range Content-Range',
+        );
+      }
+      final denied = await client.getUrl(lease.uri.replace(path: '/invalid'));
+      denied.headers.set(HttpHeaders.rangeHeader, 'bytes=1-2');
+      final deniedResponse = await denied.close();
+      expect(deniedResponse.statusCode == 404, 'range does not bypass token');
+      await deniedResponse.drain<void>();
+    } finally {
+      client.close(force: true);
+      await lease.close();
+      await dir.delete(recursive: true);
+    }
+  });
+
   ft.test('QuickTime major brand selects MIME for HTTP and DIDL', () async {
     final dir = await Directory.systemTemp.createTemp('orvex-dlna-mov-');
     final loop = InternetAddress.loopbackIPv4;
