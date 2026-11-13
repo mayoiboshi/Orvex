@@ -346,7 +346,14 @@ class DlnaPlaybackEngine
     if (h == null || mm == null || ss == null || mm > 59 || ss > 59) {
       return null;
     }
-    return Duration(hours: h, minutes: mm, seconds: ss);
+    // Duration stores signed 64-bit microseconds. A device can return a
+    // syntactically valid time whose conversion would otherwise overflow and
+    // become a negative position or duration.
+    const maxSeconds = 0x7fffffffffffffff ~/ Duration.microsecondsPerSecond;
+    if (h > maxSeconds ~/ Duration.secondsPerHour) return null;
+    final seconds = h * Duration.secondsPerHour + mm * 60 + ss;
+    if (seconds > maxSeconds) return null;
+    return Duration(seconds: seconds);
   }
 
   void _startPoll(int generation) {

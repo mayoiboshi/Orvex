@@ -112,7 +112,10 @@ class FailedLocalSeekEngine extends FakeEngine {
 class Renderer {
   late HttpServer server;
   final actions = <String>[];
-  String status = 'STOPPED', position = '00:00:00', track = '';
+  String status = 'STOPPED',
+      position = '00:00:00',
+      duration = '00:02:00',
+      track = '';
   bool ignoreStop = false,
       ignorePause = false,
       ignoreSeek = false,
@@ -187,7 +190,7 @@ class Renderer {
           }
           if (action == 'Pause' && !ignorePause) status = 'PAUSED_PLAYBACK';
           final fields = action == 'GetPositionInfo'
-              ? '<RelTime>$oldPosition</RelTime><TrackDuration>00:02:00</TrackDuration><TrackURI>$track</TrackURI>'
+              ? '<RelTime>$oldPosition</RelTime><TrackDuration>$duration</TrackDuration><TrackURI>$track</TrackURI>'
               : action == 'GetTransportInfo'
               ? '<CurrentTransportState>$status</CurrentTransportState>'
               : '';
@@ -264,6 +267,40 @@ void main() {
   tearDown(() async {
     await remote.close();
     await dir.delete(recursive: true);
+  });
+  test('poll rejects overflowing remote position and duration', () async {
+    await engine.connect('test');
+
+    Future<PlaybackFrame> poll(String position, String duration) {
+      final next = engine.frames.first.timeout(const Duration(seconds: 3));
+      remote.position = position;
+      remote.duration = duration;
+      return next;
+    }
+
+    final normal = await poll('00:00:21', '00:02:03');
+    expect(normal.position, const Duration(seconds: 21));
+    expect(normal.duration, const Duration(seconds: 123));
+
+    final overflowing = await poll(
+      '2562047789:00:00',
+      '999999999999999999:00:00',
+    );
+    expect(overflowing.position, normal.position);
+    expect(overflowing.duration, normal.duration);
+
+    // The largest whole second in a signed 64-bit microsecond Duration is
+    // accepted, but the immediately following second must be ignored.
+    const maximum = Duration(seconds: 9223372036854);
+    final boundary = await poll('2562047788:00:54', '2562047788:00:54');
+    expect(boundary.position, maximum);
+    expect(boundary.duration, maximum);
+    final tooLarge = await poll('2562047788:00:55', '00:60:00');
+    expect(tooLarge.position, maximum);
+    expect(tooLarge.duration, maximum);
+
+    await engine.disconnect();
+    await engine.dispose();
   });
   test('hung local pause times out visibly but retains owner until late completion', () async {
     final localGate = PauseGateEngine();
