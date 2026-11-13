@@ -1030,6 +1030,35 @@ void main() {
     await engine.disconnect();
     await engine.dispose();
   });
+  test('disconnect restores the latest verified remote position', () async {
+    final frames = <PlaybackFrame>[];
+    final sub = engine.frames.listen(frames.add);
+    await engine.connect('test');
+    // A receiver-side seek after the last poll must be captured before Stop.
+    remote.position = '00:01:15';
+    await engine.disconnect();
+    expect(local.seeks.last, const Duration(seconds: 75));
+    expect(frames.last.position, const Duration(seconds: 75));
+    await sub.cancel();
+    await engine.dispose();
+  });
+  test(
+    'disconnect retains the confirmed checkpoint for invalid remote time',
+    () async {
+      final frames = <PlaybackFrame>[];
+      final sub = engine.frames.listen(frames.add);
+      await engine.connect('test');
+      remote.position = '00:00:40';
+      await engine.frames.first.timeout(const Duration(seconds: 3));
+      expect(frames.last.position, const Duration(seconds: 40));
+      remote.position = 'NOT_IMPLEMENTED';
+      await engine.disconnect();
+      expect(local.seeks.last, const Duration(seconds: 40));
+      expect(frames.last.position, const Duration(seconds: 40));
+      await sub.cancel();
+      await engine.dispose();
+    },
+  );
   test('foreign track does not overwrite progress or receive Stop', () async {
     final frames = <PlaybackFrame>[];
     final sub = engine.frames.listen(frames.add);
@@ -1089,6 +1118,7 @@ void main() {
     'a track switched after Stop cannot confirm another item state',
     () async {
       await engine.connect('test');
+      remote.position = '00:01:15';
       remote.switchOnStop = true;
       await expectLater(engine.disconnect(), throwsA(isA<DlnaFailure>()));
       expect(engine.phase.value, DlnaPhase.uncertain);

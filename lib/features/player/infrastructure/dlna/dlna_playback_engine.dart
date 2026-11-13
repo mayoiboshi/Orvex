@@ -430,11 +430,12 @@ class DlnaPlaybackEngine
     }
   }
 
-  Future<void> _verifyCurrentTrack() async {
+  Future<Duration?> _verifyCurrentTrack() async {
     final info = await _device!.command('GetPositionInfo', {
       'InstanceID': '0',
     }, timeout: const Duration(seconds: 1));
     _checkTrack(info);
+    return _parseTime(info['RelTime']);
   }
 
   Future<Duration> _confirmPosition(Duration target) async {
@@ -522,7 +523,7 @@ class DlnaPlaybackEngine
     _poll?.cancel();
     var remoteStopped = false;
     try {
-      await _verifyCurrentTrack();
+      final lastPosition = await _verifyCurrentTrack() ?? _remote.position;
       if (_disposed || generation != _generation) {
         throw DlnaFailure('停止请求已失效');
       }
@@ -544,7 +545,7 @@ class DlnaPlaybackEngine
         }
         return;
       }
-      await airplay.seek(_remote.position);
+      await airplay.seek(lastPosition);
       if (_disposed || generation != _generation) {
         _remoteTouched = false;
         if (_disposed) {
@@ -569,7 +570,7 @@ class DlnaPlaybackEngine
       _authoritative = false;
       _remoteTouched = false;
       _frames.add(
-        PlaybackFrame(position: _remote.position, duration: _remote.duration),
+        PlaybackFrame(position: lastPosition, duration: _remote.duration),
       );
       _set(DlnaPhase.idle);
     } catch (_) {
