@@ -24,6 +24,56 @@ Future<void> rejects(Future<Object?> Function() f, String message) async {
 }
 
 void main() {
+  ft.test('QuickTime major brand selects MIME for HTTP and DIDL', () async {
+    final dir = await Directory.systemTemp.createTemp('orvex-dlna-mov-');
+    final loop = InternetAddress.loopbackIPv4;
+    // An ffmpeg-generated MOV, including its complete `qt  ` ftyp box.
+    final mov = await File('test/fixtures/generated-quicktime.mov')
+        .readAsBytes();
+    final mp4Brand = List<int>.of(mov)..setRange(8, 12, ascii.encode('isom'));
+    final invalidSize = List<int>.of(mov)..[3] = 15;
+    try {
+      for (final (name, bytes, expected) in [
+        ('wrong.mp4', mov, 'video/quicktime'),
+        ('wrong.mov', mp4Brand, 'video/mp4'),
+        ('truncated.mov', mov.sublist(0, 19), 'video/mp4'),
+        ('invalid.mov', invalidSize, 'video/mp4'),
+        ('short.mov', mov.sublist(0, 8), 'video/mp4'),
+      ]) {
+        final file = File('${dir.path}/$name');
+        await file.writeAsBytes(bytes);
+        final lease = await LeasedMediaServer.start(
+          file: file,
+          bind: loop,
+          peer: loop,
+        );
+        final client = HttpClient()..findProxy = (_) => 'DIRECT';
+        try {
+          final response = await (await client.headUrl(lease.uri)).close();
+          expect(
+            response.headers.contentType?.mimeType == expected,
+            '$name HTTP MIME',
+          );
+          await response.drain<void>();
+          final metadata = DlnaDevice.mediaMetadata(
+            lease.uri,
+            name,
+            lease.mimeType,
+          );
+          expect(
+            metadata.contains('http-get:*:$expected:*'),
+            '$name DIDL MIME',
+          );
+        } finally {
+          client.close(force: true);
+          await lease.close();
+        }
+      }
+    } finally {
+      await dir.delete(recursive: true);
+    }
+  });
+
   ft.test('MPEG transport stream packets set HTTP and DIDL MIME', () async {
     final dir = await Directory.systemTemp.createTemp('orvex-dlna-ts-');
     final loop = InternetAddress.loopbackIPv4;

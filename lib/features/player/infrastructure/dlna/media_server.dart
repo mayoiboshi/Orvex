@@ -73,6 +73,17 @@ class LeasedMediaServer {
         h[5] == 0x74 &&
         h[6] == 0x79 &&
         h[7] == 0x70) {
+      // QuickTime uses an ISO-style ftyp box too, but its major brand is
+      // `qt  `. Only trust the brand when the complete bounded box is present.
+      final size = (h[0] << 24) | (h[1] << 16) | (h[2] << 8) | h[3];
+      if (size >= 16 &&
+          size <= h.length &&
+          h[8] == 0x71 &&
+          h[9] == 0x74 &&
+          h[10] == 0x20 &&
+          h[11] == 0x20) {
+        return 'video/quicktime';
+      }
       return 'video/mp4';
     }
     if (h.length >= 4 &&
