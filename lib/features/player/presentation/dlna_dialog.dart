@@ -41,7 +41,7 @@ class _DialogState extends State<_Dialog> {
             if (phase == DlnaPhase.idle)
               TextField(
                 controller: address,
-                keyboardType: TextInputType.number,
+                keyboardType: TextInputType.url,
                 decoration: const InputDecoration(
                   labelText: '设备 IPv4 地址',
                   hintText: '例如 192.168.1.10',

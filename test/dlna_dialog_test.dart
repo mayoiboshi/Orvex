@@ -55,8 +55,10 @@ class _RetryEngine extends DlnaPlaybackEngine {
   }
 
   Completer<void>? attempt;
+  String? lastAddress;
   @override
   Future<void> connect(String address) async {
+    lastAddress = address;
     await attempt!.future;
     phase.value = DlnaPhase.active;
   }
@@ -94,9 +96,16 @@ void main() {
     await tester.tap(find.text('打开'));
     await tester.pumpAndSettle();
 
+    expect(
+      tester.widget<TextField>(find.byType(TextField)).keyboardType,
+      TextInputType.url,
+    );
+    await tester.enterText(find.byType(TextField), '192.168.1.10');
+
     engine.attempt = Completer<void>();
     await tester.tap(find.text('连接'));
     await tester.pump();
+    expect(engine.lastAddress, '192.168.1.10');
     engine.attempt!.completeError(StateError('首次失败'));
     await tester.pump();
     expect(find.textContaining('首次失败'), findsOneWidget);
