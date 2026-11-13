@@ -39,6 +39,9 @@ class _RouteEngine extends AirPlayPlaybackEngine {
   int prepares = 0;
   int cancels = 0;
   Completer<void>? gate;
+  Completer<void>? cancelGate;
+  bool cancelFails = false;
+  bool disposed = false;
   @override
   bool get externalActive => active;
   @override
@@ -46,15 +49,26 @@ class _RouteEngine extends AirPlayPlaybackEngine {
     prepares++;
     phaseNotifier.value = AirPlayPhase.preparing;
     if (gate != null) await gate!.future;
-    phaseNotifier.value = AirPlayPhase.choosing;
+    if (!disposed) phaseNotifier.value = AirPlayPhase.choosing;
     return true;
   }
 
   @override
   Future<void> cancelRoute() async {
     cancels++;
+    if (cancelGate != null) await cancelGate!.future;
     active = false;
-    phaseNotifier.value = AirPlayPhase.idle;
+    if (!disposed) {
+      phaseNotifier.value = cancelFails
+          ? AirPlayPhase.failed
+          : AirPlayPhase.idle;
+    }
+  }
+
+  @override
+  Future<void> dispose() async {
+    disposed = true;
+    await super.dispose();
   }
 }
 
@@ -79,6 +93,9 @@ void main() {
     });
     tearDown(() async {
       if (engine.gate case final gate? when !gate.isCompleted) gate.complete();
+      if (engine.cancelGate case final gate? when !gate.isCompleted) {
+        gate.complete();
+      }
       await session.close().timeout(const Duration(seconds: 2));
       session.dispose();
       await local.cleanUp().timeout(const Duration(seconds: 2));
@@ -132,6 +149,114 @@ void main() {
       engine.gate!.complete();
       await tester.pump();
       expect(engine.cancels, 1);
+    });
+    testWidgets('late cancel after session close cannot pop the page', (
+      tester,
+    ) async {
+      engine.active = true;
+      engine.phaseNotifier.value = AirPlayPhase.active;
+      engine.cancelGate = Completer<void>();
+      await tester.pumpWidget(host());
+      await tester.tap(find.text('open'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('结束视频投屏'));
+      await tester.pump();
+      expect(engine.cancels, 1);
+      expect(
+        tester
+            .widget<TextButton>(
+              find.ancestor(
+                of: find.text('完成'),
+                matching: find.byType(TextButton),
+              ),
+            )
+            .onPressed,
+        isNull,
+      );
+
+      late Future<void> closing;
+      await tester.runAsync(() async {
+        closing = session.close();
+      });
+      await tester.pump();
+      engine.cancelGate!.complete();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+      expect(find.text('open'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      await tester.runAsync(() => closing.timeout(const Duration(seconds: 2)));
+    });
+    testWidgets('cancel failure is not retried when the dialog closes', (
+      tester,
+    ) async {
+      engine.cancelFails = true;
+      await tester.pumpWidget(host());
+      await tester.tap(find.text('open'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('取消'));
+      await tester.pumpAndSettle();
+      expect(engine.cancels, 1);
+      expect(engine.phaseNotifier.value, AirPlayPhase.failed);
+      expect(find.text('open'), findsOneWidget);
+    });
+    testWidgets('late cancel removes only its own covered dialog', (
+      tester,
+    ) async {
+      final navigatorKey = GlobalKey<NavigatorState>();
+      engine.active = true;
+      engine.phaseNotifier.value = AirPlayPhase.active;
+      engine.cancelGate = Completer<void>();
+      await tester.pumpWidget(
+        MaterialApp(
+          navigatorKey: navigatorKey,
+          home: Scaffold(
+            body: Builder(
+              builder: (context) => TextButton(
+                onPressed: () =>
+                    showAirPlayRouteDialog(context, session, engine),
+                child: const Text('open'),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.text('open'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('结束视频投屏'));
+      await tester.pump();
+      navigatorKey.currentState!.push<void>(
+        MaterialPageRoute<void>(
+          builder: (_) => const Scaffold(body: Text('other route')),
+        ),
+      );
+      await tester.pumpAndSettle();
+      engine.cancelGate!.complete();
+      await tester.pumpAndSettle();
+      expect(find.text('other route'), findsOneWidget);
+      navigatorKey.currentState!.pop();
+      await tester.pumpAndSettle();
+      expect(find.text('open'), findsOneWidget);
+      expect(find.text('结束视频投屏'), findsNothing);
+      expect(engine.cancels, 1);
+    });
+    testWidgets('late prepare after session close cannot show stale dialog', (
+      tester,
+    ) async {
+      engine.gate = Completer<void>();
+      await tester.pumpWidget(host());
+      await tester.tap(find.text('open'));
+      await tester.pump();
+      late Future<void> closing;
+      await tester.runAsync(() async {
+        closing = session.close();
+      });
+      await tester.pump();
+      engine.gate!.complete();
+      await tester.pumpAndSettle();
+      expect(find.text('AirPlay 视频投屏'), findsNothing);
+      expect(find.text('open'), findsOneWidget);
+      expect(engine.cancels, 0);
+      await tester.runAsync(() => closing.timeout(const Duration(seconds: 2)));
     });
   });
   for (final wrapped in [false, true]) {

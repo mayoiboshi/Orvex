@@ -18,6 +18,7 @@ Future<void> showAirPlayRouteDialog(
   _openRoutes[engine] = true;
   try {
     final existingRoute = engine.externalActive;
+    var cancelRequested = false;
     if (!existingRoute) {
       final prepared = await engine.prepareRoute();
       if (!context.mounted) {
@@ -33,26 +34,52 @@ Future<void> showAirPlayRouteDialog(
         return;
       }
     }
+    if (!context.mounted || !_ownsEngine(session, engine)) return;
     await showDialog<void>(
       context: context,
       barrierDismissible: false,
-      builder: (_) => _AirPlayRouteDialog(session: session, engine: engine),
+      builder: (_) => _AirPlayRouteDialog(
+        session: session,
+        engine: engine,
+        onCancel: () {
+          cancelRequested = true;
+          return engine.cancelRoute();
+        },
+      ),
     );
-    if (!existingRoute && !engine.externalActive) await engine.cancelRoute();
+    if (!existingRoute &&
+        !cancelRequested &&
+        !engine.externalActive &&
+        _ownsEngine(session, engine)) {
+      await engine.cancelRoute();
+    }
   } finally {
     _openRoutes[engine] = false;
   }
 }
 
+bool _ownsEngine(PlaybackSession session, AirPlayPlaybackEngine engine) =>
+    identical(session.engine, engine) ||
+    (session.engine is DlnaPlaybackEngine &&
+        identical((session.engine as DlnaPlaybackEngine).airplay, engine));
+
 class _AirPlayRouteDialog extends StatefulWidget {
-  const _AirPlayRouteDialog({required this.session, required this.engine});
+  const _AirPlayRouteDialog({
+    required this.session,
+    required this.engine,
+    required this.onCancel,
+  });
   final PlaybackSession session;
   final AirPlayPlaybackEngine engine;
+  final Future<void> Function() onCancel;
   @override
   State<_AirPlayRouteDialog> createState() => _AirPlayRouteDialogState();
 }
 
 class _AirPlayRouteDialogState extends State<_AirPlayRouteDialog> {
+  bool _closing = false;
+  bool _ending = false;
+
   @override
   void initState() {
     super.initState();
@@ -60,14 +87,30 @@ class _AirPlayRouteDialogState extends State<_AirPlayRouteDialog> {
   }
 
   void _checkSession() {
-    if (mounted &&
-        !identical(widget.session.engine, widget.engine) &&
-        !(widget.session.engine is DlnaPlaybackEngine &&
-            identical(
-              (widget.session.engine as DlnaPlaybackEngine).airplay,
-              widget.engine,
-            ))) {
-      Navigator.of(context).maybePop();
+    if (mounted && !_ownsEngine(widget.session, widget.engine)) _closeDialog();
+  }
+
+  void _closeDialog() {
+    if (!mounted || _closing) return;
+    final route = ModalRoute.of(context);
+    if (route == null || !route.isActive) return;
+    _closing = true;
+    final navigator = Navigator.of(context);
+    if (route.isCurrent) {
+      navigator.pop();
+    } else {
+      navigator.removeRoute(route);
+    }
+  }
+
+  Future<void> _endRoute() async {
+    if (_ending || _closing) return;
+    setState(() => _ending = true);
+    try {
+      await widget.onCancel();
+      if (mounted) _closeDialog();
+    } finally {
+      if (mounted) setState(() => _ending = false);
     }
   }
 
@@ -104,15 +147,12 @@ class _AirPlayRouteDialogState extends State<_AirPlayRouteDialog> {
       ),
       actions: [
         TextButton(
-          onPressed: () async {
-            await widget.engine.cancelRoute();
-            if (context.mounted) Navigator.of(context).pop();
-          },
+          onPressed: _ending ? null : _endRoute,
           child: Text(phase == AirPlayPhase.active ? '结束视频投屏' : '取消'),
         ),
         if (phase == AirPlayPhase.active)
           TextButton(
-            onPressed: () => Navigator.of(context).pop(),
+            onPressed: _ending ? null : _closeDialog,
             child: const Text('完成'),
           ),
       ],
