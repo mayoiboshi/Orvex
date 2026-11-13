@@ -2,6 +2,13 @@
 
 更新日期：2026-11-10。当前交付优先 iPadOS。iPhone 核心播放、Bangumi 柯南个案和历史路径修复已有用户反馈；其余平台与场景按下文区分。本文件保留验证历史，当前能力清单统一见 [ROADMAP](../ROADMAP.md)。
 
+## iOS 投屏与 DLNA WebM 格式识别（2026-11-13）
+
+- DLNA 文件服务按有界 EBML 头部的 DocType 识别 WebM，向接收设备提供 `video/webm`；Matroska 及识别前无法解析的头部保留原有回退。测试覆盖扩展名不一致、多字节长度、伪装子串和截断或过大头部；生成的 WebM 样本在本机验证 HTTP MIME 正确。
+- 正式工作区执行 `./scripts/check`：格式检查和静态分析通过，336 项普通测试通过；AirPlay/DLNA 专项 76 项通过。AirPlay、DLNA 和 WebM 修复的三个隔离快照分别通过 287、335、336 项检查及 iOS 模拟器 Debug 构建。以上均不等同于真实接收器验收。
+- `./scripts/flutterw build ios --release --no-codesign --no-pub --target lib/main.dart` 通过。签名 Release 构建因 Xcode 无账户且缺少 `dev.orvex.orvex` 对应开发描述文件而失败；设备列表中 iPad Pro 2022 和 iPhone 17 Pro Max 均显示 unavailable，本轮未覆盖安装或启动。
+- **Not Tested**：真实 AirPlay/DLNA 接收器的画面、声音、控制、断线和 WebM 兼容性，以及真实 File Provider 授权；无法依据本轮自动测试判断电视是否接受 WebM。
+
 ## iOS DLNA 手动地址投送（2026-11-11）
 
 - 代码实现手动输入同一局域网 IPv4，对该地址单播查询并校验设备；无自动发现。选中文件以临时令牌和目标 IP 限制提供，停止与进度依靠设备报告，未知状态保持锁定。外挂字幕与字幕样式不随投送；内嵌轨道、格式和编码受接收设备限制。
