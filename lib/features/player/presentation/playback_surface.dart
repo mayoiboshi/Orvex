@@ -917,13 +917,7 @@ class _PlaybackSurfaceState extends State<PlaybackSurface>
             return IconButton(
               tooltip: 'AirPlay 视频投屏',
               onPressed: session.ready && dlna.phase.value == DlnaPhase.idle
-                  ? () async {
-                      if (airPlay.externalActive) {
-                        await airPlay.cancelRoute();
-                      } else {
-                        await showAirPlayRouteDialog(context, session, airPlay);
-                      }
-                    }
+                  ? () => showAirPlayRouteDialog(context, session, airPlay)
                   : null,
               icon: Icon(
                 phase == AirPlayPhase.active
@@ -938,17 +932,9 @@ class _PlaybackSurfaceState extends State<PlaybackSurface>
         ValueListenableBuilder<AirPlayPhase>(
           valueListenable: airPlay.phaseNotifier,
           builder: (context, phase, _) => IconButton(
-            tooltip: phase == AirPlayPhase.active
-                ? '结束 AirPlay 视频投屏'
-                : 'AirPlay 视频投屏',
+            tooltip: 'AirPlay 视频投屏',
             onPressed: session.ready
-                ? () async {
-                    if (airPlay.externalActive) {
-                      await airPlay.cancelRoute();
-                    } else {
-                      await showAirPlayRouteDialog(context, session, airPlay);
-                    }
-                  }
+                ? () => showAirPlayRouteDialog(context, session, airPlay)
                 : null,
             icon: Icon(
               phase == AirPlayPhase.active
