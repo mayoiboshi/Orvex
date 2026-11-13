@@ -4,6 +4,8 @@ import '../application/playback_session.dart';
 import '../infrastructure/airplay_playback_engine.dart';
 import '../infrastructure/dlna/dlna_playback_engine.dart';
 
+final _openRoutes = Expando<bool>();
+
 /// Presents Apple's real route picker after the local session is paused and
 /// AVPlayer has prepared a silent candidate. No selection is guessed from the
 /// picker closing; only the native external-video state can activate casting.
@@ -12,26 +14,34 @@ Future<void> showAirPlayRouteDialog(
   PlaybackSession session,
   AirPlayPlaybackEngine engine,
 ) async {
-  final prepared = await engine.prepareRoute();
-  if (!context.mounted) {
-    await engine.cancelRoute();
-    return;
-  }
-  if (!prepared) {
-    final message = engine.issue ?? '无法准备 AirPlay，播放已暂停';
-    await engine.cancelRoute();
-    if (context.mounted) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(message)));
+  if (_openRoutes[engine] == true) return;
+  _openRoutes[engine] = true;
+  try {
+    final existingRoute = engine.externalActive;
+    if (!existingRoute) {
+      final prepared = await engine.prepareRoute();
+      if (!context.mounted) {
+        if (prepared) await engine.cancelRoute();
+        return;
+      }
+      if (!prepared) {
+        final message = engine.issue ?? '无法准备 AirPlay，播放已暂停';
+        if (context.mounted) {
+          ScaffoldMessenger.of(context)
+              .showSnackBar(SnackBar(content: Text(message)));
+        }
+        return;
+      }
     }
-    return;
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => _AirPlayRouteDialog(session: session, engine: engine),
+    );
+    if (!existingRoute && !engine.externalActive) await engine.cancelRoute();
+  } finally {
+    _openRoutes[engine] = false;
   }
-  await showDialog<void>(
-    context: context,
-    barrierDismissible: false,
-    builder: (_) => _AirPlayRouteDialog(session: session, engine: engine),
-  );
-  if (!engine.externalActive) await engine.cancelRoute();
 }
 
 class _AirPlayRouteDialog extends StatefulWidget {
