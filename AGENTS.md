@@ -74,3 +74,4 @@
 - 第二批独立审查已完成，末尾交付为 `8e996ed`。下一批从该提交之后起算，结果见 [验证记录](docs/verification/STATUS.md)。
 - 第三批独立审查已完成，末尾交付为 `9826f27`。下一批从该提交之后起算，结果见 [验证记录](docs/verification/STATUS.md)。
 - 第四批独立审查已完成，末尾交付为 `dac8bb3`。下一批从该提交之后起算，结果见 [验证记录](docs/verification/STATUS.md)。
+- 第六批独立审查已完成，末尾交付为 `706df82`。下一批从该提交之后起算，结果见 [验证记录](docs/verification/STATUS.md)。
