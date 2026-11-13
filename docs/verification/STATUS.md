@@ -2,6 +2,18 @@
 
 更新日期：2026-11-10。当前交付优先 iPadOS。iPhone 核心播放、Bangumi 柯南个案和历史路径修复已有用户反馈；其余平台与场景按下文区分。本文件保留验证历史，当前能力清单统一见 [ROADMAP](../ROADMAP.md)。
 
+## AirPlay 无接收器集成复验（2026-11-13）
+
+- 新建专用 iPad Pro 11 英寸 M5、iOS 27.2 模拟器 `82D5B6B0-5622-4759-8976-29CD292D5ED9`；两项测试均在导入生成素材之前断言原生 `isSimulator`。使用下列命令分别执行，均以退出码 0 通过（各 1 项）；测试结束后该临时模拟器已关闭并删除。复现时须新建模拟器并替换 ID，不得使用物理设备。
+
+  ```bash
+  ./scripts/flutterw test --no-pub integration_test/airplay_native_test.dart -d 82D5B6B0-5622-4759-8976-29CD292D5ED9 --no-uninstall --dart-define=ORVEX_SILENT_SIMULATOR_TEST=true
+  ./scripts/flutterw test --no-pub integration_test/airplay_flow_test.dart -d 82D5B6B0-5622-4759-8976-29CD292D5ED9 --no-uninstall --dart-define=ORVEX_SILENT_SIMULATOR_TEST=true
+  ```
+
+- 原生测试验证无视频路由时的候选准备、定位、所有权与取消；流程测试验证无接收器时进入面板、取消后保持暂停和手动恢复。流程测试的媒体内核显式使用 `silentAudioForTesting`，不构成声音验收。构建提示 `media_kit_libs_ios_video` 和 `media_kit_video` 尚不支持 iOS Swift Package Manager、未来 Flutter 版本可能将其视为错误；本次构建及测试通过。
+- **Not Tested**：真实 AirPlay 接收器画面、声音、路由切换、断线、File Provider 和真机行为。本次只运行集成测试入口，未构建或安装正式包。
+
 ## 第六批十次交付独立审查（2026-11-13）
 
 - 范围为 `cbc9f02` 之后至 `706df82` 的十项已推送修复和功能，文档提交 `8f8f8fe` 不计。审查重点为本批新增投屏、文件服务和播放资源所有权，以及相关回归。
